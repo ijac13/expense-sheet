@@ -187,7 +187,7 @@ The app uses a **tiered security model** — friction matches risk. Logging an e
 | Layer | Requirement |
 |-------|-------------|
 | Sign-in | Google Sign-In only — no passwords stored in the app |
-| Session timeout | Auto sign-out after 30 minutes of inactivity |
+| Session timeout | Auto sign-out after 1 minute of inactivity |
 | Token expiry | Firebase Auth tokens expire after 1 hour — enforced, not extended |
 | Report access | Requires Google re-authentication before the reports screen loads. If the user has Google 2FA enabled on their account, it applies automatically here — no separate 2FA system to build. |
 | Data in transit | HTTPS only — Firebase Hosting enforces this |
