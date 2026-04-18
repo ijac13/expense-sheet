@@ -153,16 +153,30 @@ Access is controlled by this tab. Only emails listed here can sign in to the app
 | language | string | Preferred language: `en` or `zh` |
 | created_at | datetime | When user was added |
 
+## Platform
+
+This is a **mobile-optimized web app**, not a native app. One codebase works across iOS and Android through the browser — no App Store submission needed. It can be installed as a **PWA (Progressive Web App)**: users add it to their home screen and it runs full-screen without browser chrome, feeling like a native app.
+
+## UI Design
+
+UI is designed using **Claude Design** (anthropic.com/news/claude-design-anthropic-labs) — Anthropic's collaborative visual creation tool. Two touchpoints:
+
+- **Project setup:** Claude Design establishes the design system (colors, typography, components) as the visual foundation for the whole app.
+- **Each feature's spec:** A Claude Design prototype is attached as the UI contract before the build agent writes any code. The build agent implements exactly what the prototype shows.
+
+Design system output is committed to the repo so build agents have a consistent reference.
+
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
-| Frontend | Next.js (React), mobile-first |
+| Frontend | Next.js (React), mobile-optimized web app (PWA) |
 | Hosting | Firebase Hosting |
 | Backend | Firebase Functions (Node.js) |
 | Database | Google Sheets API |
 | Auth | Firebase Authentication — Google Sign-In only |
 | Subscription scheduler | Google Apps Script (time-based trigger) |
+| UI design | Claude Design |
 
 **Cost:** All within Google/Firebase free tiers. Expected monthly cost: $0.
 
@@ -198,7 +212,7 @@ GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
 
 1. Create a new Google Spreadsheet in Google Drive
 2. Create the 4 tabs (Expenses, Categories, Subscriptions, Users) with the columns above
-3. Seed the Categories tab with the 20 default categories
+3. Seed the Categories tab with the default categories
 4. Add both user emails to the Users tab
 5. Share the Spreadsheet with both user emails (Editor access)
 6. Create a Firebase project — enable Hosting, Functions, and Authentication with Google Sign-In
