@@ -1,9 +1,9 @@
 ---
 id: "002"
 title: Expense Entry
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-04-18T15:53:07Z
 completed:
 verdict:
 score: 1.0
