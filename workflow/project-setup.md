@@ -37,7 +37,7 @@ One Google Spreadsheet with 4 tabs:
 
 Schema for each tab is defined in `2026-02-17-expense-tracker-design.md`.
 
-**Category longevity:** Categories should be treated as append-only. Never rename or delete a category — instead mark it `is_active: false` and create a new one. This preserves historical accuracy: an expense logged in 2024 as "Eating Out" still shows as "Eating Out" even if that category was later retired. Optionally, a `successor_id` field on the Categories tab can link a retired category to its replacement, allowing reports to group them. The spec should resolve whether expenses store `category_id` only or both `category_id` and a `category_name` snapshot.
+**Category longevity:** Expenses store `category_id` only — no name snapshot. Categories can be freely renamed; the new name retroactively applies to all historical expenses using that ID, which is the intended behavior. Categories are never deleted — only archived (`is_active: false`). New categories can be created at any time. This keeps the schema simple and reports consistent across time.
 
 ## What Needs to Be Set Up
 
