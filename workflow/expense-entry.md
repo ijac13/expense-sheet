@@ -34,11 +34,18 @@ A user can open the app, log an expense, and be done in a few taps:
 
 ## Plan
 
+### Home Screen
+
+The home screen opens directly to the entry UI — calculator ready, no extra tap needed. Date and paid by are pre-filled with defaults, so the common case is: type amount → pick category → confirm.
+
+After confirm → today's expense list (the new entry is visible at the top)
+After cancel → today's expense list
+
 ### Entry Flow
 
-Date → Amount → Category → Paid by → Confirm (optional: notes)
+Amount → Category → Confirm (date and paid by pre-filled; notes optional and tucked away)
 
-The common case — amount and category — should take 3 taps or fewer. Everything else is optional and secondary.
+The common case takes 3 taps or fewer. Date and paid by are always visible but never blocking.
 
 ### Amount Input
 
