@@ -28,9 +28,10 @@ A user can open the app, log an expense, and be done in a few taps:
 
 ### Out of Scope
 
-- Editing or deleting an existing expense (separate concern)
+- Editing or deleting an existing expense (entity 010)
 - Recurring/subscription expenses (entity 004)
 - Category management — creating or editing categories (entity 003)
+- AI category suggestion — users pick the category manually; no suggestion needed
 
 ## Plan
 
@@ -63,6 +64,19 @@ The common case takes 3 taps or fewer. Date and paid by are always visible but n
 | date | today | yes | yes |
 | paid_by | logged-in user | yes | no |
 | notes | empty | yes | no |
+
+### Today's Expense List
+
+Shown after confirm or cancel. Shows all expenses for today regardless of who recorded them.
+
+**Header:**
+- Date (e.g., "April 18")
+- Total amount for today (e.g., "NT$2,450")
+
+**Each row (sorted by expense time, most recent first):**
+- Category icon + category name
+- Amount
+- Notes in smaller font below the category (only shown if notes exist)
 
 ### Writes to Spreadsheet
 
