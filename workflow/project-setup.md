@@ -157,26 +157,38 @@ Access is controlled by this tab. Only emails listed here can sign in to the app
 
 This is a **mobile-optimized web app**, not a native app. One codebase works across iOS and Android through the browser — no App Store submission needed. It can be installed as a **PWA (Progressive Web App)**: users add it to their home screen and it runs full-screen without browser chrome, feeling like a native app.
 
-## UI Design
+## UI Design System
 
-UI is designed using **Claude Design** (anthropic.com/news/claude-design-anthropic-labs) — Anthropic's collaborative visual creation tool. Two touchpoints:
+**DaisyUI** on top of Tailwind CSS — a free, open-source component library with pre-built themes. No design work needed; components look good out of the box.
 
-- **Project setup:** Claude Design establishes the design system (colors, typography, components) as the visual foundation for the whole app.
-- **Each feature's spec:** A Claude Design prototype is attached as the UI contract before the build agent writes any code. The build agent implements exactly what the prototype shows.
+**Theme: fantasy**
 
-Design system output is committed to the repo so build agents have a consistent reference.
+| Element | Value | Feel |
+|---------|-------|------|
+| Background | Pure white | Clean |
+| Primary | Deep purple-magenta `oklch(37.45% 0.189 325.02)` | Bold |
+| Secondary | Medium blue `oklch(53.92% 0.162 241.36)` | Cool |
+| Accent | Warm amber `oklch(75.98% 0.204 56.72)` | Warm pop |
+| Text | Dark blue-gray `oklch(27.807% 0.029 256.847)` | Easy to read |
+| Box radius | 1rem | Soft, rounded |
+| Field radius | 0.5rem | Soft, rounded |
+
+Full theme config (for `tailwind.config.js` / `daisyui` plugin):
+```json
+{"name":"fantasy","color-scheme":"light","--color-base-100":"oklch(100% 0 0)","--color-base-200":"oklch(93% 0 0)","--color-base-300":"oklch(86% 0 0)","--color-base-content":"oklch(27.807% 0.029 256.847)","--color-primary":"oklch(37.45% 0.189 325.02)","--color-primary-content":"oklch(87.49% 0.037 325.02)","--color-secondary":"oklch(53.92% 0.162 241.36)","--color-secondary-content":"oklch(90.784% 0.032 241.36)","--color-accent":"oklch(75.98% 0.204 56.72)","--color-accent-content":"oklch(15.196% 0.04 56.72)","--color-neutral":"oklch(27.807% 0.029 256.847)","--color-neutral-content":"oklch(85.561% 0.005 256.847)","--color-info":"oklch(72.06% 0.191 231.6)","--color-success":"oklch(64.8% 0.15 160)","--color-warning":"oklch(84.71% 0.199 83.87)","--color-error":"oklch(71.76% 0.221 22.18)","--radius-selector":"1rem","--radius-field":"0.5rem","--radius-box":"1rem","--depth":"1","--noise":"0"}
+```
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
 | Frontend | Next.js (React), mobile-optimized web app (PWA) |
+| UI components | DaisyUI + Tailwind CSS, fantasy theme |
 | Hosting | Firebase Hosting |
 | Backend | Firebase Functions (Node.js) |
 | Database | Google Sheets API |
 | Auth | Firebase Authentication — Google Sign-In only |
 | Subscription scheduler | Google Apps Script (time-based trigger) |
-| UI design | Claude Design |
 
 **Cost:** All within Google/Firebase free tiers. Expected monthly cost: $0.
 
@@ -216,6 +228,16 @@ GOOGLE_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
 ```
 
+## Staging Environment
+
+Firebase Hosting preview channels provide staging — a temporary URL for testing before going live. No separate Firebase project needed.
+
+- **Local dev:** `npm run dev` against a test Google Spreadsheet
+- **Staging:** `firebase hosting:channel:deploy preview` — generates a unique preview URL (e.g., `expense-sheet--preview-abc123.web.app`) for the verify stage
+- **Production:** `firebase deploy` — goes live at the main Firebase Hosting URL
+
+The test Google Spreadsheet (for local dev and staging) is separate from the production Spreadsheet. Its ID goes in `.env.local` and is never used in production.
+
 ## What the Agent Builds
 
 - Initialized Next.js project with Firebase Functions folder layout
@@ -227,14 +249,14 @@ GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
 
 ## What Captain Does Manually (One-Time)
 
-1. Create a new Google Spreadsheet in Google Drive
-2. Create the 4 tabs (Expenses, Categories, Subscriptions, Users) with the columns above
-3. Seed the Categories tab with the default categories
-4. Add both user emails to the Users tab
-5. Share the Spreadsheet with both user emails (Editor access)
+1. Create two Google Spreadsheets in Google Drive — one for production, one for staging/dev
+2. In each: create the 4 tabs (Expenses, Categories, Subscriptions, Users) with the columns above
+3. Seed the Categories tab with the 22 default categories
+4. Add both user emails to the Users tab (production Sheet only)
+5. Share both Spreadsheets with both user emails (Editor access)
 6. Create a Firebase project — enable Hosting, Functions, and Authentication with Google Sign-In
 7. Create a Google service account with Sheets API access; download the key JSON
-8. Copy `.env.example` to `.env` and fill in all values
+8. Copy `.env.example` to `.env` (production) and `.env.local` (staging), fill in respective Sheet IDs
 9. Deploy to Firebase Hosting
 
 ## Success
