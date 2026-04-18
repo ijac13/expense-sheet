@@ -55,16 +55,17 @@ Google Spreadsheet (Single source of truth)
   • Direct edits are immediately reflected in the app on next read
 ```
 
-**Key principle:** Google Sheets is the database. The app is the UI layer on top of it. There is no separate database. Any edit — whether made through the app or directly in the Spreadsheet — is the truth. The app always reads fresh from the Sheet; it never maintains a separate copy.
+**Key principle:** Google Sheets is the database. The app is the UI layer on top of it. There is no separate database. Both the app and the Spreadsheet are full edit interfaces — users can create, edit, and delete records from either. Any change made through the app or directly in the Spreadsheet is immediately the truth. The app always reads fresh from the Sheet; it never maintains a separate copy.
 
 ## Data Flow
 
 1. Open app on phone → Firebase serves the Next.js web app
 2. Sign in with Google → Firebase Auth validates, Firebase Function checks email against Users tab
-3. Add expense → Firebase Function writes a new row to Expenses tab
-4. View reports → Firebase Function reads Expenses tab, aggregates and returns data
-5. Subscription due → Google Apps Script runs on schedule, writes confirmed expense row to Expenses tab
-6. Direct Sheet edit → immediately visible in app on next data fetch
+3. Add or edit expense → Firebase Function writes to Expenses tab (create or update row)
+4. Delete expense → Firebase Function removes the row from Expenses tab
+5. View reports → Firebase Function reads Expenses tab, aggregates and returns data
+6. Subscription due → Google Apps Script runs on schedule, writes confirmed expense row to Expenses tab
+7. Direct Sheet edit (create, edit, or delete) → immediately visible in app on next data fetch
 
 ## Google Spreadsheet Structure
 
