@@ -19,7 +19,7 @@ This is the feature the whole app exists for. Every time money is spent, it gets
 A user can open the app, log an expense, and be done in a few taps:
 
 - Amount input works like a calculator — supports simple math (`50+30`, `200-15`) to finalize the amount before confirming
-- Category is selected from the grid and the selection is fast
+- Category is selected from the grid and the selection is fast — defaults to the last used category
 - Date defaults to today, editable if needed
 - Paid by defaults to the logged-in user, editable if the other person paid
 - Notes are optional and never required to save
@@ -36,14 +36,14 @@ A user can open the app, log an expense, and be done in a few taps:
 
 ### Entry Flow
 
-Amount → Category → Confirm (with optional: date, paid by, notes)
+Date → Amount → Category → Paid by → Confirm (optional: notes)
 
 The common case — amount and category — should take 3 taps or fewer. Everything else is optional and secondary.
 
 ### Amount Input
 
 - Numeric keypad, large touch targets
-- Supports simple arithmetic: `+`, `-`, `*`, `/`
+- Supports simple arithmetic: `+`, `-`, `*`, `/` and `()`
 - Expression evaluates on confirm (e.g., `120+80` → `200`)
 - Amount is in TWD
 
@@ -52,7 +52,7 @@ The common case — amount and category — should take 3 taps or fewer. Everyth
 | Field | Default | Editable? | Required? |
 |-------|---------|-----------|----------|
 | amount | — | yes | yes |
-| category_id | — | yes | yes |
+| category_id | last used category | yes | yes |
 | date | today | yes | yes |
 | paid_by | logged-in user | yes | no |
 | notes | empty | yes | no |
