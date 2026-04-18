@@ -180,6 +180,23 @@ Design system output is committed to the repo so build agents have a consistent 
 
 **Cost:** All within Google/Firebase free tiers. Expected monthly cost: $0.
 
+## Security
+
+The app uses a **tiered security model** — friction matches risk. Logging an expense is low friction (habit-critical). Viewing reports requires extra verification (sensitive financial data).
+
+| Layer | Requirement |
+|-------|-------------|
+| Sign-in | Google Sign-In only — no passwords stored in the app |
+| Session timeout | Auto sign-out after 30 minutes of inactivity |
+| Token expiry | Firebase Auth tokens expire after 1 hour — enforced, not extended |
+| Report access | Requires Google re-authentication before the reports screen loads. If the user has Google 2FA enabled on their account, it applies automatically here — no separate 2FA system to build. |
+| Data in transit | HTTPS only — Firebase Hosting enforces this |
+| Data in browser | No expense data cached in localStorage, sessionStorage, or cookies — always fetched fresh from the Sheet. Nothing sensitive left in the browser. |
+| API access | Firebase Functions validate the auth token on every request — no unauthenticated calls reach the Sheet |
+
+**Why Google re-auth for reports:**
+The app already trusts Google for identity. Re-authenticating for sensitive screens means Google's own security (including their 2FA if enabled) protects the reports — no custom 2FA infrastructure needed.
+
 ## Environment Variables
 
 All credentials go in `.env` (gitignored). The repo ships `.env.example`:
