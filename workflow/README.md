@@ -152,6 +152,8 @@ grep -l "status: ideation" expense-sheet/workflow/*.md
 
 ## Feature Template
 
+Every feature body follows this structure: **why → success → plan**. Start with purpose, then define what done looks like, then describe the approach.
+
 ```yaml
 ---
 id:
@@ -167,7 +169,23 @@ issue:
 pr:
 ---
 
-What problem does this feature solve, and what does success look like in daily use?
+One sentence: why this feature exists and what problem it solves.
+
+## Success
+
+What done looks like — specific, scoped to this feature only. Not the whole app.
+
+- Criterion 1
+- Criterion 2
+- ...
+
+### Out of Scope
+
+What this feature explicitly does not cover.
+
+## Plan
+
+How to make it happen — architecture, decisions, constraints, open questions.
 ```
 
 ## Commit Discipline

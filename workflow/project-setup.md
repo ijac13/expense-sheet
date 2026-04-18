@@ -1,9 +1,9 @@
 ---
 id: "001"
 title: Project Setup
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-04-18T15:31:13Z
 completed:
 verdict:
 score: 1.0
@@ -24,6 +24,9 @@ Project setup is complete when:
 - `.env.example` is complete and documents every required variable
 - App compiles and starts without errors (`npm run dev`)
 - No credentials or personal data anywhere in the committed code
+
+
+### Out of Scope
 
 This does not include sign-in working, connecting to the Spreadsheet, or any feature screen. Those depend on the captain completing the manual setup steps and belong to their own feature entities.
 
