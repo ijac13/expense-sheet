@@ -122,6 +122,8 @@ Categories are **never deleted** — only archived. Renaming a category retroact
 | 🏠 | Rent | 房租 |
 | 🛒 | Shopping | 購物 |
 | 🚗 | Car Repair | 修車 |
+| 💝 | Donate | 捐款 |
+| 🏡 | Mortgage | 房貸 |
 | 📦 | Other | 其他 |
 
 ### Tab 3: Subscriptions
