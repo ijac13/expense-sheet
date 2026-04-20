@@ -1,7 +1,7 @@
 ---
 id: "002"
 title: Expense Entry
-status: spec
+status: build
 source: commission seed
 started: 2026-04-18T15:53:07Z
 completed:
