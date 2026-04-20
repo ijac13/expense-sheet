@@ -1,9 +1,9 @@
 ---
 id: "003"
 title: Category System
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-04-20T10:30:00Z
 completed:
 verdict:
 score: 0.8
@@ -35,7 +35,7 @@ Categories are how every expense is classified. Without categories, the data is 
 - Deleting categories — categories are never deleted, only archived (data integrity across 20+ years)
 - AI category suggestion — out of scope for the whole app (see entity 002)
 - Merging two categories into one — future concern
-- Category icons beyond emoji
+- Category icons beyond emoji - never want to do that 
 
 ## Plan
 
@@ -56,7 +56,7 @@ Defined in `project-setup.md` Categories tab:
 
 Accessible from Settings. Shows two sections:
 
-1. **Active** — list of active categories, each row tappable to edit (rename, change emoji, reorder)
+1. **Active** — list of active categories in `sort_order` sequence, each row has ↑↓ arrow buttons to reorder and is tappable to edit (rename, change emoji)
 2. **Archived** — collapsed section showing archived categories with option to restore
 
 ### Add Category
@@ -65,7 +65,7 @@ Tapping "+ Add category" opens a form:
 - Emoji picker or text input for icon
 - Name (EN) — required
 - Name (繁中) — required
-- Sort order — defaults to last position
+- Sort order — defaults to last position (appended to end of active list)
 
 On save: Firebase Function appends a row to the Categories tab.
 
