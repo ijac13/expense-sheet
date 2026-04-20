@@ -276,3 +276,22 @@ The test Google Spreadsheet (for local dev and staging) is separate from the pro
 7. Create a Google service account with Sheets API access; download the key JSON
 8. Copy `.env.example` to `.env` (production) and `.env.local` (staging), fill in respective Sheet IDs
 9. Deploy to Firebase Hosting
+
+## Stage Report: build
+
+- DONE: Code scaffold exists with correct folder structure (Next.js + Firebase Functions)
+  `app/` (Next.js App Router), `functions/src/index.ts` (Firebase Functions), `apps-script/` — commit d4b0070
+- DONE: DaisyUI + fantasy theme installed and renders (visible when app starts)
+  DaisyUI v5.5.19 installed; fantasy theme configured via `@plugin "daisyui/theme"` in globals.css; build output: `/*! 🌼 daisyUI 5.5.19 */`; page renders with `btn-primary`, `btn-secondary`, `badge-accent` components
+- DONE: PWA manifest is in place
+  `app/public/manifest.json` — display: standalone, theme_color: #5c1a5a matching fantasy primary, icons placeholder at `app/public/icons/`
+- DONE: `.env.example` is complete and documents every required variable
+  `.env.example` documents all 9 variables: 6 Firebase (NEXT_PUBLIC_*) + 3 Google Sheets (server-side); each variable has a description comment
+- DONE: App compiles and starts without errors
+  `npm run build` in `app/` passes: `✓ Compiled successfully in 1893ms`, TypeScript clean, 4/4 static pages generated
+- DONE: No credentials or personal data anywhere in committed code
+  `.env` and `.env.local` are gitignored; `.firebaserc` is gitignored; `.env.example` has only placeholder values; `functions/src/index.ts` has no credentials
+
+### Summary
+
+Built the full project scaffold on branch `feature/001-project-setup` (worktree: `.claude/worktrees/agent-a1f3b159`). Next.js 16 with App Router and Tailwind v4 is initialized; DaisyUI v5 fantasy theme is configured via CSS `@plugin` directives (the v4/v5 approach — no `tailwind.config.js` needed). The app renders a styled landing page proving the theme is active. Firebase Functions scaffold and Apps Script subscription-scheduler placeholder are in place alongside SETUP.md with the complete Spreadsheet schema and step-by-step manual setup instructions.
