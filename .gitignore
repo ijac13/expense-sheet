@@ -11,6 +11,7 @@ firebase-debug.log
 # Google service account keys
 *-service-account.json
 service-account*.json
+expense-sheet-*.json
 
 # OS
 .DS_Store

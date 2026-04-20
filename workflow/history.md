@@ -1,9 +1,9 @@
 ---
 id: "012"
 title: Expense History
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-04-20T10:00:00Z
 completed:
 verdict:
 score: 0.8
@@ -23,12 +23,13 @@ Every expense ever logged should be browsable in one place. History gives both u
 ## Success
 
 - History tab shows all expenses across all time, sorted by date (most recent first)
-- Each row shows: date, who billed, who paid, amount, category
+- Each row shows: date, who paid, amount, category
 - Both users' entries are visible to both users
+
 
 ### Out of Scope
 
-- Filtering or searching expenses (separate concern)
+- Filtering or searching expenses (entity 013)
 - Editing or deleting from this view (entity 010)
 - Reports and analytics (entity 005)
 
