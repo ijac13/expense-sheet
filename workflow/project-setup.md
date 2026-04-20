@@ -1,7 +1,7 @@
 ---
 id: "001"
 title: Project Setup
-status: spec
+status: build
 source: commission seed
 started: 2026-04-18T15:31:13Z
 completed:

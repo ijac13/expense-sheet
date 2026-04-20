@@ -1,9 +1,9 @@
 ---
 id: "011"
 title: Navigation and Pages
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-04-20T01:00:00Z
 completed:
 verdict:
 score: 1.0
