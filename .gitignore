@@ -7,7 +7,6 @@
 # Firebase
 .firebase/
 firebase-debug.log
-.firebaserc
 
 # Google service account keys
 *-service-account.json
