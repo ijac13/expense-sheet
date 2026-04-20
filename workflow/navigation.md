@@ -36,16 +36,18 @@ Bottom tab bar — standard mobile pattern, always visible, 4–5 tabs.
 
 ### Tabs and Pages
 
-| Tab | Pages | Notes |
-|-----|-------|-------|
-| **Home** | Entry form + today's expense list | Opens directly to entry UI |
-| **History** | Past expenses by date | TBD: own tab or under Home? |
-| **Subscriptions** | Recurring expense list + add/edit | Entity 004 |
-| **Reports** | Monthly summary, trends, deep-dives | Entity 005 |
-| **Settings** | Categories, users, language | Entities 003, 006, 007 |
+5 tabs, always visible in the bottom bar:
 
-### Open Questions
+| Tab | Content | Entity |
+|-----|---------|--------|
+| **Home** | Entry form + today's expense list | 002 |
+| **History** | Plain expense list — date, who billed, who paid, amount, category | — |
+| **Subscriptions** | Recurring expense list + add/edit | 004 |
+| **Reports** | Monthly summary, trends, deep-dives | 005 |
+| **Settings** | Categories, user management, language toggle | 003, 006, 007 |
 
-- **History tab** — is expense history its own tab, or does it live under Home (scroll down past today to see older entries)?
-- **Settings contents** — what sections live in Settings? Categories management, user management, language toggle?
-- **Tab count** — 4 tabs (Home, Reports, Subscriptions, Settings) or 5 (add History)?
+### Settings Sections
+
+- Category management — view, create, edit, archive categories (entity 003)
+- User management — see who has access (entity 006)
+- Language toggle — EN/繁中 (entity 007)
