@@ -1,11 +1,11 @@
 ---
 id: "001"
 title: Project Setup
-status: build
+status: done
 source: commission seed
 started: 2026-04-18T15:31:13Z
-completed:
-verdict:
+completed: 2026-04-20T10:00:00Z
+verdict: PASSED
 score: 1.0
 worktree:
 issue:
@@ -268,12 +268,16 @@ The test Google Spreadsheet (for local dev and staging) is separate from the pro
 ## What Captain Does Manually (One-Time)
 
 1. Create two Google Spreadsheets in Google Drive — one for production, one for staging/dev
-2. In each: create the 4 tabs (Expenses, Categories, Subscriptions, Users) with the columns above
-3. Seed the Categories tab with the 22 default categories
-4. Add both user emails to the Users tab (production Sheet only)
+   - [x] prod: https://docs.google.com/spreadsheets/d/1ZCmtQh2YvexnuxUpMroQnqT6DtQLvtyLQDTHiBTVe5o/edit?gid=0#gid=0
+   - [x] staging:https://docs.google.com/spreadsheets/d/19_D7yQaJvZrJyQ3q2oxaVWgWXoofXvCZ0kHUR4IeA-o/edit?usp=sharing
+2. [x] In each: create the 4 tabs (Expenses, Categories, Subscriptions, Users) with the columns above
+3. [x] Seed the Categories tab with the 22 default categories
+4. [x] Add both user emails to the Users tab (production Sheet only)
 5. Share both Spreadsheets with both user emails (Editor access)
-6. Create a Firebase project — enable Hosting, Functions, and Authentication with Google Sign-In
-7. Create a Google service account with Sheets API access; download the key JSON
+  - [x] prod
+  - [x] stagin
+6. [x] Create a Firebase project — enable Hosting, Functions, and Authentication with Google Sign-In
+7. [x] Create a Google service account with Sheets API access; download the key JSON
 8. Copy `.env.example` to `.env` (production) and `.env.local` (staging), fill in respective Sheet IDs
 9. Deploy to Firebase Hosting
 
