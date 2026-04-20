@@ -171,6 +171,11 @@ pr:
 
 One sentence: why this feature exists and what problem it solves.
 
+## User Stories
+
+- As [user], I want [action] so that [outcome].
+- (2–4 stories covering the main use cases)
+
 ## Success
 
 What done looks like — specific, scoped to this feature only. Not the whole app.
