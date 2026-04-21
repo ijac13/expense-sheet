@@ -1,9 +1,9 @@
 ---
 id: "005"
 title: Reports
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-04-21T02:00:00Z
 completed:
 verdict:
 score: 0.7
@@ -49,11 +49,13 @@ Period selector at top: **Monthly | Annual**. Payer filter: all / me / husband.
 2. **By category** — pie chart (switchable to bar chart), sorted by amount descending, tappable to drill in; payer filter defaults to all users
 3. **By payer** — split between the two users
 4. **Comparison** — this month vs previous month and vs same month last year, delta per category
+5. **Insights** — AI advice card (entity 014), auto-generated at month-end
 
 **Annual view** (default: current year):
 1. **Total** — total spend for the year
 2. **By category** — pie chart (switchable to bar chart), full year breakdown sorted by amount
 3. **Month trend** — month-by-month totals for the year
+4. **Insights** — AI advice card (entity 014) for the full year
 
 Tapping a category row in either view → opens a new screen showing the expense list for that category and period. Back button returns to the report.
 
