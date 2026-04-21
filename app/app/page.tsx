@@ -87,7 +87,7 @@ export default function Home() {
   }
 
   return (
-    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto pb-20">
+    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto">
       {/* Amount display */}
       <div className="bg-primary text-primary-content px-4 pt-12 pb-4">
         <div className="text-base opacity-70 mb-1">Amount (TWD)</div>
@@ -186,21 +186,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Tab bar — temporary stub until entity 011 navigation is built */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-base-100 border-t border-base-200 flex">
-        {[
-          { icon: "🏠", label: "Home", active: true },
-          { icon: "📋", label: "History", active: false },
-          { icon: "🔄", label: "Subscriptions", active: false },
-          { icon: "📊", label: "Reports", active: false },
-          { icon: "⚙️", label: "Settings", active: false },
-        ].map((tab) => (
-          <button key={tab.label} className={`flex-1 flex flex-col items-center py-2 text-xs gap-1 ${tab.active ? "text-primary" : "text-base-content/50"}`}>
-            <span className="text-xl">{tab.icon}</span>
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </nav>
     </main>
   );
 }
