@@ -1,9 +1,9 @@
 ---
 id: "004"
 title: Subscription Tracking
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-04-21T00:00:00Z
 completed:
 verdict:
 score: 0.9
