@@ -70,3 +70,68 @@ Reports screen triggers Google re-auth once per session (see entity 006 for auth
 ## Open Questions
 
 All resolved.
+
+## Spec
+
+### Goal
+
+Provide monthly and annual spending reports with category breakdowns, payer filters, and drill-down capability so users can understand where their money goes and spot trends over time.
+
+### User Stories
+
+- As a user, I want to see a monthly summary of spending by category and payer so I can understand where money went this month.
+- As a user, I want to compare this month against last month and the same month last year so I can spot trends.
+- As a user, I want an annual view with month-by-month totals so I can see the full year at a glance.
+- As a user, I want to tap a category to drill into the individual expenses behind it so I can investigate specific spending.
+- As a user, I want to filter the report by payer so I can see my spending separately from my husband's.
+
+### Acceptance Criteria
+
+- [ ] Reports tab defaults to monthly view showing the current month's total spend.
+- [ ] A period selector at the top switches between Monthly (default) and Annual views.
+- [ ] Monthly view displays: total spend, category breakdown (amounts and percentages), payer breakdown, comparison to previous month and same month last year (delta per category).
+- [ ] Category breakdown renders as a pie chart by default; a toggle switches it to a bar chart.
+- [ ] Payer filter (All / Me / Husband) defaults to All and applies to all charts and totals in the current view.
+- [ ] Annual view displays: total spend for the year, category breakdown (pie or bar, same toggle), month-by-month totals for the year.
+- [ ] Tapping any category in either view opens a drill-down screen listing all expenses in that category for the selected period.
+- [ ] The drill-down screen has a Back button that returns to the report without resetting the period or payer filter.
+- [ ] Spending Insights (entity 014) appears as a section at the bottom of both monthly and annual views.
+- [ ] Reports screen triggers Google re-authentication once per session (entity 006) before data loads; subsequent navigations within the session skip re-auth.
+- [ ] All aggregation is performed server-side via a Firebase Function; no raw expense rows are sent to the client for reports.
+- [ ] Monthly view navigates back and forward one month at a time via prev/next controls.
+- [ ] Annual view navigates back and forward one year at a time via prev/next controls.
+
+### Edge Cases
+
+- No expenses yet: both views show an empty state with a prompt to start logging; no chart is rendered.
+- Only one month of data: monthly comparison section shows "no data" for the previous month and same-month-last-year slots rather than zeroes or errors.
+- Same month last year has no data: the year-over-year comparison slot shows "no data" rather than a zero-delta.
+- Switching between Monthly and Annual mid-session: payer filter persists; period resets to the current month or current year respectively.
+- Payer filter set to a single user, then drill-down opened: drill-down list respects the active payer filter.
+- Firebase Function returns an error: report screen shows an error state with a retry action; no partial data is displayed.
+
+### Out of Scope
+
+- Custom fiscal year or arbitrary date range summaries
+- Export to CSV or PDF
+- Budget targets or alerts
+- Predictive spending forecasts
+- Per-category trend lines across multiple months in monthly view
+- Splitting individual expenses between payers within the report
+
+## Stage Report: spec
+
+- DONE: Read entity ideation content and workflow README spec template
+  Source files: `/Users/ijac/Claude-ijac/expense-sheet/workflow/reports.md`, `/Users/ijac/Claude-ijac/expense-sheet/workflow/README.md`
+- DONE: Wrote formal `## Spec` section with Goal, User Stories, Acceptance Criteria, Edge Cases, Out of Scope
+  Appended below existing ideation content; ideation not modified
+- DONE: Incorporated all key decisions (two views, pie/bar toggle, payer filter, drill-down, entity 014 insights, entity 006 re-auth, server-side aggregation)
+  All decisions from dispatch prompt reflected in acceptance criteria
+- DONE: Covered all four specified edge cases plus two additional real-world scenarios
+  Empty state, one month of data, same-month-last-year missing, mid-session view switch, filter+drill-down interaction, Firebase error
+- DONE: Appended `## Stage Report: spec` section
+  This section
+
+### Summary
+
+Converted the ideation and plan content for entity 005 Reports into a formal spec. Acceptance criteria are scoped to be binary and independently testable. Key architectural decisions (server-side aggregation, session-scoped re-auth, entity 014 and 006 integration) are encoded as explicit criteria rather than notes.
