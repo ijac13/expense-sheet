@@ -1,9 +1,9 @@
 ---
 id: "010"
 title: Edit and Delete Expense
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-04-21T03:00:00Z
 completed:
 verdict:
 score: 0.8
