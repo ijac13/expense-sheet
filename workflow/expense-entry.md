@@ -7,7 +7,7 @@ started: 2026-04-18T15:53:07Z
 completed:
 verdict:
 score: 1.0
-worktree:
+worktree: feature/002-expense-entry
 issue:
 pr:
 ---
@@ -85,3 +85,26 @@ On save, a Firebase Function creates a new row in the Expenses tab:
 - `created_by` — logged-in user's email (auto-filled, not editable)
 - `created_at` — current timestamp (auto-filled, not editable)
 - `status` — always `confirmed`
+
+## Stage Report: build
+
+- DONE: Amount input works like a calculator — supports `+`, `-`, `*`, `/`, `()`
+  `app/app/lib/calculator.ts` — `evaluateExpression()` using safe `Function()` eval; keypad renders `+`, `-`, `×`, `÷`, `(`, `)` keys; commit cba0ab3
+- DONE: Category selected from grid, defaults to last used
+  `app/app/lib/categories.ts` — `getDefaultCategory()` reads from localStorage; `saveLastCategory()` persists on selection; 22 categories rendered in 4-col grid; commit cba0ab3
+- DONE: Date defaults to today, editable
+  Date field pre-filled with `new Date().toISOString().split("T")[0]`; tapping reveals `<input type="date">`; commit dce6e5a
+- DONE: Paid by defaults to logged-in user (stub as "Me"), editable
+  Toggle button cycles between "Me" and "Husband"; commit dce6e5a
+- DONE: Notes optional, never required
+  Notes `<input>` present but not validated; confirm works without notes; commit dce6e5a
+- DONE: After confirm → today's expense list (new entry visible)
+  `stubSaveExpense()` logs to console, prepends new expense to state; view switches to list; new entry appears at top sorted by `created_at`; commit dce6e5a
+- DONE: After cancel → today's expense list
+  Cancel button resets form and sets view to "list"; commit dce6e5a
+- DONE: Today's list shows date header + daily total
+  `TodayExpenseList` renders date (e.g., "April 20") and `NT$X,XXX` total from `getDailyTotal()`; commit 8011eed
+
+### Summary
+
+Built the full expense entry home screen on branch `feature/002-expense-entry`. The page is a single client component that toggles between entry form and today's list views. The calculator keypad supports all required operators; expressions evaluate on confirm via safe `Function()` eval. All 22 default categories are rendered in a scrollable grid with localStorage persistence for last-used selection. Firebase calls are stubbed (console.log only). Build passes: `✓ Compiled successfully`, TypeScript clean, static export succeeds.
