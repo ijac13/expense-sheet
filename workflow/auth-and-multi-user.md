@@ -27,15 +27,15 @@ Both my husband and I need to log expenses independently on our own phones and s
 - Only emails listed in the Users tab can access the app — any other Google account is rejected after sign-in
 - Session auto-expires after 1 minute of inactivity
 - Reports screen requires Google re-authentication before loading
-- Both users see all expenses, categories, and subscriptions
-- Each expense records `created_by` (who logged it) and `paid_by` (who paid) — these can be different people
-- User management is visible in Settings → User management (view only — adding/removing users is done directly in the Users tab)
+- Both users see all expenses, categories, and subscriptions and users
+- Each expense records `created_by` (who logged it) and `paid_by` (who paid) — these can be different people, but by default they will be the same person.
+- User management is visible in Settings → User management (view only — adding/removing users is done directly in the Users tab) 
 
 ### Out of Scope
 
 - Registering new users from within the app — done by editing the Users tab directly in Google Sheets
 - Role-based permissions — all authorized users have equal access
-- Sharing with more than 2 users — designed for 2, but the Users tab supports more if needed
+- Sharing with more than 2 users — exactly 2 users, no temporary or guest access
 - Password-based login — Google Sign-In only
 
 ## Plan
@@ -47,7 +47,7 @@ Both my husband and I need to log expenses independently on our own phones and s
 3. After Google sign-in → Firebase Auth returns the user's email
 4. Firebase Function checks the email against the Users tab
 5. If email found → allow access, load the app
-6. If email not found → sign out immediately, show "Access denied" message
+6. If email not found → sign out immediately, show "This account isn't authorized"
 
 ### Session Management
 
@@ -58,7 +58,7 @@ Both my husband and I need to log expenses independently on our own phones and s
 
 ### Re-auth for Reports
 
-Before the Reports screen loads, trigger a Google re-authentication prompt. If the user completes it, proceed. If cancelled, stay on previous screen.
+Before the Reports screen loads (once per session), trigger a Google re-authentication prompt. If the user completes it, proceed. If cancelled, stay on previous screen. Re-auth is not required again until the session ends.
 
 ### User Management Screen (Settings)
 
@@ -72,7 +72,4 @@ Defined in `project-setup.md`. The captain adds/removes users by editing this ta
 
 ## Open Questions
 
-- **Access denied message** — when an unauthorized Google account signs in, what should the message say? Generic error or something specific like "This account isn't authorized — contact [name] to be added"?
-- **Inactivity timer** — 1 minute was decided in project setup. Still feel right in practice, or too aggressive?
-- **Re-auth for reports** — does Reports require Google re-auth every time the tab is opened, or just once per session?
-- **Two-user assumption** — the app is designed for exactly 2 users. If a 3rd person needs temporary access (e.g., a house-sitter), how should that work?
+All resolved.
