@@ -46,13 +46,13 @@ Period selector at top: **Monthly | Annual**. Payer filter: all / me / husband.
 
 **Monthly view** (default: current month):
 1. **Total** — large number, total spend for selected month
-2. **By category** — bar chart (switchable to pie chart), sorted by amount descending, tappable to drill in; payer filter defaults to all users
+2. **By category** — pie chart (switchable to bar chart), sorted by amount descending, tappable to drill in; payer filter defaults to all users
 3. **By payer** — split between the two users
 4. **Comparison** — this month vs previous month and vs same month last year, delta per category
 
 **Annual view** (default: current year):
 1. **Total** — total spend for the year
-2. **By category** — bar chart (switchable to pie chart), full year breakdown sorted by amount
+2. **By category** — pie chart (switchable to bar chart), full year breakdown sorted by amount
 3. **Month trend** — month-by-month totals for the year
 
 Tapping a category row in either view → opens a new screen showing the expense list for that category and period. Back button returns to the report.
