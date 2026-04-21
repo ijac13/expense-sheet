@@ -1,7 +1,7 @@
 ---
 id: "003"
 title: Category System
-status: build
+status: verify
 source: commission seed
 started: 2026-04-20T10:30:00Z
 completed:

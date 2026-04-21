@@ -1,7 +1,7 @@
 ---
 id: "004"
 title: Subscription Tracking
-status: build
+status: verify
 source: commission seed
 started: 2026-04-21T00:00:00Z
 completed:
