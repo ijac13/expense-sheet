@@ -1,9 +1,9 @@
 ---
 id: "006"
 title: Auth and Multi-User
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-04-21T02:00:00Z
 completed:
 verdict:
 score: 0.9
