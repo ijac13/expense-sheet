@@ -12,7 +12,7 @@ issue:
 pr:
 ---
 
-The app needs to work in both English and Traditional Chinese (繁中) because we use both. Every label, category name, button, and message should be available in both languages. User preference is saved per account. This is a final pass across the full UI after all other features are built.
+The app needs to work in both English and Traditional Chinese (繁中) because we use both. Every label, category name, button, and message should be available in both languages. User preference is saved per account. Default language is 繁中. This is a final pass across the full UI — dispatched after all other features with visible UI text are built (at minimum after 011 navigation is done).
 
 ## User Stories
 
@@ -27,6 +27,8 @@ The app needs to work in both English and Traditional Chinese (繁中) because w
 - All static UI strings (buttons, labels, tab names, error messages) are translated
 - Category names use `name_en` or `name_zh` based on the active language
 - Switching language takes effect immediately without a page reload
+- All error messages and empty states are translated — full coverage, not just main UI labels
+- Default language for new users is 繁中
 
 ### Out of Scope
 
@@ -56,6 +58,4 @@ A simple toggle or segmented control: `EN | 繁中`. Switching fires the update 
 
 ## Open Questions
 
-- **Default language** — what should new users get before they set a preference? EN or 繁中?
-- **Timing** — this is explicitly a final pass after all features are built. Which entity should be the last one before 007 is dispatched?
-- **Translation coverage** — are error messages and empty states included, or just the main UI labels?
+All resolved.
