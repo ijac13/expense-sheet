@@ -17,7 +17,7 @@ The point of logging everything is to understand where money is going. Monthly s
 ## User Stories
 
 - As a user, I want a monthly spending summary so I can see how much we spent in total and per category
-- As a user, I want to compare this month to last month so I can spot trends
+- As a user, I want to compare this month to last month and the same month last year so I can spot trends
 - As a user, I want to drill into a category to see all expenses that belong to it
 - As a user, I want to filter by who paid so I can see my spending separately from my husband's
 

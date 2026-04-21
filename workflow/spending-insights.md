@@ -48,16 +48,18 @@ Firebase Function collects and structures:
 
 ### AI Analysis
 
-The structured data is sent to Claude API with a prompt asking for:
-1. Top 2–3 categories showing unusual increases — with a specific observation and suggestion
-2. Top 1–2 categories showing positive trends — with encouragement to maintain
+The structured household spending data (both users combined) is sent to Claude API with a prompt asking for:
+1. Top 2–3 categories showing unusual increases — with a specific observation and a warm, practical suggestion
+2. Top 1–2 categories showing positive trends — with genuine encouragement to maintain
 3. One overall spending summary sentence
 
-Response is plain language, concise, actionable.
+Tone: warm financial advisor — knowledgeable and direct, but kind. Like a trusted friend who happens to know about money. Not cold and clinical, not cheerleader-y.
+
+Response is plain language, concise, actionable. Generated automatically at end of each month.
 
 ### Display
 
-A dedicated section in the Reports tab (or its own tab). Rendered as a short advisory card — not a chart. Refreshed once per month or on demand.
+A dedicated section inside the Reports tab. Rendered as a short advisory card — not a chart. Auto-generated at month-end; no manual refresh needed.
 
 ### Privacy
 
@@ -65,8 +67,4 @@ Expense data sent to Claude API contains amounts and category names only — no 
 
 ## Open Questions
 
-- **Placement** — should this be a section inside the Reports tab, or its own separate tab?
-- **Refresh trigger** — generated once at month-end automatically, or on-demand when the user taps "Generate insights"?
-- **Tone** — neutral and analytical, or warm and encouraging? Should it feel like a financial advisor or a supportive coach?
-- **Both users or individual** — does the advice cover combined household spending, or give each user their own insights?
-- **How many months of history needed** — what's the minimum data before insights are useful? (e.g., need at least 2 months to compare)
+- **Minimum history** — what's the minimum data before insights are useful? Need at least 2 months to compare — should the section be hidden until enough data exists, or show a "not enough data yet" message?
