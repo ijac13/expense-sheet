@@ -71,3 +71,58 @@ For subscription expenses, dialog adds: "This was created by a subscription. Fut
 ## Open Questions
 
 All resolved.
+
+## Spec
+
+### Goal
+
+Allow either user to correct or remove any expense entry from the app, with changes immediately reflected in the Google Sheet via Firebase Function.
+
+### User Stories
+
+- As a user, I want to tap any expense row and edit its fields so I can correct mistakes without deleting and re-entering the entry.
+- As a user, I want to delete an expense with a confirmation step so I can remove duplicates or invalid entries without accidental loss.
+- As a user, I want to be warned when editing or deleting a subscription-generated expense so I understand that the subscription itself is unchanged.
+- As a user, I want edits and deletes made in the app to trigger a refresh of reports and spending insights so my dashboard stays accurate.
+
+### Acceptance Criteria
+
+- [ ] Tapping any expense row in the Home today list opens the edit screen for that expense.
+- [ ] Tapping any expense row in History opens the edit screen for that expense.
+- [ ] The edit screen uses the same layout as the entry form (entity 002), pre-filled with the expense's current values.
+- [ ] All fields are editable: amount, category, date, paid by, notes.
+- [ ] Either user can edit or delete any expense regardless of who created it.
+- [ ] Saving an edit calls a Firebase Function that updates the matching row in the Expenses tab by `id`.
+- [ ] Tapping Delete on the edit screen shows a confirmation dialog: "Delete this expense?" with Cancel and Delete buttons.
+- [ ] Confirming delete calls a Firebase Function that removes the matching row by `id`. There is no undo.
+- [ ] When the expense has a `subscription_id`, a warning banner appears at the top of the edit screen: "This expense was created by a subscription. Editing it here won't affect future entries — update the subscription directly if the amount or details have changed."
+- [ ] When the expense has a `subscription_id`, the same warning text appears inside the delete confirmation dialog.
+- [ ] After a successful edit or delete, reports and spending insights (entity 014) refresh.
+- [ ] Changes made directly in the Google Sheet are reflected in the app on the next read (no special handling required beyond normal read flow).
+
+### Edge Cases
+
+- Deleting a subscription-generated expense: the warning banner and dialog both note the subscription is unaffected. The row is removed; the subscription continues generating future entries.
+- Editing `paid_by` to the other user: the field updates normally — no ownership restriction applies.
+- Editing an expense originally created by the other user: allowed without restriction. No visual indicator is required.
+- Tapping an expense that no longer exists in the sheet (deleted directly in the sheet): the app attempts to fetch or update the row by `id`, receives no match, and shows an error message — "This expense no longer exists." The edit screen dismisses after acknowledgment.
+
+### Out of Scope
+
+- Bulk edit or delete
+- Undo after delete
+- Edit history or audit log
+- Restricting edits or deletes by ownership
+
+## Stage Report: spec
+
+- DONE: Read entity file and README spec template
+  `/Users/ijac/Claude-ijac/expense-sheet/workflow/edit-delete-expense.md` and `workflow/README.md`
+- DONE: Wrote `## Spec` section with Goal, User Stories, Acceptance Criteria, Edge Cases, Out of Scope
+  Appended below existing ideation content; all key decisions from assignment incorporated
+- DONE: Wrote `## Stage Report: spec` section
+  Appended at end of file per protocol
+
+### Summary
+
+Converted the ideation content for entity 010 into a formal spec covering goal, four user stories, thirteen binary acceptance criteria, four edge cases, and an explicit out-of-scope list. All key decisions from the assignment (entry points, field editability, subscription warning banner, delete confirmation, Firebase Function write path, report refresh) are captured as testable criteria.
