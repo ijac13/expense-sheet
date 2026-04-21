@@ -59,3 +59,57 @@ A simple toggle or segmented control: `EN | 繁中`. Switching fires the update 
 ## Open Questions
 
 All resolved.
+
+## Spec
+
+### Goal
+
+Localize every visible UI string in the app to English and Traditional Chinese, with per-account language preference defaulting to 繁中 and switching immediately without a page reload.
+
+### User Stories
+
+- As a user, I want to switch the app language between EN and 繁中 in Settings so I can use whichever feels natural.
+- As a user, I want my language preference saved to my account so it is restored automatically on every sign-in.
+- As a user, I want category names to display in my preferred language so the expense list is always readable.
+- As a user, I want all error messages and empty states to appear in my preferred language so I am never left with untranslated text.
+
+### Acceptance Criteria
+
+- [ ] A segmented control `EN | 繁中` is present in the Settings screen and reflects the current active language.
+- [ ] Selecting a language updates the UI immediately — all static strings re-render without a page reload.
+- [ ] Switching language writes the new value to the `language` field in the Users tab row for the current user via a Firebase Function.
+- [ ] On sign-in, the app reads the user's `language` field and activates that locale before the first render.
+- [ ] New users with no `language` field in the Users tab default to 繁中.
+- [ ] All static UI strings — tab names, button labels, form labels, placeholder text, error messages, and empty states — are fully translated in both `locales/en.json` and `locales/zh.json`.
+- [ ] Category names are rendered using `name_en` when EN is active and `name_zh` when 繁中 is active.
+- [ ] A category with a missing `name_zh` value falls back to `name_en` rather than showing blank or an error.
+- [ ] No hardcoded UI strings remain outside the locale files (static strings only; user-entered data is exempt).
+
+### Edge Cases
+
+- User switches language mid-session: the entire UI re-renders immediately using the new locale; no stale strings remain visible.
+- User has no `language` field set in the Users tab (new account or legacy row): app defaults to 繁中.
+- Category row has `name_zh` empty or null: the app falls back to `name_en` for that category name.
+- Firebase Function update fails on language switch: the UI still switches locally; the error is surfaced as a translated error message; preference reverts to the last successfully saved value on next sign-in.
+- Two users sharing the app each have independent `language` fields; switching on one account does not affect the other.
+
+### Out of Scope
+
+- Languages other than EN and 繁中.
+- Per-screen or per-component language overrides — one setting applies to the whole app.
+- Translation of user-entered data: notes, subscription names, and similar free-text fields.
+- Right-to-left layout changes (not required for either supported language).
+- Automatic language detection based on device locale.
+
+## Stage Report: spec
+
+- DONE: Read entity file and workflow README for spec template
+  `/Users/ijac/Claude-ijac/expense-sheet/workflow/bilingual-support.md` and `workflow/README.md`
+- DONE: Wrote `## Spec` section with Goal, User Stories, Acceptance Criteria, Edge Cases, Out of Scope
+  All key decisions from dispatch prompt incorporated; ideation content preserved above spec
+- DONE: Appended `## Stage Report: spec`
+  This section
+
+### Summary
+
+Converted the ideation content for entity 007 bilingual-support into a formal spec following the workflow Spec Template. All key decisions from the dispatch prompt are reflected: two languages only (EN / 繁中), default 繁中 for new users, language persisted to the Users tab `language` field, immediate re-render on switch, full UI string coverage via `next-intl` locale files, and category name fallback from `name_zh` to `name_en`. Acceptance criteria are binary and independently testable.
