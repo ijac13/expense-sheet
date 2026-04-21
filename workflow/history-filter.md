@@ -38,4 +38,13 @@ The history list shows everything, which is overwhelming when you're looking for
 
 ## Plan
 
-To be designed.
+Filter state lives in the History tab — a filter bar at the top with an icon to expand options. Active filters are shown as chips. Clear all resets to full history.
+
+Filtering and searching happen client-side if the full history is loaded, or server-side via a Firebase Function query if the dataset is large.
+
+## Open Questions
+
+- **Filter UI placement** — filter icon that opens a bottom sheet, or always-visible filter bar at the top?
+- **Date range picker** — free date range, or preset options (this month, last month, last 3 months, custom)?
+- **Subscription filter** — should you be able to filter to show only auto-generated subscription entries, or only manual entries?
+- **Search scope** — notes only, or also match against category name and subscription name?

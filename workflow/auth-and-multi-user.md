@@ -23,7 +23,7 @@ Both my husband and I need to log expenses independently on our own phones and s
 
 ## Success
 
-- Sign in with Google works on mobile browser
+- Sign in with Google works on mobile browser in iOS and Andriod
 - Only emails listed in the Users tab can access the app — any other Google account is rejected after sign-in
 - Session auto-expires after 1 minute of inactivity
 - Reports screen requires Google re-authentication before loading
@@ -69,3 +69,10 @@ Read-only view of who has access:
 ### Users Tab
 
 Defined in `project-setup.md`. The captain adds/removes users by editing this tab directly. The app reads it on every auth check.
+
+## Open Questions
+
+- **Access denied message** — when an unauthorized Google account signs in, what should the message say? Generic error or something specific like "This account isn't authorized — contact [name] to be added"?
+- **Inactivity timer** — 1 minute was decided in project setup. Still feel right in practice, or too aggressive?
+- **Re-auth for reports** — does Reports require Google re-auth every time the tab is opened, or just once per session?
+- **Two-user assumption** — the app is designed for exactly 2 users. If a 3rd person needs temporary access (e.g., a house-sitter), how should that work?
