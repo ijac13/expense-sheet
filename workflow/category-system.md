@@ -1,13 +1,13 @@
 ---
 id: "003"
 title: Category System
-status: spec
+status: build
 source: commission seed
 started: 2026-04-20T10:30:00Z
 completed:
 verdict:
 score: 0.8
-worktree:
+worktree: feature/003-category-system
 issue:
 pr:
 ---

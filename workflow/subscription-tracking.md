@@ -1,13 +1,13 @@
 ---
 id: "004"
 title: Subscription Tracking
-status: spec
+status: build
 source: commission seed
 started: 2026-04-21T00:00:00Z
 completed:
 verdict:
 score: 0.9
-worktree:
+worktree: feature/004-subscription-tracking
 issue:
 pr:
 ---
