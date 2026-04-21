@@ -12,7 +12,7 @@ issue:
 pr:
 ---
 
-Recurring expenses (Netflix, Spotify, rent, etc.) are real spending too. I don't want to manually log them every month. Define a subscription once — name, amount, category, frequency (monthly or annual), due date — and the system automatically creates a confirmed expense entry when it comes due. No pending state, no confirmation needed. It just appears in the expense list as if I logged it.
+Recurring expenses (Netflix, Spotify, rent, etc.) are real spending too. I don't want to manually log them every month. Define a subscription once — name, amount, category, frequency (monthly or annual), and which day it fires — and the system automatically creates a confirmed expense entry on that day every cycle. No expiry, no pending state, no confirmation needed. It runs forever until cancelled. It just appears in the expense list as if I logged it.
 
 ## User Stories
 
@@ -35,6 +35,7 @@ Recurring expenses (Netflix, Spotify, rent, etc.) are real spending too. I don't
 - Variable amounts — subscriptions have a fixed amount; create a new subscription to change the amount
 - Pausing a subscription — only cancellation is supported
 - Reminders or notifications before a subscription fires
+- End dates or expiry — subscriptions run until cancelled, no end date
 - Retroactively creating missed entries
 - Approval or review before an entry is created — it fires and confirms automatically
 - Viewing all past entries for a subscription — use History filter (entity 013)
@@ -52,7 +53,7 @@ Defined in `project-setup.md` Subscriptions tab:
 | `amount` | Fixed amount in TWD |
 | `category_id` | Reference to Categories tab |
 | `frequency` | `monthly` or `annual` |
-| `due_day` | Day of month (1–31) |
+| `due_day` | Required — day of month to fire (1–31) |
 | `due_month` | Month for annual only (1–12) |
 | `paid_by` | User email of who pays |
 | `is_active` | `true` = running; `false` = cancelled |
