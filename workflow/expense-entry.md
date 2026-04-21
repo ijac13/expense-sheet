@@ -108,3 +108,34 @@ On save, a Firebase Function creates a new row in the Expenses tab:
 ### Summary
 
 Built the full expense entry home screen on branch `feature/002-expense-entry`. The page is a single client component that toggles between entry form and today's list views. The calculator keypad supports all required operators; expressions evaluate on confirm via safe `Function()` eval. All 22 default categories are rendered in a scrollable grid with localStorage persistence for last-used selection. Firebase calls are stubbed (console.log only). Build passes: `✓ Compiled successfully`, TypeScript clean, static export succeeds.
+
+## Stage Report: verify
+
+- PASS: Amount input works like a calculator — supports `+`, `-`, `*`, `/`, `()`
+  `calculator.ts` `evaluateExpression()` uses safe `Function()` eval; `KEYPAD_LAYOUT` includes all 6 operator keys; `applyKey()` appends each to expression string
+- PASS: Category selected from grid, defaults to last used
+  `CategoryPicker.tsx` renders all 22 categories in 4-col grid; `getDefaultCategory()` reads localStorage on mount; `saveLastCategory()` persists on selection
+- PASS: Date defaults to today, editable
+  State initialized as `new Date().toISOString().split("T")[0]`; tap toggle reveals `<input type="date">`; date resets on cancel
+- PASS: Paid by defaults to "Me" (logged-in user stub), editable
+  `paidBy` state defaults to `"Me"`; toggle button cycles between "Me" and "Husband"
+- PASS: Notes optional, never required to save
+  Notes `<input>` present but not validated; `handleConfirm()` only validates amount > 0
+- PASS: After confirm → today's list (new entry visible at top)
+  New expense prepended via `setExpenses((prev) => [newExpense, ...prev])`; `getTodayExpenses()` sorts desc by `created_at`; view switches to list
+- PASS: After cancel → today's list
+  `handleCancel()` calls `resetForm()` then `setView("list")`
+- PASS: Today list header: date + daily total
+  `TodayExpenseList` renders `formatDate(today)` (e.g., "April 20") and `NT${total.toLocaleString()}`
+- PASS: Each row shows category icon + name, amount, notes if present
+  Row renders `category.icon`, `category.name_en`, `NT$X`; notes rendered conditionally when `expense.notes` is truthy
+- SKIPPED: Firebase deploy to preview channel
+  `firebase` CLI command blocked by permission; build passes (`✓ Compiled successfully`, TypeScript clean, static export); no staging URL available
+- SKIPPED: Expense written to spreadsheet immediately (real Firebase write)
+  Stub only (`stubSaveExpense()` logs to console); real write deferred to entity 006 per plan
+- SKIPPED: Both users can log independently and see each other's entries
+  Client-side only for now; multi-user sync deferred to later entity per plan
+
+### Summary
+
+All UI acceptance criteria pass based on code review. The entry form covers amount (calculator with all operators), category grid with last-used persistence, date/paid-by defaults, optional notes, and correct post-confirm/cancel navigation. The today's list displays date header, daily total, and per-row category + amount + notes. Firebase write is intentionally stubbed for this entity. Firebase preview deploy was blocked by shell permissions — the build itself is clean and static export succeeds; a manual `firebase hosting:channel:deploy preview-002 --expires 7d` from the repo root would produce the staging URL.
