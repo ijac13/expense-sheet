@@ -15,14 +15,14 @@ export default function CategoryPicker({ selected, onSelect }: CategoryPickerPro
           key={cat.id}
           type="button"
           onClick={() => onSelect(cat.id)}
-          className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all min-h-[64px] ${
+          className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all min-h-[72px] ${
             selected === cat.id
               ? "border-primary bg-primary/10 text-primary font-semibold"
               : "border-base-300 bg-base-100 text-base-content hover:border-primary/50"
           }`}
         >
-          <span className="text-2xl leading-none">{cat.icon}</span>
-          <span className="text-[10px] text-center leading-tight">{cat.name_en}</span>
+          <span className="text-3xl leading-none">{cat.icon}</span>
+          <span className="text-xs text-center leading-tight">{cat.name_en}</span>
         </button>
       ))}
     </div>

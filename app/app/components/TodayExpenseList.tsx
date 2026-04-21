@@ -2,6 +2,7 @@
 
 import { Expense, getTodayExpenses, getDailyTotal } from "../lib/expenses";
 import { DEFAULT_CATEGORIES } from "../lib/categories";
+import { USERS } from "../lib/users";
 
 interface TodayExpenseListProps {
   expenses: Expense[];
@@ -55,7 +56,7 @@ export default function TodayExpenseList({ expenses, onAddNew }: TodayExpenseLis
                     {expense.notes && (
                       <div className="text-xs text-base-content/60 truncate">{expense.notes}</div>
                     )}
-                    <div className="text-xs text-base-content/40">Paid by {expense.paid_by}</div>
+                    <div className="text-xs text-base-content/40">Paid by {USERS.find((u) => u.id === expense.paid_by)?.name ?? expense.paid_by}</div>
                   </div>
                   <div className="text-lg font-semibold text-primary whitespace-nowrap">
                     NT${expense.amount.toLocaleString()}

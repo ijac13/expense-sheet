@@ -7,6 +7,7 @@ import TodayExpenseList from "./components/TodayExpenseList";
 import { KeypadKey, applyKey, evaluateExpression } from "./lib/calculator";
 import { getDefaultCategory, saveLastCategory } from "./lib/categories";
 import { Expense, MOCK_EXPENSES, stubSaveExpense } from "./lib/expenses";
+import { USERS, UserId, DEFAULT_USER } from "./lib/users";
 
 type View = "entry" | "list";
 
@@ -15,7 +16,7 @@ export default function Home() {
   const [expression, setExpression] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [paidBy, setPaidBy] = useState<"Me" | "Husband">("Me");
+  const [paidBy, setPaidBy] = useState<UserId>(DEFAULT_USER);
   const [notes, setNotes] = useState("");
   const [expenses, setExpenses] = useState<Expense[]>(MOCK_EXPENSES);
   const [evalError, setEvalError] = useState(false);
@@ -64,7 +65,7 @@ export default function Home() {
     setNotes("");
     setEvalError(false);
     setDate(new Date().toISOString().split("T")[0]);
-    setPaidBy("Me");
+    setPaidBy(DEFAULT_USER);
   }
 
   // Computed display: show evaluated value preview when expression is valid
@@ -86,12 +87,12 @@ export default function Home() {
   }
 
   return (
-    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto">
+    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto pb-20">
       {/* Amount display */}
       <div className="bg-primary text-primary-content px-4 pt-12 pb-4">
-        <div className="text-sm opacity-70 mb-1">Amount (TWD)</div>
+        <div className="text-base opacity-70 mb-1">Amount (TWD)</div>
         <div
-          className={`text-4xl font-mono font-bold min-h-[52px] break-all ${
+          className={`text-5xl font-mono font-bold min-h-[52px] break-all ${
             evalError ? "text-error" : ""
           }`}
         >
@@ -123,11 +124,14 @@ export default function Home() {
           {/* Paid by toggle */}
           <button
             type="button"
-            onClick={() => setPaidBy((p) => (p === "Me" ? "Husband" : "Me"))}
+            onClick={() => setPaidBy((p) => {
+              const idx = USERS.findIndex((u) => u.id === p);
+              return USERS[(idx + 1) % USERS.length].id;
+            })}
             className="btn btn-outline btn-sm flex-1 justify-start gap-2"
           >
             <span>👤</span>
-            <span>{paidBy}</span>
+            <span>{USERS.find((u) => u.id === paidBy)?.name ?? paidBy}</span>
           </button>
         </div>
 
@@ -181,6 +185,22 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      {/* Tab bar — temporary stub until entity 011 navigation is built */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-base-100 border-t border-base-200 flex">
+        {[
+          { icon: "🏠", label: "Home", active: true },
+          { icon: "📋", label: "History", active: false },
+          { icon: "🔄", label: "Subscriptions", active: false },
+          { icon: "📊", label: "Reports", active: false },
+          { icon: "⚙️", label: "Settings", active: false },
+        ].map((tab) => (
+          <button key={tab.label} className={`flex-1 flex flex-col items-center py-2 text-xs gap-1 ${tab.active ? "text-primary" : "text-base-content/50"}`}>
+            <span className="text-xl">{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </nav>
     </main>
   );
 }
