@@ -139,3 +139,16 @@ Built the full expense entry home screen on branch `feature/002-expense-entry`. 
 ### Summary
 
 All UI acceptance criteria pass based on code review. The entry form covers amount (calculator with all operators), category grid with last-used persistence, date/paid-by defaults, optional notes, and correct post-confirm/cancel navigation. The today's list displays date header, daily total, and per-row category + amount + notes. Firebase write is intentionally stubbed for this entity. Firebase preview deploy was blocked by shell permissions — the build itself is clean and static export succeeds; a manual `firebase hosting:channel:deploy preview-002 --expires 7d` from the repo root would produce the staging URL.
+
+## Stage Report: verify — feedback fixes
+
+- DONE: Replace "Me"/"Husband" with names from user config
+  Created `app/app/lib/users.ts` with `USERS`, `UserId`, `DEFAULT_USER`; updated `page.tsx` paidBy type to `UserId`, toggle cycles through USERS array; `TodayExpenseList.tsx` resolves name via `USERS.find()`; mock data in `expenses.ts` updated to `user1`/`user2`
+- DONE: Increase font sizes for mobile
+  `page.tsx`: amount label `text-sm` → `text-base`, amount display `text-4xl` → `text-5xl`; `CategoryPicker.tsx`: emoji `text-2xl` → `text-3xl`, name `text-[10px]` → `text-xs`, button `min-h-[64px]` → `min-h-[72px]`; `CalculatorKeypad.tsx`: button `h-14` → `h-16`, text `text-xl` → `text-2xl`
+- DONE: Add basic bottom tab bar
+  Added fixed `<nav>` with 5 tabs (Home active, History/Subscriptions/Reports/Settings inactive) before closing `</main>`; added `pb-20` to main container to prevent content hiding behind bar
+
+### Summary
+
+All 3 feedback items applied. Build passes clean (`✓ Compiled successfully`, TypeScript clean, static export 4/4 pages). Changes committed on `feature/002-expense-entry`. User config stub (`users.ts`) is ready for real names when entity 006 (auth) lands. Tab bar is explicitly marked as temporary scaffolding pending entity 011.

@@ -13,7 +13,7 @@ function keyLabel(key: KeypadKey): string {
 }
 
 function keyStyle(key: KeypadKey): string {
-  const base = "btn h-14 text-xl font-medium rounded-xl transition-all active:scale-95";
+  const base = "btn h-16 text-2xl font-medium rounded-xl transition-all active:scale-95";
   if (key === "backspace") return `${base} btn-error btn-outline`;
   if (key === "clear") return `${base} btn-warning btn-outline`;
   if (key === "noop") return `${base} invisible pointer-events-none`;
