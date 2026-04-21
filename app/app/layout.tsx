@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import TabBar from "./components/TabBar";
 
 export const metadata: Metadata = {
   title: "Expense Tracker",
@@ -21,7 +22,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Expense Tracker" />
       </head>
-      <body className="min-h-full flex flex-col antialiased">{children}</body>
+      <body className="min-h-full flex flex-col antialiased">
+        <div className="pb-16">{children}</div>
+        <TabBar />
+      </body>
     </html>
   );
 }
