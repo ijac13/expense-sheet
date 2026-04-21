@@ -46,16 +46,16 @@ Period selector at top: **Monthly | Annual**. Payer filter: all / me / husband.
 
 **Monthly view** (default: current month):
 1. **Total** — large number, total spend for selected month
-2. **By category** — sorted list with amount and % of total, tappable to drill in
+2. **By category** — bar chart (switchable to pie chart), sorted by amount descending, tappable to drill in; payer filter defaults to all users
 3. **By payer** — split between the two users
 4. **Comparison** — this month vs previous month and vs same month last year, delta per category
 
 **Annual view** (default: current year):
 1. **Total** — total spend for the year
-2. **By category** — full year breakdown, sorted by amount
-3. **Month trend** — month-by-month totals for the year (spark line or bar chart)
+2. **By category** — bar chart (switchable to pie chart), full year breakdown sorted by amount
+3. **Month trend** — month-by-month totals for the year
 
-Tapping a category row in either view → drills into an expense list for that category and period.
+Tapping a category row in either view → opens a new screen showing the expense list for that category and period. Back button returns to the report.
 
 ### Data
 
@@ -67,6 +67,4 @@ Reports screen triggers Google re-auth once per session (see entity 006 for auth
 
 ## Open Questions
 
-- **Chart type** — bar chart, pie chart, or sorted list for category breakdown? What feels most useful on mobile?
-- **Payer filter default** — all users or just me?
-- **Drill-down navigation** — new screen or expand inline?
+All resolved.
