@@ -1,13 +1,13 @@
 ---
 id: "005"
 title: Reports
-status: spec
+status: build
 source: commission seed
 started: 2026-04-21T02:00:00Z
 completed:
 verdict:
 score: 0.7
-worktree:
+worktree: feature/005-reports
 issue:
 pr:
 ---

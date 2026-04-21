@@ -1,13 +1,13 @@
 ---
 id: "012"
 title: Expense History
-status: spec
+status: build
 source: commission seed
 started: 2026-04-20T10:00:00Z
 completed:
 verdict:
 score: 0.8
-worktree:
+worktree: feature/012-history
 issue:
 pr:
 ---

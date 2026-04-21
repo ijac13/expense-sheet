@@ -1,13 +1,13 @@
 ---
 id: "010"
 title: Edit and Delete Expense
-status: spec
+status: build
 source: commission seed
 started: 2026-04-21T03:00:00Z
 completed:
 verdict:
 score: 0.8
-worktree:
+worktree: feature/010-edit-delete-expense
 issue:
 pr:
 ---

@@ -1,13 +1,13 @@
 ---
 id: "011"
 title: Navigation and Pages
-status: spec
+status: build
 source: commission seed
 started: 2026-04-20T01:00:00Z
 completed:
 verdict:
 score: 1.0
-worktree:
+worktree: feature/011-navigation
 issue:
 pr:
 ---
