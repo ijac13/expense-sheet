@@ -73,3 +73,52 @@ Defined in `project-setup.md`. The captain adds/removes users by editing this ta
 ## Open Questions
 
 All resolved.
+
+## Spec
+
+### Goal
+
+Enable two household users to sign in with Google and access a shared expense tracker on mobile, with access gated by a Users tab in Google Sheets and automatic session expiry after inactivity.
+
+### User Stories
+
+- As a user, I want to sign in with my Google account so I do not need to manage a separate password.
+- As a user, I want to be automatically signed out after 1 minute of inactivity so my financial data is protected if I leave my phone unattended.
+- As a user, I want to see all expenses regardless of who logged them so my husband and I have a complete shared view of household spending.
+- As an unauthorized user, I want to see a clear rejection message after attempting sign-in so I understand why I cannot access the app.
+
+### Acceptance Criteria
+
+- [ ] Google Sign-In button appears on the sign-in screen and initiates the Google OAuth flow.
+- [ ] Sign-in works on mobile browser on iOS and Android.
+- [ ] After Google sign-in, the app checks the signed-in email against the Users tab in Google Sheets.
+- [ ] If the email is found in the Users tab, the user is granted access and the app loads.
+- [ ] If the email is not found in the Users tab, the user is signed out immediately and sees the message "This account isn't authorized".
+- [ ] A timer resets on every tap or navigation event; after 1 minute of inactivity the user is signed out and redirected to the sign-in screen.
+- [ ] The inactivity timer is stored in memory only — it does not persist across page loads or tabs.
+- [ ] Firebase Auth tokens expire after 1 hour and are not extended.
+- [ ] Before the Reports screen loads for the first time in a session, the app triggers a Google re-authentication prompt.
+- [ ] If re-authentication is completed, the Reports screen loads; if cancelled, the user remains on the previous screen.
+- [ ] Re-authentication is required only once per session — subsequent opens of Reports do not prompt again.
+- [ ] Both users see all expenses, categories, subscriptions, and the user list.
+- [ ] Every expense stores `created_by` (the logged-in user at time of entry) and `paid_by` (defaults to `created_by` but is editable).
+- [ ] Settings → User Management displays a read-only list of emails and display names from the Users tab.
+- [ ] Settings → User Management has no add or remove controls.
+
+### Edge Cases
+
+- User signs in with a valid Google account whose email is not in the Users tab: the user is signed out immediately after OAuth completes and sees "This account isn't authorized". No app data is accessible.
+- Session expires while the user has an unsaved form open: the user is redirected to sign-in; in-progress form data is lost (not persisted).
+- Re-authentication is cancelled on the Reports screen: the app stays on whichever screen the user was on before navigating to Reports; no report data is loaded.
+- Both users are signed in simultaneously on different devices: each has an independent session; both see all shared data; one user's session expiry does not affect the other.
+
+### Out of Scope
+
+- Registering or inviting users from within the app — users are added or removed by editing the Users tab directly in Google Sheets.
+- Role-based permissions — all authorized users have identical access.
+- More than 2 users, guest access, or temporary access.
+- Password-based or email-link login — Google Sign-In only.
+
+## Stage Report: spec
+
+Spec written from approved ideation content and key decisions. All acceptance criteria are binary and independently testable. Edge cases cover the four scenarios identified in the brief. No changes made to ideation content.
