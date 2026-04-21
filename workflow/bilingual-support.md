@@ -1,9 +1,9 @@
 ---
 id: "007"
 title: Bilingual Support
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-04-21T03:30:00Z
 completed:
 verdict:
 score: 0.6
