@@ -27,7 +27,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-12 pb-20">
+    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-20">
       <h1 className="text-2xl font-semibold mb-1">{t("settings.title")}</h1>
       {currentUser && (
         <p className="text-sm text-base-content/50 mb-6">

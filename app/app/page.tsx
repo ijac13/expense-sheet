@@ -70,7 +70,7 @@ export default function HomePage() {
     <main className="flex flex-col bg-base-100 max-w-md mx-auto overflow-hidden" style={{ height: "100dvh" }}>
 
       {/* Amount display */}
-      <div className="bg-primary text-primary-content px-4 pt-12 pb-4 shrink-0">
+      <div className="bg-primary text-primary-content px-4 pt-6 pb-4 shrink-0">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm opacity-70">{t("home.amount_label")}</span>
           {expenses.length > 0 && (

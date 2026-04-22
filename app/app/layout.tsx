@@ -16,10 +16,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full" data-theme="fantasy">
+    <html lang="en" className="h-full" data-theme="forest">
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#5c1a5a" />
+        <meta name="theme-color" content="#1e6d4a" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />

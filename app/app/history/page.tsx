@@ -85,7 +85,7 @@ export default function HistoryPage() {
 
   if (expenses.length === 0) {
     return (
-      <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-12 pb-20">
+      <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-20">
         <h1 className="text-2xl font-semibold mb-4">{t("history.title")}</h1>
         <p className="text-base-content/50 text-sm text-center pt-12">{t("history.no_expenses")}</p>
       </main>
@@ -95,7 +95,7 @@ export default function HistoryPage() {
   return (
     <>
       <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto pb-20">
-        <div className="sticky top-0 bg-base-100 px-4 pt-12 pb-3 border-b border-base-300">
+        <div className="sticky top-0 bg-base-100 px-4 pt-6 pb-3 border-b border-base-300">
           <h1 className="text-2xl font-semibold">{t("history.title")}</h1>
         </div>
 

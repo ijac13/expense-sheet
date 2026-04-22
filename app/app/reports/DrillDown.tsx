@@ -51,7 +51,7 @@ export default function DrillDown({
   return (
     <div className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto">
       {/* Header */}
-      <div className="bg-primary text-primary-content px-4 pt-12 pb-4">
+      <div className="bg-primary text-primary-content px-4 pt-6 pb-4">
         <button
           type="button"
           onClick={onBack}
