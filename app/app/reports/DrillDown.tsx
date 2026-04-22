@@ -29,6 +29,9 @@ export default function DrillDown({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Scroll to top when drill-down opens
+  useEffect(() => { window.scrollTo(0, 0); }, []);
+
   useEffect(() => {
     setLoading(true);
     setError(null);
