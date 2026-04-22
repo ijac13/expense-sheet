@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 export type Language = "en" | "zh";
 export const LANGUAGE_KEY = "app-language";
@@ -16,6 +17,7 @@ export function setLanguage(lang: Language) {
 }
 
 export default function LanguageToggle() {
+  const { i18n } = useTranslation();
   const [lang, setLang] = useState<Language>(DEFAULT_LANGUAGE);
 
   useEffect(() => {
@@ -25,6 +27,7 @@ export default function LanguageToggle() {
   function toggle(l: Language) {
     setLang(l);
     setLanguage(l);
+    i18n.changeLanguage(l);
   }
 
   return (

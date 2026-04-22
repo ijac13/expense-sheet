@@ -1,0 +1,10 @@
+{
+  "tabs": { "home": "首頁", "history": "紀錄", "reports": "報表", "subscriptions": "訂閱", "settings": "設定" },
+  "home": { "title": "新增支出", "amount_label": "金額（台幣）", "logged_today": "筆今日紀錄", "notes_placeholder": "備註（選填）", "log_another": "再記一筆", "save": "儲存", "paid_by": "付款人", "today": "今天", "yesterday": "昨天" },
+  "history": { "title": "歷史紀錄", "no_expenses": "尚無支出", "entries": "筆" },
+  "reports": { "title": "報表", "monthly": "月報", "annual": "年報", "all": "全部", "total": "合計", "by_category": "分類明細", "by_payer": "付款人", "back": "返回", "no_data": "無資料" },
+  "settings": { "title": "設定", "signed_in_as": "目前登入", "font_size": "字體大小", "small": "小", "medium": "中", "large": "大", "language": "語言", "category_management": "分類管理", "user_management": "使用者管理" },
+  "categories": { "eating-out": "外食", "daily-necessities": "日常用品", "groceries": "生鮮超市", "medical": "醫療", "travel": "旅遊", "transportation": "交通", "digital": "數位訂閱", "babies": "寶寶", "clothing": "服飾", "sports": "運動", "gifts": "禮物", "tuition": "學費", "tolls": "過路費", "equipment": "設備", "fuel": "加油", "entertainment": "娛樂", "rent": "房租", "shopping": "購物", "car-repair": "汽車維修", "donate": "捐款", "mortgage": "房貸", "other": "其他" },
+  "errors": { "load_failed": "載入失敗", "retry": "重試", "no_longer_exists": "此筆支出已不存在。" },
+  "common": { "cancel": "取消", "delete": "刪除", "edit": "編輯", "save": "儲存", "back": "返回", "twd": "台幣" }
+}

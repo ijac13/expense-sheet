@@ -3,6 +3,7 @@ import "./globals.css";
 import TabBar from "./components/TabBar";
 import { AuthProvider } from "./lib/authContext";
 import FontSizeProvider from "./components/FontSizeProvider";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "Expense Tracker",
@@ -26,10 +27,12 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col antialiased">
         <FontSizeProvider>
-          <AuthProvider>
-            <div className="pb-16">{children}</div>
-            <TabBar />
-          </AuthProvider>
+          <Providers>
+            <AuthProvider>
+              <div className="pb-16">{children}</div>
+              <TabBar />
+            </AuthProvider>
+          </Providers>
         </FontSizeProvider>
       </body>
     </html>
