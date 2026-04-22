@@ -1,7 +1,7 @@
 ---
 id: "012"
 title: Expense History
-status: build
+status: verify
 source: commission seed
 started: 2026-04-20T10:00:00Z
 completed:
