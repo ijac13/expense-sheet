@@ -4,8 +4,8 @@ import { usePathname } from "next/navigation";
 import { Home, Clock, RefreshCw, BarChart2, Settings } from "lucide-react";
 
 const TABS = [
-  { id: "history",       href: "/history",      Icon: Clock,      label: "History" },
   { id: "reports",       href: "/reports",      Icon: BarChart2,  label: "Reports" },
+  { id: "history",       href: "/history",      Icon: Clock,      label: "History" },
   { id: "home",          href: "/",             Icon: Home,       label: "Home" },
   { id: "subscriptions", href: "/subscriptions",Icon: RefreshCw,  label: "Recurring" },
   { id: "settings",      href: "/settings",     Icon: Settings,   label: "Settings" },
