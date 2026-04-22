@@ -96,72 +96,26 @@ export default function HomePage() {
         />
       </div>
 
-      {/* Entry dock */}
+      {/* Entry dock — amount display + tap to open sheet */}
       <div className="shrink-0 bg-base-100 border-t border-base-300 pb-20">
-        {/* Row 1: icon + amount + note + expand */}
-        <div className="flex items-center gap-3 px-3.5 py-2.5 bg-white border-b border-base-300">
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="grid place-items-center w-[34px] h-[34px] rounded-xl bg-primary text-primary-content">
-              <SelectedIcon size={18} strokeWidth={1.6} />
-            </span>
-            <div>
-              <div className="text-[11px] font-medium text-base-content/50 uppercase tracking-wider">TWD</div>
-              <div className={`text-lg font-medium leading-tight ${amount ? "text-base-content" : "text-base-content/35"}`}>
-                {amount ? `$${amount}` : "$0"}
-              </div>
+        <button
+          onClick={() => setShowKeypad(true)}
+          className="w-full flex items-center gap-3 px-3.5 py-3"
+        >
+          <span className="grid place-items-center w-[34px] h-[34px] rounded-xl bg-primary text-primary-content shrink-0">
+            <SelectedIcon size={18} strokeWidth={1.6} />
+          </span>
+          <div className="flex-1 text-left">
+            <div className="text-[11px] font-medium text-base-content/50 uppercase tracking-wider">TWD · tap to enter</div>
+            <div className={`text-lg font-medium leading-tight ${amount ? "text-base-content" : "text-base-content/35"}`}>
+              {amount ? `$${amount}` : "$0"}
             </div>
           </div>
-          <input
-            className="flex-1 bg-transparent outline-none text-sm text-base-content placeholder:text-base-content/40"
-            placeholder="Add a note…"
-            value={note}
-            onChange={e => setNote(e.target.value)}
-          />
-          <button onClick={() => setShowKeypad(true)} className="p-1.5 rounded-lg text-base-content/50 hover:text-base-content">
-            <Expand size={18} />
-          </button>
-        </div>
-
-        {/* Row 2: payer chip */}
-        <div className="flex items-center gap-2 px-3.5 py-2">
-          <span className="text-xs text-base-content/50">Paid by</span>
-          <button
-            onClick={() => setPaidBy(nextUser.id)}
-            className="px-3 py-1 rounded-full bg-base-200 text-xs font-medium text-base-content/70"
-          >
-            {paidByUser?.name ?? paidBy}
-          </button>
-        </div>
-
-        {/* Row 3: date stepper */}
-        <div className="mx-3.5 h-10 rounded-full bg-primary/10 flex items-center justify-between px-3 text-sm font-medium">
-          <button onClick={() => stepDate(-1)} className="w-7 h-7 grid place-items-center rounded-full bg-white shadow-sm">
-            <ChevronLeft size={16} />
-          </button>
-          <span className="text-base-content/80">{formatDateLabel(date)} · {date}</span>
-          <button onClick={() => stepDate(1)} className="w-7 h-7 grid place-items-center rounded-full bg-white shadow-sm">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-
-        {/* Row 4: CTA */}
-        <div className="grid grid-cols-2 mx-3.5 mt-2.5 rounded-2xl overflow-hidden">
-          <button
-            onClick={() => { handleConfirm(); }}
-            className="py-4 text-sm font-semibold bg-base-200 text-base-content/70 active:bg-base-300"
-          >
-            Log another
-          </button>
-          <button
-            onClick={() => { handleConfirm(); setShowList(true); }}
-            className="py-4 text-sm font-semibold bg-primary text-primary-content active:opacity-80"
-          >
-            Save
-          </button>
-        </div>
+          <Expand size={18} className="text-base-content/40" />
+        </button>
       </div>
 
-      {/* Keypad bottom sheet */}
+      {/* Keypad bottom sheet — amount + note + payer + date all together */}
       {showKeypad && (
         <div
           className="fixed inset-0 z-20 bg-black/45 flex items-end"
@@ -171,12 +125,46 @@ export default function HomePage() {
             className="w-full max-w-md mx-auto bg-base-100 rounded-t-3xl p-4 pb-8"
             onClick={e => e.stopPropagation()}
           >
-            <div className="w-9 h-1 rounded-full bg-base-300 mx-auto mb-3" />
-            <div className="text-4xl font-medium tracking-tight px-1 py-2 mb-2">
+            <div className="w-9 h-1 rounded-full bg-base-300 mx-auto mb-4" />
+
+            {/* Amount display */}
+            <div className="text-4xl font-medium tracking-tight px-1 pb-3 border-b border-base-300">
               <span className="text-lg text-base-content/50 mr-1">$</span>
               {amount || "0"}
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
+
+            {/* Note input */}
+            <input
+              className="w-full bg-transparent outline-none text-sm text-base-content placeholder:text-base-content/40 py-2.5 border-b border-base-300"
+              placeholder="Add a note…"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+            />
+
+            {/* Payer + Date row */}
+            <div className="flex items-center gap-3 py-2.5 border-b border-base-300">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-base-content/50">Paid by</span>
+                <button
+                  onClick={() => setPaidBy(nextUser.id)}
+                  className="px-2.5 py-1 rounded-full bg-base-200 text-xs font-medium text-base-content/70"
+                >
+                  {paidByUser?.name ?? paidBy}
+                </button>
+              </div>
+              <div className="flex items-center gap-1 ml-auto">
+                <button onClick={() => stepDate(-1)} className="w-6 h-6 grid place-items-center rounded-full bg-base-200">
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-xs font-medium text-base-content/70 px-1">{formatDateLabel(date)}</span>
+                <button onClick={() => stepDate(1)} className="w-6 h-6 grid place-items-center rounded-full bg-base-200">
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Keypad */}
+            <div className="grid grid-cols-3 gap-1.5 mt-3">
               {["1","2","3","4","5","6","7","8","9",".","0","⌫"].map(k => (
                 <button
                   key={k}
@@ -187,12 +175,22 @@ export default function HomePage() {
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setShowKeypad(false)}
-              className="w-full h-14 mt-1.5 rounded-2xl bg-primary text-primary-content font-semibold text-base"
-            >
-              Done
-            </button>
+
+            {/* Submit / Log another */}
+            <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+              <button
+                onClick={() => { handleConfirm(); }}
+                className="h-14 rounded-2xl bg-base-200 text-sm font-semibold text-base-content/70 active:bg-base-300"
+              >
+                Log another
+              </button>
+              <button
+                onClick={() => { handleConfirm(); setShowList(true); }}
+                className="h-14 rounded-2xl bg-primary text-primary-content font-semibold text-base active:opacity-80"
+              >
+                Submit
+              </button>
+            </div>
           </div>
         </div>
       )}
