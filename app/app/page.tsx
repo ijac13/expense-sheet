@@ -1,12 +1,18 @@
 "use client";
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Expand, Package } from "lucide-react";
+import { ChevronLeft, ChevronRight, Package } from "lucide-react";
 import CategoryPicker from "./components/CategoryPicker";
-import TodayExpenseList from "./components/TodayExpenseList";
-import { DEFAULT_CATEGORIES, CATEGORY_ICONS } from "./lib/categories";
-import { getDefaultCategory, saveLastCategory } from "./lib/categories";
+import { DEFAULT_CATEGORIES, CATEGORY_ICONS, getDefaultCategory, saveLastCategory } from "./lib/categories";
 import { addExpense, getTodayExpenses } from "./lib/expenses";
 import { USERS, DEFAULT_USER, type UserId } from "./lib/users";
+
+const KEYS = [
+  ["7","8","9","⌫"],
+  ["4","5","6","C"],
+  ["1","2","3","+"],
+  [".","0","×","÷"],
+  ["(",")","-",""],
+];
 
 export default function HomePage() {
   const [categoryId, setCategoryId] = useState<string>(() => getDefaultCategory());
@@ -14,36 +20,34 @@ export default function HomePage() {
   const [note, setNote] = useState("");
   const [paidBy, setPaidBy] = useState<UserId>(DEFAULT_USER);
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [showKeypad, setShowKeypad] = useState(false);
-  const [showList, setShowList] = useState(false);
   const [expenses, setExpenses] = useState(() => getTodayExpenses());
 
   const selectedCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId);
   const SelectedIcon = selectedCat ? (CATEGORY_ICONS[selectedCat.id] ?? Package) : Package;
+  const paidByUser = USERS.find(u => u.id === paidBy);
+  const nextUser = USERS[(USERS.findIndex(u => u.id === paidBy) + 1) % USERS.length];
 
   function handleSelectCategory(id: string) {
     setCategoryId(id);
     saveLastCategory(id);
   }
 
-  function handleKeypad(key: string) {
-    if (key === "⌫") {
-      setAmount(a => a.slice(0, -1));
-    } else if (key === "." && amount.includes(".")) {
-      // no-op
-    } else {
-      setAmount(a => a + key);
-    }
+  function handleKey(key: string) {
+    if (key === "") return;
+    if (key === "⌫") { setAmount(a => a.slice(0, -1)); return; }
+    if (key === "C") { setAmount(""); return; }
+    setAmount(a => a + key);
   }
 
-  function handleConfirm() {
-    const val = parseFloat(amount);
+  function handleConfirm(andContinue = false) {
+    let val: number;
+    try { val = Function(`"use strict"; return (${amount || "0"})`)() as number; }
+    catch { return; }
     if (!val || val <= 0) return;
     addExpense({ amount: val, category_id: categoryId, date, paid_by: paidBy, created_by: paidBy, notes: note });
     setExpenses(getTodayExpenses());
     setAmount("");
-    setNote("");
-    setShowKeypad(false);
+    if (!andContinue) setNote("");
   }
 
   function stepDate(dir: 1 | -1) {
@@ -60,35 +64,63 @@ export default function HomePage() {
     return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
 
-  const paidByUser = USERS.find(u => u.id === paidBy);
-  const nextUser = USERS[(USERS.findIndex(u => u.id === paidBy) + 1) % USERS.length];
-
-  if (showList) {
-    return (
-      <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto pb-20">
-        <div className="sticky top-0 bg-base-100 px-4 pt-12 pb-3 border-b border-base-300">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-semibold">Today</h1>
-            <button onClick={() => setShowList(false)} className="btn btn-sm btn-primary">+ Add</button>
-          </div>
-        </div>
-        <TodayExpenseList expenses={expenses} />
-      </main>
-    );
-  }
-
   return (
     <main className="flex flex-col h-screen bg-base-100 max-w-md mx-auto overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-12 pb-3">
-        <h1 className="text-xl font-semibold text-base-content">Add Expense</h1>
-        <button onClick={() => setShowList(true)} className="text-sm text-base-content/60 underline underline-offset-2">
-          Today ({expenses.length})
-        </button>
+
+      {/* Amount display */}
+      <div className="bg-primary text-primary-content px-4 pt-12 pb-4 shrink-0">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-sm opacity-70">Amount (TWD)</span>
+          {expenses.length > 0 && (
+            <span className="text-xs opacity-60">{expenses.length} logged today</span>
+          )}
+        </div>
+        <div className="text-5xl font-mono font-bold min-h-[52px] break-all">
+          {amount || <span className="opacity-40">0</span>}
+        </div>
       </div>
 
-      {/* Category grid — scrollable middle */}
+      {/* Scrollable middle: category picker */}
       <div className="flex-1 overflow-y-auto">
+        {/* Meta row: category icon + date/payer/notes */}
+        <div className="px-4 pt-3 pb-2 flex gap-2">
+          <button
+            onClick={() => {}}
+            className="flex items-center gap-2 px-3 py-2 bg-base-200 rounded-xl text-sm"
+          >
+            <SelectedIcon size={16} strokeWidth={1.6} />
+            <span className="text-base-content/70">{selectedCat?.name_en}</span>
+          </button>
+          <button
+            onClick={() => setPaidBy(nextUser.id)}
+            className="flex items-center gap-2 px-3 py-2 bg-base-200 rounded-xl text-sm text-base-content/70"
+          >
+            {paidByUser?.name ?? paidBy}
+          </button>
+        </div>
+
+        {/* Date stepper */}
+        <div className="mx-4 mb-2 h-9 rounded-full bg-primary/10 flex items-center justify-between px-3 text-sm font-medium">
+          <button onClick={() => stepDate(-1)} className="w-6 h-6 grid place-items-center rounded-full bg-white shadow-sm">
+            <ChevronLeft size={14} />
+          </button>
+          <span className="text-base-content/80">{formatDateLabel(date)} · {date}</span>
+          <button onClick={() => stepDate(1)} className="w-6 h-6 grid place-items-center rounded-full bg-white shadow-sm">
+            <ChevronRight size={14} />
+          </button>
+        </div>
+
+        {/* Notes */}
+        <div className="px-4 mb-3">
+          <input
+            className="w-full px-3 py-2 rounded-xl bg-base-200 text-sm outline-none placeholder:text-base-content/40"
+            placeholder="Notes (optional)"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+          />
+        </div>
+
+        {/* Category picker */}
         <CategoryPicker
           categories={DEFAULT_CATEGORIES}
           selectedId={categoryId}
@@ -96,104 +128,42 @@ export default function HomePage() {
         />
       </div>
 
-      {/* Entry dock — amount display + tap to open sheet */}
-      <div className="shrink-0 bg-base-100 border-t border-base-300 pb-20">
-        <button
-          onClick={() => setShowKeypad(true)}
-          className="w-full flex items-center gap-3 px-3.5 py-3"
-        >
-          <span className="grid place-items-center w-[34px] h-[34px] rounded-xl bg-primary text-primary-content shrink-0">
-            <SelectedIcon size={18} strokeWidth={1.6} />
-          </span>
-          <div className="flex-1 text-left">
-            <div className="text-[11px] font-medium text-base-content/50 uppercase tracking-wider">TWD · tap to enter</div>
-            <div className={`text-lg font-medium leading-tight ${amount ? "text-base-content" : "text-base-content/35"}`}>
-              {amount ? `$${amount}` : "$0"}
-            </div>
-          </div>
-          <Expand size={18} className="text-base-content/40" />
-        </button>
-      </div>
-
-      {/* Keypad bottom sheet — amount + note + payer + date all together */}
-      {showKeypad && (
-        <div
-          className="fixed inset-0 z-20 bg-black/45 flex items-end"
-          onClick={() => setShowKeypad(false)}
-        >
-          <div
-            className="w-full max-w-md mx-auto bg-base-100 rounded-t-3xl p-4 pb-8"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="w-9 h-1 rounded-full bg-base-300 mx-auto mb-4" />
-
-            {/* Amount display */}
-            <div className="text-4xl font-medium tracking-tight px-1 pb-3 border-b border-base-300">
-              <span className="text-lg text-base-content/50 mr-1">$</span>
-              {amount || "0"}
-            </div>
-
-            {/* Note input */}
-            <input
-              className="w-full bg-transparent outline-none text-sm text-base-content placeholder:text-base-content/40 py-2.5 border-b border-base-300"
-              placeholder="Add a note…"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-            />
-
-            {/* Payer + Date row */}
-            <div className="flex items-center gap-3 py-2.5 border-b border-base-300">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-base-content/50">Paid by</span>
-                <button
-                  onClick={() => setPaidBy(nextUser.id)}
-                  className="px-2.5 py-1 rounded-full bg-base-200 text-xs font-medium text-base-content/70"
-                >
-                  {paidByUser?.name ?? paidBy}
-                </button>
-              </div>
-              <div className="flex items-center gap-1 ml-auto">
-                <button onClick={() => stepDate(-1)} className="w-6 h-6 grid place-items-center rounded-full bg-base-200">
-                  <ChevronLeft size={14} />
-                </button>
-                <span className="text-xs font-medium text-base-content/70 px-1">{formatDateLabel(date)}</span>
-                <button onClick={() => stepDate(1)} className="w-6 h-6 grid place-items-center rounded-full bg-base-200">
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-
-            {/* Keypad */}
-            <div className="grid grid-cols-3 gap-1.5 mt-3">
-              {["1","2","3","4","5","6","7","8","9",".","0","⌫"].map(k => (
-                <button
-                  key={k}
-                  onClick={() => handleKeypad(k)}
-                  className="h-14 rounded-2xl bg-white border border-base-300 text-xl font-medium active:bg-primary/10"
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
-
-            {/* Submit / Log another */}
-            <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+      {/* Calculator — always visible at bottom */}
+      <div className="shrink-0 bg-base-100 border-t border-base-300 px-3 pt-2 pb-20">
+        <div className="grid grid-cols-4 gap-1.5 mb-1.5">
+          {KEYS.flat().map((key, i) => {
+            if (key === "") return <div key={i} />;
+            const isOp = ["+","-","×","÷","(",")"].includes(key);
+            const isDel = key === "⌫" || key === "C";
+            return (
               <button
-                onClick={() => { handleConfirm(); }}
-                className="h-14 rounded-2xl bg-base-200 text-sm font-semibold text-base-content/70 active:bg-base-300"
+                key={i}
+                onClick={() => handleKey(key)}
+                className={`h-12 rounded-xl text-lg font-medium transition-all active:scale-95
+                  ${isDel ? "bg-base-200 text-base-content/70 border border-base-300"
+                  : isOp ? "bg-secondary/20 text-secondary border border-secondary/30"
+                  : "bg-white border border-base-300 text-base-content"}`}
               >
-                Log another
+                {key}
               </button>
-              <button
-                onClick={() => { handleConfirm(); setShowList(true); }}
-                className="h-14 rounded-2xl bg-primary text-primary-content font-semibold text-base active:opacity-80"
-              >
-                Submit
-              </button>
-            </div>
-          </div>
+            );
+          })}
         </div>
-      )}
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            onClick={() => handleConfirm(true)}
+            className="h-12 rounded-xl bg-base-200 text-sm font-semibold text-base-content/70 active:bg-base-300"
+          >
+            Log another
+          </button>
+          <button
+            onClick={() => handleConfirm(false)}
+            className="h-12 rounded-xl bg-primary text-primary-content font-semibold active:opacity-80"
+          >
+            Save
+          </button>
+        </div>
+      </div>
     </main>
   );
 }
