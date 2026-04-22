@@ -1,3 +1,36 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  Utensils, ShoppingCart, Carrot, Stethoscope, Plane, Bus,
+  Smartphone, Baby, Shirt, Dumbbell, Gift, GraduationCap,
+  Milestone, Wrench, Fuel, Gamepad2, Home, ShoppingBag,
+  Car, HandHeart, Key, Package,
+} from "lucide-react";
+
+export const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  "eating-out": Utensils,
+  "daily-necessities": ShoppingCart,
+  "groceries": Carrot,
+  "medical": Stethoscope,
+  "travel": Plane,
+  "transportation": Bus,
+  "digital": Smartphone,
+  "babies": Baby,
+  "clothing": Shirt,
+  "sports": Dumbbell,
+  "gifts": Gift,
+  "tuition": GraduationCap,
+  "tolls": Milestone,
+  "equipment": Wrench,
+  "fuel": Fuel,
+  "entertainment": Gamepad2,
+  "rent": Home,
+  "shopping": ShoppingBag,
+  "car-repair": Car,
+  "donate": HandHeart,
+  "mortgage": Key,
+  "other": Package,
+};
+
 export interface Category {
   id: string;
   name_en: string;

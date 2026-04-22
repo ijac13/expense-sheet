@@ -1,191 +1,201 @@
 "use client";
-
-import { useState, useEffect } from "react";
-import CalculatorKeypad from "./components/CalculatorKeypad";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, Expand, Package } from "lucide-react";
 import CategoryPicker from "./components/CategoryPicker";
 import TodayExpenseList from "./components/TodayExpenseList";
-import { KeypadKey, applyKey, evaluateExpression } from "./lib/calculator";
+import { DEFAULT_CATEGORIES, CATEGORY_ICONS } from "./lib/categories";
 import { getDefaultCategory, saveLastCategory } from "./lib/categories";
-import { Expense, MOCK_EXPENSES, stubSaveExpense } from "./lib/expenses";
-import { USERS, UserId, DEFAULT_USER } from "./lib/users";
+import { addExpense, getTodayExpenses } from "./lib/expenses";
+import { USERS, DEFAULT_USER, type UserId } from "./lib/users";
 
-type View = "entry" | "list";
-
-export default function Home() {
-  const [view, setView] = useState<View>("entry");
-  const [expression, setExpression] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+export default function HomePage() {
+  const [categoryId, setCategoryId] = useState<string>(() => getDefaultCategory());
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
   const [paidBy, setPaidBy] = useState<UserId>(DEFAULT_USER);
-  const [notes, setNotes] = useState("");
-  const [expenses, setExpenses] = useState<Expense[]>(MOCK_EXPENSES);
-  const [evalError, setEvalError] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [showKeypad, setShowKeypad] = useState(false);
+  const [showList, setShowList] = useState(false);
+  const [expenses, setExpenses] = useState(() => getTodayExpenses());
 
-  // Load last-used category from localStorage on mount
-  useEffect(() => {
-    setCategoryId(getDefaultCategory());
-  }, []);
+  const selectedCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId);
+  const SelectedIcon = selectedCat ? (CATEGORY_ICONS[selectedCat.id] ?? Package) : Package;
 
-  function handleKey(key: KeypadKey) {
-    setEvalError(false);
-    setExpression((prev) => applyKey(prev, key));
-  }
-
-  function handleCategorySelect(id: string) {
+  function handleSelectCategory(id: string) {
     setCategoryId(id);
     saveLastCategory(id);
   }
 
-  function handleConfirm() {
-    const amount = evaluateExpression(expression);
-    if (amount === null || amount <= 0) {
-      setEvalError(true);
-      return;
+  function handleKeypad(key: string) {
+    if (key === "⌫") {
+      setAmount(a => a.slice(0, -1));
+    } else if (key === "." && amount.includes(".")) {
+      // no-op
+    } else {
+      setAmount(a => a + key);
     }
-    const newExpense = stubSaveExpense({
-      date,
-      amount,
-      category_id: categoryId,
-      paid_by: paidBy,
-      notes,
-    });
-    setExpenses((prev) => [newExpense, ...prev]);
-    resetForm();
-    setView("list");
   }
 
-  function handleCancel() {
-    resetForm();
-    setView("list");
+  function handleConfirm() {
+    const val = parseFloat(amount);
+    if (!val || val <= 0) return;
+    addExpense({ amount: val, category_id: categoryId, date, paid_by: paidBy, created_by: paidBy, notes: note });
+    setExpenses(getTodayExpenses());
+    setAmount("");
+    setNote("");
+    setShowKeypad(false);
   }
 
-  function resetForm() {
-    setExpression("");
-    setNotes("");
-    setEvalError(false);
-    setDate(new Date().toISOString().split("T")[0]);
-    setPaidBy(DEFAULT_USER);
+  function stepDate(dir: 1 | -1) {
+    const d = new Date(date + "T00:00:00");
+    d.setDate(d.getDate() + dir);
+    setDate(d.toISOString().split("T")[0]);
   }
 
-  // Computed display: show evaluated value preview when expression is valid
-  const evaluatedAmount = evaluateExpression(expression);
-  const showPreview =
-    expression.includes("+") ||
-    expression.includes("-") ||
-    expression.includes("×") ||
-    expression.includes("÷") ||
-    expression.includes("(");
+  function formatDateLabel(d: string) {
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    if (d === today) return "Today";
+    if (d === yesterday) return "Yesterday";
+    return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
 
-  if (view === "list") {
+  const paidByUser = USERS.find(u => u.id === paidBy);
+  const nextUser = USERS[(USERS.findIndex(u => u.id === paidBy) + 1) % USERS.length];
+
+  if (showList) {
     return (
-      <TodayExpenseList
-        expenses={expenses}
-        onAddNew={() => setView("entry")}
-      />
+      <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto pb-20">
+        <div className="sticky top-0 bg-base-100 px-4 pt-12 pb-3 border-b border-base-300">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-semibold">Today</h1>
+            <button onClick={() => setShowList(false)} className="btn btn-sm btn-primary">+ Add</button>
+          </div>
+        </div>
+        <TodayExpenseList expenses={expenses} />
+      </main>
     );
   }
 
   return (
-    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto">
-      {/* Amount display */}
-      <div className="bg-primary text-primary-content px-4 pt-12 pb-4">
-        <div className="text-base opacity-70 mb-1">Amount (TWD)</div>
-        <div
-          className={`text-5xl font-mono font-bold min-h-[52px] break-all ${
-            evalError ? "text-error" : ""
-          }`}
-        >
-          {expression || <span className="opacity-40">0</span>}
-        </div>
-        {showPreview && evaluatedAmount !== null && (
-          <div className="text-sm opacity-70 mt-1">= NT${evaluatedAmount.toLocaleString()}</div>
-        )}
-        {evalError && (
-          <div className="text-sm text-error-content bg-error/20 rounded px-2 py-1 mt-1">
-            Enter a valid amount
-          </div>
-        )}
+    <main className="flex flex-col h-screen bg-base-100 max-w-md mx-auto overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 pt-12 pb-3">
+        <h1 className="text-xl font-semibold text-base-content">Add Expense</h1>
+        <button onClick={() => setShowList(true)} className="text-sm text-base-content/60 underline underline-offset-2">
+          Today ({expenses.length})
+        </button>
       </div>
 
-      {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 pb-6">
-        {/* Supporting fields */}
-        <div className="flex gap-2">
-          {/* Date */}
-          <button
-            type="button"
-            onClick={() => setShowDatePicker((p) => !p)}
-            className="btn btn-outline btn-sm flex-1 justify-start gap-2"
-          >
-            <span>📅</span>
-            <span>{date}</span>
-          </button>
-          {/* Paid by toggle */}
-          <button
-            type="button"
-            onClick={() => setPaidBy((p) => {
-              const idx = USERS.findIndex((u) => u.id === p);
-              return USERS[(idx + 1) % USERS.length].id;
-            })}
-            className="btn btn-outline btn-sm flex-1 justify-start gap-2"
-          >
-            <span>👤</span>
-            <span>{USERS.find((u) => u.id === paidBy)?.name ?? paidBy}</span>
-          </button>
-        </div>
-
-        {showDatePicker && (
-          <input
-            type="date"
-            className="input input-bordered w-full"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setShowDatePicker(false);
-            }}
-          />
-        )}
-
-        {/* Notes */}
-        <input
-          type="text"
-          placeholder="Notes (optional)"
-          className="input input-bordered w-full"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+      {/* Category grid — scrollable middle */}
+      <div className="flex-1 overflow-y-auto">
+        <CategoryPicker
+          categories={DEFAULT_CATEGORIES}
+          selectedId={categoryId}
+          onSelect={handleSelectCategory}
         />
+      </div>
 
-        {/* Category picker */}
-        <div>
-          <div className="text-xs text-base-content/50 mb-2 uppercase tracking-wide">Category</div>
-          {categoryId && (
-            <CategoryPicker selected={categoryId} onSelect={handleCategorySelect} />
-          )}
+      {/* Entry dock */}
+      <div className="shrink-0 bg-base-100 border-t border-base-300 pb-20">
+        {/* Row 1: icon + amount + note + expand */}
+        <div className="flex items-center gap-3 px-3.5 py-2.5 bg-white border-b border-base-300">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="grid place-items-center w-[34px] h-[34px] rounded-xl bg-primary text-primary-content">
+              <SelectedIcon size={18} strokeWidth={1.6} />
+            </span>
+            <div>
+              <div className="text-[11px] font-medium text-base-content/50 uppercase tracking-wider">TWD</div>
+              <div className={`text-lg font-medium leading-tight ${amount ? "text-base-content" : "text-base-content/35"}`}>
+                {amount ? `$${amount}` : "$0"}
+              </div>
+            </div>
+          </div>
+          <input
+            className="flex-1 bg-transparent outline-none text-sm text-base-content placeholder:text-base-content/40"
+            placeholder="Add a note…"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+          />
+          <button onClick={() => setShowKeypad(true)} className="p-1.5 rounded-lg text-base-content/50 hover:text-base-content">
+            <Expand size={18} />
+          </button>
+        </div>
+
+        {/* Row 2: payer chip */}
+        <div className="flex items-center gap-2 px-3.5 py-2">
+          <span className="text-xs text-base-content/50">Paid by</span>
+          <button
+            onClick={() => setPaidBy(nextUser.id)}
+            className="px-3 py-1 rounded-full bg-base-200 text-xs font-medium text-base-content/70"
+          >
+            {paidByUser?.name ?? paidBy}
+          </button>
+        </div>
+
+        {/* Row 3: date stepper */}
+        <div className="mx-3.5 h-10 rounded-full bg-primary/10 flex items-center justify-between px-3 text-sm font-medium">
+          <button onClick={() => stepDate(-1)} className="w-7 h-7 grid place-items-center rounded-full bg-white shadow-sm">
+            <ChevronLeft size={16} />
+          </button>
+          <span className="text-base-content/80">{formatDateLabel(date)} · {date}</span>
+          <button onClick={() => stepDate(1)} className="w-7 h-7 grid place-items-center rounded-full bg-white shadow-sm">
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
+        {/* Row 4: CTA */}
+        <div className="grid grid-cols-2 mx-3.5 mt-2.5 rounded-2xl overflow-hidden">
+          <button
+            onClick={() => { handleConfirm(); }}
+            className="py-4 text-sm font-semibold bg-base-200 text-base-content/70 active:bg-base-300"
+          >
+            Log another
+          </button>
+          <button
+            onClick={() => { handleConfirm(); setShowList(true); }}
+            className="py-4 text-sm font-semibold bg-primary text-primary-content active:opacity-80"
+          >
+            Save
+          </button>
         </div>
       </div>
 
-      {/* Keypad + actions — sticky at bottom */}
-      <div className="sticky bottom-0 bg-base-100/95 backdrop-blur-sm border-t border-base-200 px-4 pt-3 pb-6 space-y-3">
-        <CalculatorKeypad onKey={handleKey} />
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="btn btn-ghost border border-base-300 text-base-content"
+      {/* Keypad bottom sheet */}
+      {showKeypad && (
+        <div
+          className="fixed inset-0 z-20 bg-black/45 flex items-end"
+          onClick={() => setShowKeypad(false)}
+        >
+          <div
+            className="w-full max-w-md mx-auto bg-base-100 rounded-t-3xl p-4 pb-8"
+            onClick={e => e.stopPropagation()}
           >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            className="btn btn-primary"
-          >
-            Confirm
-          </button>
+            <div className="w-9 h-1 rounded-full bg-base-300 mx-auto mb-3" />
+            <div className="text-4xl font-medium tracking-tight px-1 py-2 mb-2">
+              <span className="text-lg text-base-content/50 mr-1">$</span>
+              {amount || "0"}
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {["1","2","3","4","5","6","7","8","9",".","0","⌫"].map(k => (
+                <button
+                  key={k}
+                  onClick={() => handleKeypad(k)}
+                  className="h-14 rounded-2xl bg-white border border-base-300 text-xl font-medium active:bg-primary/10"
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowKeypad(false)}
+              className="w-full h-14 mt-1.5 rounded-2xl bg-primary text-primary-content font-semibold text-base"
+            >
+              Done
+            </button>
+          </div>
         </div>
-      </div>
-
+      )}
     </main>
   );
 }

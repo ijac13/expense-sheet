@@ -1,32 +1,33 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Home, Clock, RefreshCw, BarChart2, Settings } from "lucide-react";
 
 const TABS = [
-  { href: "/", label: "Home", icon: "🏠" },
-  { href: "/history", label: "History", icon: "📋" },
-  { href: "/subscriptions", label: "Subscriptions", icon: "🔄" },
-  { href: "/reports", label: "Reports", icon: "📊" },
-  { href: "/settings", label: "Settings", icon: "⚙️" },
+  { id: "home",          href: "/",             Icon: Home,       label: "Home" },
+  { id: "history",       href: "/history",      Icon: Clock,      label: "History" },
+  { id: "subscriptions", href: "/subscriptions",Icon: RefreshCw,  label: "Recurring" },
+  { id: "reports",       href: "/reports",      Icon: BarChart2,  label: "Reports" },
+  { id: "settings",      href: "/settings",     Icon: Settings,   label: "Settings" },
 ];
 
 export default function TabBar() {
   const pathname = usePathname();
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-base-100 border-t border-base-200">
-      <div className="max-w-md mx-auto flex">
-        {TABS.map((tab) => {
-          const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-base-100 border-t border-base-300">
+      <div className="max-w-md mx-auto grid grid-cols-5 pt-1.5 pb-2">
+        {TABS.map(t => {
+          const on = pathname === t.href || (t.href !== "/" && pathname.startsWith(t.href));
           return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={`flex-1 flex flex-col items-center py-2 gap-0.5 text-[10px] transition-colors ${
-                active ? "text-primary" : "text-base-content/50"
-              }`}
-            >
-              <span className="text-xl">{tab.icon}</span>
-              <span>{tab.label}</span>
+            <Link key={t.id} href={t.href}
+              className="flex flex-col items-center gap-1">
+              <span className={`grid place-items-center w-[54px] h-7 rounded-full transition-colors
+                ${on ? "bg-primary text-primary-content" : "text-base-content/70"}`}>
+                <t.Icon size={20} strokeWidth={1.7} />
+              </span>
+              <span className={`text-[11px] font-medium ${on ? "text-base-content" : "text-base-content/50"}`}>
+                {t.label}
+              </span>
             </Link>
           );
         })}
