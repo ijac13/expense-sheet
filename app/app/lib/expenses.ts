@@ -4,8 +4,10 @@ export interface Expense {
   amount: number;
   category_id: string;
   paid_by: string;
-  notes: string;
+  created_by?: string; // who logged the expense
+  notes?: string;
   created_at: string; // ISO datetime
+  subscription_id?: string; // set if created by a recurring subscription
 }
 
 export const MOCK_EXPENSES: Expense[] = [

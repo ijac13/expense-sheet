@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Expense, getTodayExpenses, getDailyTotal } from "../lib/expenses";
 import { DEFAULT_CATEGORIES } from "../lib/categories";
 import { USERS } from "../lib/users";
@@ -46,23 +47,25 @@ export default function TodayExpenseList({ expenses, onAddNew }: TodayExpenseLis
           todayExpenses.map((expense) => {
             const category = DEFAULT_CATEGORIES.find((c) => c.id === expense.category_id);
             return (
-              <div key={expense.id} className="card bg-base-100 border border-base-200 shadow-sm">
-                <div className="card-body p-3 flex-row items-center gap-3">
-                  <div className="text-3xl">{category?.icon ?? "📦"}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-base-content">
-                      {category?.name_en ?? "Other"}
+              <Link key={expense.id} href={`/expense/${expense.id}`} className="block">
+                <div className="card bg-base-100 border border-base-200 shadow-sm">
+                  <div className="card-body p-3 flex-row items-center gap-3">
+                    <div className="text-3xl">{category?.icon ?? "📦"}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-base-content">
+                        {category?.name_en ?? "Other"}
+                      </div>
+                      {expense.notes && (
+                        <div className="text-xs text-base-content/60 truncate">{expense.notes}</div>
+                      )}
+                      <div className="text-xs text-base-content/40">Paid by {USERS.find((u) => u.id === expense.paid_by)?.name ?? expense.paid_by}</div>
                     </div>
-                    {expense.notes && (
-                      <div className="text-xs text-base-content/60 truncate">{expense.notes}</div>
-                    )}
-                    <div className="text-xs text-base-content/40">Paid by {USERS.find((u) => u.id === expense.paid_by)?.name ?? expense.paid_by}</div>
-                  </div>
-                  <div className="text-lg font-semibold text-primary whitespace-nowrap">
-                    NT${expense.amount.toLocaleString()}
+                    <div className="text-lg font-semibold text-primary whitespace-nowrap">
+                      NT${expense.amount.toLocaleString()}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })
         )}
