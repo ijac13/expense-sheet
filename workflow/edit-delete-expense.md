@@ -1,7 +1,7 @@
 ---
 id: "010"
 title: Edit and Delete Expense
-status: build
+status: verify
 source: commission seed
 started: 2026-04-21T03:00:00Z
 completed:
