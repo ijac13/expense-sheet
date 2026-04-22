@@ -35,7 +35,7 @@ const MONTH_SHORT = [
 // Donut chart helpers
 // ---------------------------------------------------------------------------
 function segmentProps(percent: number, offset: number, total: number) {
-  const circumference = 2 * Math.PI * 66;
+  const circumference = 2 * Math.PI * 88;
   const dash = (percent / total) * circumference;
   const dashOffset = circumference - (offset / total) * circumference;
   return { strokeDasharray: `${dash} ${circumference - dash}`, strokeDashoffset: dashOffset };
@@ -48,13 +48,13 @@ function DonutChart({ categories }: { categories: CategoryBreakdown[] }) {
   let offset = 0;
   return (
     <div className="flex justify-center">
-      <svg width={180} height={180} viewBox="0 0 180 180">
+      <svg width={240} height={240} viewBox="0 0 240 240">
         {/* Track */}
         <circle
-          cx={90} cy={90} r={66}
+          cx={120} cy={120} r={88}
           fill="none"
           stroke="var(--color-base-200)"
-          strokeWidth={18}
+          strokeWidth={22}
         />
         {categories.map((cat, i) => {
           const props = segmentProps(cat.total, offset, total);
@@ -62,18 +62,18 @@ function DonutChart({ categories }: { categories: CategoryBreakdown[] }) {
           return (
             <circle
               key={cat.category_id}
-              cx={90} cy={90} r={66}
+              cx={120} cy={120} r={88}
               fill="none"
               stroke={DONUT_COLORS[i % DONUT_COLORS.length]}
-              strokeWidth={18}
+              strokeWidth={22}
               strokeDasharray={props.strokeDasharray}
               strokeDashoffset={props.strokeDashoffset}
-              style={{ transform: "rotate(-90deg)", transformOrigin: "90px 90px" }}
+              style={{ transform: "rotate(-90deg)", transformOrigin: "120px 120px" }}
             />
           );
         })}
-        <text x={90} y={86} textAnchor="middle" className="fill-base-content text-xs" fontSize={11} fill="currentColor" opacity={0.5}>Total</text>
-        <text x={90} y={102} textAnchor="middle" fontSize={14} fontWeight={600} fill="currentColor">
+        <text x={120} y={114} textAnchor="middle" fontSize={13} fill="currentColor" opacity={0.5}>Total</text>
+        <text x={120} y={134} textAnchor="middle" fontSize={18} fontWeight={600} fill="currentColor">
           {`NT$${(total / 1000).toFixed(0)}k`}
         </text>
       </svg>
@@ -221,7 +221,7 @@ export default function ReportsPage() {
       {/* ------------------------------------------------------------------ */}
       {/* Header */}
       {/* ------------------------------------------------------------------ */}
-      <div className="sticky top-0 bg-base-100 px-4 pt-12 pb-3 border-b border-base-300 z-10">
+      <div className="sticky top-0 bg-base-100 px-4 pt-6 pb-3 border-b border-base-300 z-10">
         <h1 className="text-2xl font-semibold mb-3">Reports</h1>
 
         {/* Period toggle */}

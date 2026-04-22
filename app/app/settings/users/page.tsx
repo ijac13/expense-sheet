@@ -3,7 +3,7 @@ import { USERS } from "../../lib/users";
 
 export default function UsersPage() {
   return (
-    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-12 pb-20">
+    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-20">
       <h1 className="text-2xl font-semibold mb-1">User Management</h1>
       <p className="text-sm text-base-content/50 mb-6">
         Add or remove users by editing the Users tab in Google Sheets.
