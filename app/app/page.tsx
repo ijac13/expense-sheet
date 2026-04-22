@@ -65,7 +65,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="flex flex-col h-screen bg-base-100 max-w-md mx-auto overflow-hidden">
+    <main className="flex flex-col bg-base-100 max-w-md mx-auto overflow-hidden" style={{ height: "100dvh" }}>
 
       {/* Amount display */}
       <div className="bg-primary text-primary-content px-4 pt-12 pb-4 shrink-0">
