@@ -2,9 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  PieChart,
-  Pie,
-  Cell,
   BarChart,
   Bar,
   XAxis,
@@ -22,19 +19,67 @@ import {
 } from "../lib/reportTypes";
 import { getMonthlySummary, getAnnualSummary } from "../lib/reportService";
 import DrillDown from "./DrillDown";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const PIE_COLORS = [
-  "#7c3aed", "#2563eb", "#16a34a", "#d97706",
-  "#dc2626", "#6b7280", "#ec4899", "#14b8a6",
-];
+const DONUT_COLORS = ["#1e6d4a", "#5ea87f", "#f9c440", "#d97757", "#7dc6b8", "#bfdba8"];
 
 const MONTH_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
+
+// ---------------------------------------------------------------------------
+// Donut chart helpers
+// ---------------------------------------------------------------------------
+function segmentProps(percent: number, offset: number, total: number) {
+  const circumference = 2 * Math.PI * 66;
+  const dash = (percent / total) * circumference;
+  const dashOffset = circumference - (offset / total) * circumference;
+  return { strokeDasharray: `${dash} ${circumference - dash}`, strokeDashoffset: dashOffset };
+}
+
+function DonutChart({ categories }: { categories: CategoryBreakdown[] }) {
+  const total = categories.reduce((s, c) => s + c.total, 0);
+  if (total === 0) return null;
+
+  let offset = 0;
+  return (
+    <div className="flex justify-center">
+      <svg width={180} height={180} viewBox="0 0 180 180">
+        {/* Track */}
+        <circle
+          cx={90} cy={90} r={66}
+          fill="none"
+          stroke="var(--color-base-200)"
+          strokeWidth={18}
+        />
+        {categories.map((cat, i) => {
+          const props = segmentProps(cat.total, offset, total);
+          offset += cat.total;
+          return (
+            <circle
+              key={cat.category_id}
+              cx={90} cy={90} r={66}
+              fill="none"
+              stroke={DONUT_COLORS[i % DONUT_COLORS.length]}
+              strokeWidth={18}
+              strokeDasharray={props.strokeDasharray}
+              strokeDashoffset={props.strokeDashoffset}
+              style={{ transform: "rotate(-90deg)", transformOrigin: "90px 90px" }}
+            />
+          );
+        })}
+        <text x={90} y={86} textAnchor="middle" className="fill-base-content text-xs" fontSize={11} fill="currentColor" opacity={0.5}>Total</text>
+        <text x={90} y={102} textAnchor="middle" fontSize={14} fontWeight={600} fill="currentColor">
+          {`NT$${(total / 1000).toFixed(0)}k`}
+        </text>
+      </svg>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Delta badge
@@ -71,7 +116,6 @@ function CategoryRow({
       className="w-full flex items-center gap-3 py-3 px-4 hover:bg-base-200 transition-colors rounded-xl text-left"
       onClick={() => onDrillDown(cat)}
     >
-      <span className="text-2xl w-8 text-center">{cat.icon}</span>
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-baseline">
           <span className="font-medium text-sm truncate">{cat.category_name}</span>
@@ -116,7 +160,6 @@ export default function ReportsPage() {
   // Drill-down state
   const [drillDownCategory, setDrillDownCategory] = useState<CategoryBreakdown | null>(null);
 
-  // Mount guard — prevents recharts SSR issues during static export
   useEffect(() => setMounted(true), []);
 
   // Load monthly data
@@ -174,15 +217,15 @@ export default function ReportsPage() {
   }
 
   return (
-    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto">
+    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto pb-20">
       {/* ------------------------------------------------------------------ */}
       {/* Header */}
       {/* ------------------------------------------------------------------ */}
-      <div className="bg-primary text-primary-content px-4 pt-12 pb-4">
-        <h1 className="text-xl font-bold mb-3">Reports</h1>
+      <div className="sticky top-0 bg-base-100 px-4 pt-12 pb-3 border-b border-base-300 z-10">
+        <h1 className="text-2xl font-semibold mb-3">Reports</h1>
 
         {/* Period toggle */}
-        <div className="flex gap-1 bg-primary-content/10 rounded-xl p-1 mb-3">
+        <div className="flex gap-1 bg-base-200 rounded-xl p-1 mb-3">
           {(["monthly", "annual"] as ReportPeriod[]).map((p) => (
             <button
               key={p}
@@ -190,8 +233,8 @@ export default function ReportsPage() {
               onClick={() => setPeriod(p)}
               className={`flex-1 py-1.5 text-sm font-semibold rounded-lg transition-colors capitalize ${
                 period === p
-                  ? "bg-primary-content text-primary"
-                  : "text-primary-content/70"
+                  ? "bg-primary text-primary-content"
+                  : "text-base-content/60"
               }`}
             >
               {p}
@@ -200,7 +243,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Payer filter */}
-        <div className="flex gap-1 bg-primary-content/10 rounded-xl p-1">
+        <div className="flex gap-1 bg-base-200 rounded-xl p-1">
           {(["all", "user1", "user2"] as PayerFilter[]).map((p) => (
             <button
               key={p}
@@ -208,8 +251,8 @@ export default function ReportsPage() {
               onClick={() => setPayer(p)}
               className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
                 payer === p
-                  ? "bg-primary-content text-primary"
-                  : "text-primary-content/70"
+                  ? "bg-primary text-primary-content"
+                  : "text-base-content/60"
               }`}
             >
               {p === "all" ? "All" : p === "user1" ? "Me" : "Partner"}
@@ -235,46 +278,40 @@ export default function ReportsPage() {
           <>
             {/* Navigation */}
             <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={prevMonth}
-                className="btn btn-ghost btn-sm"
-              >
-                &#8592;
+              <button type="button" onClick={prevMonth} className="btn btn-ghost btn-sm">
+                <ChevronLeft size={18} />
               </button>
               <span className="font-semibold text-base">
                 {monthly?.label ?? `${MONTH_SHORT[month - 1]} ${year}`}
               </span>
-              <button
-                type="button"
-                onClick={nextMonth}
-                className="btn btn-ghost btn-sm"
-              >
-                &#8594;
+              <button type="button" onClick={nextMonth} className="btn btn-ghost btn-sm">
+                <ChevronRight size={18} />
               </button>
             </div>
 
             {monthly && monthly.total === 0 ? (
-              /* Empty state */
               <div className="text-center py-16 text-base-content/40">
-                <div className="text-5xl mb-3">📊</div>
                 <div className="font-medium">No data for this period</div>
                 <div className="text-sm mt-1">Try a different month</div>
               </div>
             ) : monthly ? (
               <>
-                {/* Total */}
-                <div className="card bg-base-200 rounded-2xl">
-                  <div className="card-body p-5">
-                    <div className="text-xs text-base-content/50 uppercase tracking-wide">
-                      Total Spending
-                    </div>
-                    <div className="text-4xl font-mono font-bold text-primary mt-1">
-                      NT${monthly.total.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-base-content/50 mt-1">
-                      {monthly.expense_count} transactions
-                    </div>
+                {/* Summary header */}
+                <div className="bg-base-200 rounded-2xl p-5">
+                  <div className="text-xs text-base-content/50 uppercase tracking-wide mb-1">Total Spending</div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[40px] font-medium leading-none">
+                      NT${Math.floor(monthly.total).toLocaleString()}
+                    </span>
+                    <span className="text-2xl text-base-content/50">
+                      .{String(Math.round((monthly.total % 1) * 100)).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <DeltaBadge current={monthly.total} previous={monthly.comparison.prev_month_total} />
+                    <span className="text-xs text-base-content/50">
+                      vs {monthly.comparison.prev_month_label} · NT${Math.round(monthly.total / 30).toLocaleString()}/day avg
+                    </span>
                   </div>
                 </div>
 
@@ -287,37 +324,15 @@ export default function ReportsPage() {
                       onClick={() => setChartType(ct)}
                       className={`btn btn-xs ${chartType === ct ? "btn-primary" : "btn-ghost"}`}
                     >
-                      {ct === "pie" ? "Pie" : "Bar"}
+                      {ct === "pie" ? "Donut" : "Bar"}
                     </button>
                   ))}
                 </div>
 
-                {/* Category chart — guarded by mounted to avoid SSR issues */}
+                {/* Chart */}
                 {mounted && (
                   chartType === "pie" ? (
-                    <div className="flex justify-center">
-                      <PieChart width={260} height={220}>
-                        <Pie
-                          data={monthly.categories}
-                          dataKey="total"
-                          nameKey="category_name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={90}
-                          strokeWidth={2}
-                        >
-                          {monthly.categories.map((entry, index) => (
-                            <Cell
-                              key={entry.category_id}
-                              fill={PIE_COLORS[index % PIE_COLORS.length]}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, ""]}
-                        />
-                      </PieChart>
-                    </div>
+                    <DonutChart categories={monthly.categories} />
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart
@@ -335,18 +350,18 @@ export default function ReportsPage() {
                         <Tooltip
                           formatter={(value) => [`NT$${Number(value).toLocaleString()}`, "Amount"]}
                         />
-                        <Bar dataKey="total" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   )
                 )}
 
                 {/* Category list */}
-                <div className="card bg-base-100 border border-base-200 rounded-2xl overflow-hidden">
+                <div className="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
                   <div className="px-4 pt-3 pb-1 text-xs text-base-content/50 uppercase tracking-wide font-semibold">
                     By Category
                   </div>
-                  <div className="divide-y divide-base-200">
+                  <div className="divide-y divide-base-300">
                     {monthly.categories.map((cat) => (
                       <CategoryRow
                         key={cat.category_id}
@@ -358,61 +373,57 @@ export default function ReportsPage() {
                 </div>
 
                 {/* By payer */}
-                <div className="card bg-base-200 rounded-2xl">
-                  <div className="card-body p-4">
-                    <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-2">
-                      By Payer
-                    </div>
-                    <div className="space-y-2">
-                      {monthly.payers.map((p) => (
-                        <div key={p.payer_id} className="flex justify-between items-center">
-                          <span className="text-sm font-medium">{p.payer_name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-base-content/50">{p.percentage}%</span>
-                            <span className="font-mono font-semibold text-sm">
-                              NT${p.total.toLocaleString()}
-                            </span>
-                          </div>
+                <div className="bg-base-200 rounded-2xl p-4">
+                  <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-2">
+                    By Payer
+                  </div>
+                  <div className="space-y-2">
+                    {monthly.payers.map((p) => (
+                      <div key={p.payer_id} className="flex justify-between items-center">
+                        <span className="text-sm font-medium">{p.payer_name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-base-content/50">{p.percentage}%</span>
+                          <span className="font-mono font-semibold text-sm">
+                            NT${p.total.toLocaleString()}
+                          </span>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* Comparison */}
-                <div className="card bg-base-200 rounded-2xl">
-                  <div className="card-body p-4">
-                    <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-3">
-                      Comparison
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-base-content/70">
-                          vs {monthly.comparison.prev_month_label}
+                <div className="bg-base-200 rounded-2xl p-4">
+                  <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-3">
+                    Comparison
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-base-content/70">
+                        vs {monthly.comparison.prev_month_label}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm">
+                          NT${monthly.comparison.prev_month_total.toLocaleString()}
                         </span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm">
-                            NT${monthly.comparison.prev_month_total.toLocaleString()}
-                          </span>
-                          <DeltaBadge
-                            current={monthly.total}
-                            previous={monthly.comparison.prev_month_total}
-                          />
-                        </div>
+                        <DeltaBadge
+                          current={monthly.total}
+                          previous={monthly.comparison.prev_month_total}
+                        />
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-base-content/70">
-                          vs {monthly.comparison.same_month_last_year_label}
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-base-content/70">
+                        vs {monthly.comparison.same_month_last_year_label}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm">
+                          NT${monthly.comparison.same_month_last_year_total.toLocaleString()}
                         </span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm">
-                            NT${monthly.comparison.same_month_last_year_total.toLocaleString()}
-                          </span>
-                          <DeltaBadge
-                            current={monthly.total}
-                            previous={monthly.comparison.same_month_last_year_total}
-                          />
-                        </div>
+                        <DeltaBadge
+                          current={monthly.total}
+                          previous={monthly.comparison.same_month_last_year_total}
+                        />
                       </div>
                     </div>
                   </div>
@@ -420,7 +431,7 @@ export default function ReportsPage() {
 
                 {/* Insights stub */}
                 <div className="p-4 bg-base-200 rounded-xl text-sm text-base-content/50">
-                  ✨ Insights coming soon...
+                  Insights coming soon...
                 </div>
               </>
             ) : null}
@@ -434,37 +445,30 @@ export default function ReportsPage() {
           <>
             {/* Navigation */}
             <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setAnnualYear((y) => y - 1)}
-                className="btn btn-ghost btn-sm"
-              >
-                &#8592;
+              <button type="button" onClick={() => setAnnualYear((y) => y - 1)} className="btn btn-ghost btn-sm">
+                <ChevronLeft size={18} />
               </button>
               <span className="font-semibold text-base">{annualYear}</span>
-              <button
-                type="button"
-                onClick={() => setAnnualYear((y) => y + 1)}
-                className="btn btn-ghost btn-sm"
-              >
-                &#8594;
+              <button type="button" onClick={() => setAnnualYear((y) => y + 1)} className="btn btn-ghost btn-sm">
+                <ChevronRight size={18} />
               </button>
             </div>
 
             {annual && (
               <>
-                {/* Total */}
-                <div className="card bg-base-200 rounded-2xl">
-                  <div className="card-body p-5">
-                    <div className="text-xs text-base-content/50 uppercase tracking-wide">
-                      Annual Total
-                    </div>
-                    <div className="text-4xl font-mono font-bold text-primary mt-1">
-                      NT${annual.total.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-base-content/50 mt-1">
-                      {annual.expense_count} transactions
-                    </div>
+                {/* Summary header */}
+                <div className="bg-base-200 rounded-2xl p-5">
+                  <div className="text-xs text-base-content/50 uppercase tracking-wide mb-1">Annual Total</div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[40px] font-medium leading-none">
+                      NT${Math.floor(annual.total).toLocaleString()}
+                    </span>
+                    <span className="text-2xl text-base-content/50">
+                      .{String(Math.round((annual.total % 1) * 100)).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <div className="text-xs text-base-content/50 mt-1.5">
+                    {annual.expense_count} transactions · NT${Math.round(annual.total / 12).toLocaleString()}/month avg
                   </div>
                 </div>
 
@@ -477,37 +481,15 @@ export default function ReportsPage() {
                       onClick={() => setChartType(ct)}
                       className={`btn btn-xs ${chartType === ct ? "btn-primary" : "btn-ghost"}`}
                     >
-                      {ct === "pie" ? "Pie" : "Bar"}
+                      {ct === "pie" ? "Donut" : "Bar"}
                     </button>
                   ))}
                 </div>
 
-                {/* Category chart — guarded by mounted */}
+                {/* Chart */}
                 {mounted && (
                   chartType === "pie" ? (
-                    <div className="flex justify-center">
-                      <PieChart width={260} height={220}>
-                        <Pie
-                          data={annual.categories}
-                          dataKey="total"
-                          nameKey="category_name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={90}
-                          strokeWidth={2}
-                        >
-                          {annual.categories.map((entry, index) => (
-                            <Cell
-                              key={entry.category_id}
-                              fill={PIE_COLORS[index % PIE_COLORS.length]}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, ""]}
-                        />
-                      </PieChart>
-                    </div>
+                    <DonutChart categories={annual.categories} />
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart
@@ -525,18 +507,18 @@ export default function ReportsPage() {
                         <Tooltip
                           formatter={(value) => [`NT$${Number(value).toLocaleString()}`, "Amount"]}
                         />
-                        <Bar dataKey="total" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   )
                 )}
 
                 {/* Category list */}
-                <div className="card bg-base-100 border border-base-200 rounded-2xl overflow-hidden">
+                <div className="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
                   <div className="px-4 pt-3 pb-1 text-xs text-base-content/50 uppercase tracking-wide font-semibold">
                     By Category
                   </div>
-                  <div className="divide-y divide-base-200">
+                  <div className="divide-y divide-base-300">
                     {annual.categories.map((cat) => (
                       <CategoryRow
                         key={cat.category_id}
@@ -547,55 +529,51 @@ export default function ReportsPage() {
                   </div>
                 </div>
 
-                {/* Month-by-month bar chart — guarded by mounted */}
+                {/* Monthly trend chart */}
                 {mounted && (
-                  <div className="card bg-base-200 rounded-2xl">
-                    <div className="card-body p-4">
-                      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-3">
-                        Monthly Trend
-                      </div>
-                      <ResponsiveContainer width="100%" height={160}>
-                        <BarChart
-                          data={annual.monthly_trend}
-                          margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                        >
-                          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                          <YAxis tick={{ fontSize: 10 }} width={50} />
-                          <Tooltip
-                            formatter={(value) => [`NT$${Number(value).toLocaleString()}`, "Amount"]}
-                          />
-                          <Bar dataKey="total" fill="#7c3aed" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
+                  <div className="bg-base-200 rounded-2xl p-4">
+                    <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-3">
+                      Monthly Trend
                     </div>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <BarChart
+                        data={annual.monthly_trend}
+                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                      >
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} width={50} />
+                        <Tooltip
+                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, "Amount"]}
+                        />
+                        <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 )}
 
                 {/* By payer */}
-                <div className="card bg-base-200 rounded-2xl">
-                  <div className="card-body p-4">
-                    <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-2">
-                      By Payer
-                    </div>
-                    <div className="space-y-2">
-                      {annual.payers.map((p) => (
-                        <div key={p.payer_id} className="flex justify-between items-center">
-                          <span className="text-sm font-medium">{p.payer_name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-base-content/50">{p.percentage}%</span>
-                            <span className="font-mono font-semibold text-sm">
-                              NT${p.total.toLocaleString()}
-                            </span>
-                          </div>
+                <div className="bg-base-200 rounded-2xl p-4">
+                  <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-2">
+                    By Payer
+                  </div>
+                  <div className="space-y-2">
+                    {annual.payers.map((p) => (
+                      <div key={p.payer_id} className="flex justify-between items-center">
+                        <span className="text-sm font-medium">{p.payer_name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-base-content/50">{p.percentage}%</span>
+                          <span className="font-mono font-semibold text-sm">
+                            NT${p.total.toLocaleString()}
+                          </span>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* Insights stub */}
                 <div className="p-4 bg-base-200 rounded-xl text-sm text-base-content/50">
-                  ✨ Insights coming soon...
+                  Insights coming soon...
                 </div>
               </>
             )}

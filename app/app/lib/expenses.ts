@@ -40,9 +40,30 @@ export const MOCK_EXPENSES: Expense[] = [
   },
 ];
 
-export function getTodayExpenses(expenses: Expense[]): Expense[] {
+// In-memory store for the session
+let _sessionExpenses: Expense[] = [...MOCK_EXPENSES];
+
+/**
+ * Add an expense to the in-memory session store and return it.
+ * Replace with real Firebase call in entity 006.
+ */
+export function addExpense(expense: Omit<Expense, "id" | "created_at">): Expense {
+  const newExpense: Expense = {
+    ...expense,
+    id: `exp-${Date.now()}`,
+    created_at: new Date().toISOString(),
+  };
+  _sessionExpenses = [newExpense, ..._sessionExpenses];
+  console.log("[stub] Saving expense:", newExpense);
+  return newExpense;
+}
+
+/**
+ * Get all today's expenses from the session store (no args).
+ */
+export function getTodayExpenses(): Expense[] {
   const today = new Date().toISOString().split("T")[0];
-  return expenses
+  return _sessionExpenses
     .filter((e) => e.date === today)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
@@ -56,11 +77,5 @@ export function getDailyTotal(expenses: Expense[]): number {
  * Replace with real Firebase call in entity 006.
  */
 export function stubSaveExpense(expense: Omit<Expense, "id" | "created_at">): Expense {
-  const newExpense: Expense = {
-    ...expense,
-    id: `exp-${Date.now()}`,
-    created_at: new Date().toISOString(),
-  };
-  console.log("[stub] Saving expense:", newExpense);
-  return newExpense;
+  return addExpense(expense);
 }

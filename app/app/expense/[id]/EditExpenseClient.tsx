@@ -5,6 +5,7 @@ import { Expense } from "../../lib/expenses";
 import { applyKey, evaluateExpression, KeypadKey } from "../../lib/calculator";
 import CalculatorKeypad from "../../components/CalculatorKeypad";
 import CategoryPicker from "../../components/CategoryPicker";
+import { DEFAULT_CATEGORIES } from "../../lib/categories";
 import { updateExpense, deleteExpense } from "../../lib/expenseService";
 
 interface EditExpenseClientProps {
@@ -80,7 +81,7 @@ export default function EditExpenseClient({ expense }: EditExpenseClientProps) {
         <input type="text" placeholder="Notes (optional)" className="input input-bordered w-full" value={notes} onChange={e => setNotes(e.target.value)} />
         <div>
           <div className="text-xs text-base-content/50 mb-2 uppercase tracking-wide">Category</div>
-          <CategoryPicker selected={categoryId} onSelect={setCategoryId} />
+          <CategoryPicker categories={DEFAULT_CATEGORIES} selectedId={categoryId} onSelect={setCategoryId} />
         </div>
       </div>
 

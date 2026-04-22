@@ -1,30 +1,45 @@
 "use client";
+import { Package } from "lucide-react";
+import { CATEGORY_ICONS } from "../lib/categories";
 
-import { DEFAULT_CATEGORIES } from "../lib/categories";
-
-interface CategoryPickerProps {
-  selected: string;
-  onSelect: (categoryId: string) => void;
+interface Category {
+  id: string;
+  name_en: string;
+  name_zh?: string;
 }
 
-export default function CategoryPicker({ selected, onSelect }: CategoryPickerProps) {
+interface Props {
+  categories: Category[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}
+
+export default function CategoryPicker({ categories, selectedId, onSelect }: Props) {
   return (
-    <div className="grid grid-cols-4 gap-2 w-full">
-      {DEFAULT_CATEGORIES.map((cat) => (
-        <button
-          key={cat.id}
-          type="button"
-          onClick={() => onSelect(cat.id)}
-          className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all min-h-[72px] ${
-            selected === cat.id
-              ? "border-primary bg-primary/10 text-primary font-semibold"
-              : "border-base-300 bg-base-100 text-base-content hover:border-primary/50"
-          }`}
-        >
-          <span className="text-3xl leading-none">{cat.icon}</span>
-          <span className="text-xs text-center leading-tight">{cat.name_en}</span>
-        </button>
-      ))}
+    <div className="grid grid-cols-4 gap-1 px-2 pb-4">
+      {categories.map(cat => {
+        const Icon = CATEGORY_ICONS[cat.id] ?? Package;
+        const selected = cat.id === selectedId;
+        return (
+          <button
+            key={cat.id}
+            onClick={() => onSelect(cat.id)}
+            className="flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-colors active:bg-base-200"
+          >
+            <span
+              className={`grid place-items-center w-12 h-12 rounded-xl border transition-colors
+                ${selected
+                  ? "bg-primary border-primary text-primary-content"
+                  : "bg-base-100 border-base-300 text-base-content"}`}
+            >
+              <Icon size={22} strokeWidth={1.6} />
+            </span>
+            <span className={`text-[13px] leading-tight text-center ${selected ? "font-medium text-base-content" : "text-base-content/70"}`}>
+              {cat.name_en}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
