@@ -72,7 +72,7 @@ export default function HomePage() {
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm opacity-70">Amount (TWD)</span>
           {expenses.length > 0 && (
-            <span className="text-xs opacity-60">{expenses.length} logged today</span>
+            <span className="text-base font-semibold opacity-80">{expenses.length} logged today</span>
           )}
         </div>
         <div className="text-5xl font-mono font-bold min-h-[52px] break-all">
