@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Package, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { getAllExpenses } from "../lib/historyService";
 import { DEFAULT_CATEGORIES, CATEGORY_ICONS } from "../lib/categories";
 import { Expense } from "../lib/expenses";
@@ -61,6 +62,7 @@ function formatFullDate(dateStr: string): string {
 }
 
 export default function HistoryPage() {
+  const { t } = useTranslation();
   const expenses = useMemo(() => getAllExpenses(), []);
   const groups = useMemo(() => groupByDate(expenses), [expenses]);
   const [selected, setSelected] = useState<Expense | null>(null);
@@ -84,8 +86,8 @@ export default function HistoryPage() {
   if (expenses.length === 0) {
     return (
       <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-12 pb-20">
-        <h1 className="text-2xl font-semibold mb-4">History</h1>
-        <p className="text-base-content/50 text-sm text-center pt-12">No expenses yet</p>
+        <h1 className="text-2xl font-semibold mb-4">{t("history.title")}</h1>
+        <p className="text-base-content/50 text-sm text-center pt-12">{t("history.no_expenses")}</p>
       </main>
     );
   }
@@ -94,7 +96,7 @@ export default function HistoryPage() {
     <>
       <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto pb-20">
         <div className="sticky top-0 bg-base-100 px-4 pt-12 pb-3 border-b border-base-300">
-          <h1 className="text-2xl font-semibold">History</h1>
+          <h1 className="text-2xl font-semibold">{t("history.title")}</h1>
         </div>
 
         <div className="py-2">
@@ -107,7 +109,7 @@ export default function HistoryPage() {
                 <div className="flex items-center justify-between px-4 py-2 bg-base-200">
                   <span className="text-sm font-semibold text-base-content/80">{formatMonthLabel(monthKey)}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-base-content/40">{entryCount} entries</span>
+                    <span className="text-xs text-base-content/40">{entryCount} {t("history.entries")}</span>
                     <span className="text-sm font-semibold">NT${monthTotal.toLocaleString()}</span>
                   </div>
                 </div>

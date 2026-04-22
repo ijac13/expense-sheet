@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Package } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
 import { DEFAULT_CATEGORIES, CATEGORY_ICONS, getDefaultCategory, saveLastCategory } from "./lib/categories";
 import { addExpense, getTodayExpenses } from "./lib/expenses";
@@ -15,6 +16,7 @@ const KEYS = [
 ];
 
 export default function HomePage() {
+  const { t } = useTranslation();
   const [categoryId, setCategoryId] = useState<string>(() => getDefaultCategory());
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -59,8 +61,8 @@ export default function HomePage() {
   function formatDateLabel(d: string) {
     const today = new Date().toISOString().split("T")[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-    if (d === today) return "Today";
-    if (d === yesterday) return "Yesterday";
+    if (d === today) return t("home.today");
+    if (d === yesterday) return t("home.yesterday");
     return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
 
@@ -70,9 +72,9 @@ export default function HomePage() {
       {/* Amount display */}
       <div className="bg-primary text-primary-content px-4 pt-12 pb-4 shrink-0">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-sm opacity-70">Amount (TWD)</span>
+          <span className="text-sm opacity-70">{t("home.amount_label")}</span>
           {expenses.length > 0 && (
-            <span className="text-base font-semibold opacity-80">{expenses.length} logged today</span>
+            <span className="text-base font-semibold opacity-80">{expenses.length} {t("home.logged_today")}</span>
           )}
         </div>
         <div className="text-5xl font-mono font-bold min-h-[52px] break-all">
@@ -114,7 +116,7 @@ export default function HomePage() {
         <div className="px-4 mb-3">
           <input
             className="w-full px-3 py-2 rounded-xl bg-base-200 text-sm outline-none placeholder:text-base-content/40"
-            placeholder="Notes (optional)"
+            placeholder={t("home.notes_placeholder")}
             value={note}
             onChange={e => setNote(e.target.value)}
           />
@@ -154,13 +156,13 @@ export default function HomePage() {
             onClick={() => handleConfirm(true)}
             className="h-12 rounded-xl bg-base-200 text-sm font-semibold text-base-content/70 active:bg-base-300"
           >
-            Log another
+            {t("home.log_another")}
           </button>
           <button
             onClick={() => handleConfirm(false)}
             className="h-12 rounded-xl bg-primary text-primary-content font-semibold active:opacity-80"
           >
-            Save
+            {t("home.save")}
           </button>
         </div>
       </div>
