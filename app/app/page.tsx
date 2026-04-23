@@ -1,10 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Package } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
 import { DEFAULT_CATEGORIES, CATEGORY_ICONS, getDefaultCategory, saveLastCategory } from "./lib/categories";
-import { addExpense, getTodayExpenses } from "./lib/expenses";
+import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
 import { USERS, DEFAULT_USER, type UserId } from "./lib/users";
 
 const KEYS = [
@@ -22,12 +22,21 @@ export default function HomePage() {
   const [note, setNote] = useState("");
   const [paidBy, setPaidBy] = useState<UserId>(DEFAULT_USER);
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [expenses, setExpenses] = useState(() => getTodayExpenses());
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const selectedCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId);
   const SelectedIcon = selectedCat ? (CATEGORY_ICONS[selectedCat.id] ?? Package) : Package;
   const paidByUser = USERS.find(u => u.id === paidBy);
   const nextUser = USERS[(USERS.findIndex(u => u.id === paidBy) + 1) % USERS.length];
+
+  // Load today's expenses on mount
+  useEffect(() => {
+    getTodayExpenses()
+      .then(setExpenses)
+      .catch(() => setExpenses([]));
+  }, []);
 
   function handleSelectCategory(id: string) {
     setCategoryId(id);
@@ -41,15 +50,27 @@ export default function HomePage() {
     setAmount(a => a + key);
   }
 
-  function handleConfirm(andContinue = false) {
+  async function handleConfirm(andContinue = false) {
     let val: number;
     try { val = Function(`"use strict"; return (${amount || "0"})`)() as number; }
     catch { return; }
     if (!val || val <= 0) return;
-    addExpense({ amount: val, category_id: categoryId, date, paid_by: paidBy, created_by: paidBy, notes: note });
-    setExpenses(getTodayExpenses());
-    setAmount("");
-    if (!andContinue) setNote("");
+
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await addExpense({ amount: val, category_id: categoryId, date, paid_by: paidBy, created_by: paidBy, notes: note });
+      const updated = await getTodayExpenses();
+      setExpenses(updated);
+      setAmount("");
+      if (!andContinue) setNote("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save expense";
+      setSubmitError(msg);
+      alert(msg);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function stepDate(dir: 1 | -1) {
@@ -122,6 +143,13 @@ export default function HomePage() {
           />
         </div>
 
+        {/* Error state */}
+        {submitError && (
+          <div className="mx-4 mb-3 px-3 py-2 rounded-xl bg-error/10 text-error text-sm">
+            {submitError}
+          </div>
+        )}
+
         {/* Category picker */}
         <CategoryPicker
           categories={DEFAULT_CATEGORIES}
@@ -154,15 +182,17 @@ export default function HomePage() {
         <div className="grid grid-cols-2 gap-1.5">
           <button
             onClick={() => handleConfirm(true)}
-            className="h-12 rounded-xl bg-base-200 text-sm font-semibold text-base-content/70 active:bg-base-300"
+            disabled={submitting}
+            className="h-12 rounded-xl bg-base-200 text-sm font-semibold text-base-content/70 active:bg-base-300 disabled:opacity-50"
           >
             {t("home.log_another")}
           </button>
           <button
             onClick={() => handleConfirm(false)}
-            className="h-12 rounded-xl bg-primary text-primary-content font-semibold active:opacity-80"
+            disabled={submitting}
+            className="h-12 rounded-xl bg-primary text-primary-content font-semibold active:opacity-80 disabled:opacity-50"
           >
-            {t("home.save")}
+            {submitting ? "Saving..." : t("home.save")}
           </button>
         </div>
       </div>
