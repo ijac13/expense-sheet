@@ -40,7 +40,7 @@ export const MOCK_EXPENSES: Expense[] = [
   },
 ];
 
-const API_BASE = "/api/expenses";
+const API_BASE = "/api";
 
 /**
  * Add an expense via the Firebase Function API.

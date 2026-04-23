@@ -14,7 +14,7 @@ import {
 } from "./reportTypes";
 import { Expense } from "./expenses";
 
-const API_BASE = "/api/expenses";
+const API_BASE = "/api";
 
 // ---------------------------------------------------------------------------
 // Category metadata — display names and icons
