@@ -40,42 +40,38 @@ export const MOCK_EXPENSES: Expense[] = [
   },
 ];
 
-// In-memory store for the session
-let _sessionExpenses: Expense[] = [...MOCK_EXPENSES];
+const API_BASE = "/api/expenses";
 
 /**
- * Add an expense to the in-memory session store and return it.
- * Replace with real Firebase call in entity 006.
+ * Add an expense via the Firebase Function API.
  */
-export function addExpense(expense: Omit<Expense, "id" | "created_at">): Expense {
-  const newExpense: Expense = {
-    ...expense,
-    id: `exp-${Date.now()}`,
-    created_at: new Date().toISOString(),
-  };
-  _sessionExpenses = [newExpense, ..._sessionExpenses];
-  console.log("[stub] Saving expense:", newExpense);
-  return newExpense;
+export async function addExpense(expense: Omit<Expense, "id" | "created_at">): Promise<Expense> {
+  const res = await fetch(API_BASE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(expense),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to save expense: ${res.status} ${res.statusText}`);
+  }
+  return res.json() as Promise<Expense>;
 }
 
 /**
- * Get all today's expenses from the session store (no args).
+ * Get all today's expenses from the API.
  */
-export function getTodayExpenses(): Expense[] {
+export async function getTodayExpenses(): Promise<Expense[]> {
+  const res = await fetch(API_BASE);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch expenses: ${res.status} ${res.statusText}`);
+  }
+  const all: Expense[] = await res.json();
   const today = new Date().toISOString().split("T")[0];
-  return _sessionExpenses
+  return all
     .filter((e) => e.date === today)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 export function getDailyTotal(expenses: Expense[]): number {
   return expenses.reduce((sum, e) => sum + e.amount, 0);
-}
-
-/**
- * Stub save: logs to console and returns the new expense.
- * Replace with real Firebase call in entity 006.
- */
-export function stubSaveExpense(expense: Omit<Expense, "id" | "created_at">): Expense {
-  return addExpense(expense);
 }

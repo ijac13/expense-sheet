@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Package, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getAllExpenses } from "../lib/historyService";
@@ -63,9 +63,18 @@ function formatFullDate(dateStr: string): string {
 
 export default function HistoryPage() {
   const { t } = useTranslation();
-  const expenses = useMemo(() => getAllExpenses(), []);
-  const groups = useMemo(() => groupByDate(expenses), [expenses]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Expense | null>(null);
+
+  useEffect(() => {
+    getAllExpenses()
+      .then(setExpenses)
+      .catch(() => setExpenses([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const groups = useMemo(() => groupByDate(expenses), [expenses]);
 
   const monthGroups = useMemo(() => {
     const months = new Map<string, DayGroup[]>();
@@ -82,6 +91,17 @@ export default function HistoryPage() {
   const SelectedIcon = selectedCat ? (CATEGORY_ICONS[selectedCat.id] ?? Package) : Package;
   const selectedPaidBy = selected ? USERS.find(u => u.id === selected.paid_by) : null;
   const selectedCreatedBy = selected ? USERS.find(u => u.id === selected.created_by) : null;
+
+  if (loading) {
+    return (
+      <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-20">
+        <h1 className="text-2xl font-semibold mb-4">{t("history.title")}</h1>
+        <div className="flex justify-center py-16">
+          <span className="loading loading-spinner loading-md text-primary" />
+        </div>
+      </main>
+    );
+  }
 
   if (expenses.length === 0) {
     return (
