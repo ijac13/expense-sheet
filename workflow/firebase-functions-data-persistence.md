@@ -72,6 +72,35 @@ Wire the expense entry form to a Firebase Cloud Function that reads and writes t
 - Real-time listeners or Firestore
 - Offline queue / sync
 
-## Stage Report
+## Stage Report: build
 
-_To be written by build agent._
+- DONE: Add `googleapis` to functions
+  `npm install googleapis` succeeded; `functions/node_modules/googleapis` present; `functions/package.json` updated.
+- DONE: Rewrite `functions/src/index.ts` with v2 `onRequest` api function
+  `api` export uses `firebase-functions/v2/https`; handles GET (read all rows) and POST (append row); CORS headers set; `helloWorld` preserved. `npm run build` passes.
+- DONE: Update `firebase.json` with `/api/**` rewrite before catch-all
+  Rewrite `{"source": "/api/**", "function": "api"}` inserted before `**` rule.
+- DONE: Replace `addExpense()` with async POST to `/api/expenses`
+  `app/app/lib/expenses.ts` — `addExpense` returns `Promise<Expense>`; `getTodayExpenses` is async.
+- DONE: Replace `getAllExpenses()` with async GET in `historyService.ts`
+  `historyService.ts` rewritten to fetch from API, sorted by date desc.
+- DONE: Replace mock data source in `reportService.ts`
+  All three export functions (`getMonthlySummary`, `getAnnualSummary`, `getExpensesByCategory`) now call `fetchAllExpenses()` from API; aggregation logic preserved.
+- DONE: Update `page.tsx` with async `handleConfirm`, submitting state, error state
+  `handleConfirm` is async; `submitting` useState disables both buttons in-flight; inline error display + alert on failure; `getTodayExpenses` loaded via `useEffect`.
+- DONE: Update `history/page.tsx` with `useEffect` async load
+  `getAllExpenses()` called in `useEffect`; loading spinner shown while fetching; empty state on error.
+- DONE: Build functions — `npm run build` passes with no errors
+  Clean TypeScript compile; output in `functions/lib/`.
+- DONE: Build frontend — `npm run build` passes with 14 static pages
+  Next.js static export succeeds; no TypeScript errors.
+- FAILED: Deploy functions to Firebase
+  Project `expense-sheet-b2db8` is on Spark (free) plan; Cloud Functions require Blaze (pay-as-you-go). Firebase blocked deploy with: "Required API cloudbuild.googleapis.com can't be enabled until the upgrade is complete." Captain must upgrade at https://console.firebase.google.com/project/expense-sheet-b2db8/usage/details then re-run `firebase deploy --only functions,hosting`.
+- DONE: Deploy hosting
+  `firebase deploy --only hosting` succeeded; frontend at https://expense-sheet-b2db8.web.app (warns about missing api function endpoint as expected).
+- SKIPPED: Smoke-test curl verification
+  Skipped because functions deploy blocked by billing gate. Cannot verify until captain upgrades to Blaze and deploys functions.
+
+### Summary
+
+All code is complete and committed (commit `4c7fa96`). The Firebase Function (`api`) handles GET/POST for `/api/expenses` using Application Default Credentials with the Sheets API. Frontend stubs across four files have been replaced with real async API calls with loading and error states. The only remaining blocker is a Firebase billing gate: the project must be upgraded to the Blaze plan before Cloud Functions can be deployed. The captain should upgrade the project, then run `firebase deploy --only functions,hosting` from the project root.
