@@ -1,6 +1,6 @@
 import { Expense } from "./expenses";
 
-const API_BASE = "/api/expenses";
+const API_BASE = "/api";
 
 /**
  * Fetch all expenses from the API, sorted by date descending.
