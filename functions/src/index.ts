@@ -59,12 +59,7 @@ export const api = onRequest(async (req, res) => {
     return;
   }
 
-  // Route: only /api/expenses is handled
-  const path = (req.path ?? "").replace(/\/$/, "");
-  if (path !== "/expenses" && path !== "") {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
+  // Accept any path — this function serves a single expenses endpoint
 
   try {
     const sheets = await getSheetsClient();
