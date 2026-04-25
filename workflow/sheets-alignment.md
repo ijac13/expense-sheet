@@ -1,7 +1,7 @@
 ---
 id: "022"
 title: Google Sheets Alignment — Users and Subscriptions Tabs
-status: build
+status: verify
 source: captain feedback
 started: 2026-04-25
 completed:
