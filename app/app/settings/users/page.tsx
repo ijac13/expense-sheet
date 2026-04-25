@@ -60,7 +60,7 @@ export default function UsersPage() {
               </div>
               <div>
                 <div className="font-medium">{u.name}</div>
-                <div className="text-sm text-base-content/50">{u.email || "No email set"}</div>
+                <div className="text-sm text-base-content/50">{u.email || (u.id.includes("@") ? u.id : "No email set")}</div>
               </div>
             </div>
           ))}
