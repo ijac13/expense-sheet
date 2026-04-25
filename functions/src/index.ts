@@ -13,6 +13,7 @@ export const helloWorld = functionsV1.https.onRequest((request, response) => {
 // Helpers
 // ---------------------------------------------------------------------------
 const SHEET_NAME = "Expenses";
+const USERS_SHEET_NAME = "Users";
 const HEADER = ["id", "date", "amount", "category_id", "paid_by", "created_by", "notes", "created_at"];
 
 function setCors(res: { set: (key: string, value: string) => void }) {
@@ -41,6 +42,14 @@ function rowToExpense(row: (string | null | undefined)[]): Record<string, unknow
   };
 }
 
+function rowToUser(row: (string | null | undefined)[]): Record<string, unknown> {
+  return {
+    id: row[0] ?? "",
+    name: row[1] ?? "",
+    email: row[2] ?? "",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // HTTP API function
 // ---------------------------------------------------------------------------
@@ -59,10 +68,26 @@ export const api = onRequest(async (req, res) => {
     return;
   }
 
-  // Accept any path — this function serves a single expenses endpoint
+  const path = req.path ?? "";
 
   try {
     const sheets = await getSheetsClient();
+
+    // -----------------------------------------------------------------------
+    // GET /api/users — return all user rows from the Users tab
+    // -----------------------------------------------------------------------
+    if (req.method === "GET" && path.includes("users")) {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${USERS_SHEET_NAME}!A:C`,
+      });
+      const rows = response.data.values ?? [];
+
+      // Skip header row
+      const users = rows.slice(1).map(rowToUser);
+      res.status(200).json(users);
+      return;
+    }
 
     // -----------------------------------------------------------------------
     // GET — return all expense rows

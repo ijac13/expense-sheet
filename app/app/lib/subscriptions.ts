@@ -1,3 +1,7 @@
+// Google Sheet tab name: "Subscriptions"
+// The tab bar label (t("tabs.subscriptions")) resolves to "Subscriptions" in English.
+// The Google Sheet tab must be named "Subscriptions" to match.
+
 export interface Subscription {
   id: string;
   name: string;
