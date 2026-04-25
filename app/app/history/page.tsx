@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getAllExpenses } from "../lib/historyService";
@@ -183,8 +184,8 @@ export default function HistoryPage() {
         </div>
       </main>
 
-      {/* Expense detail bottom sheet */}
-      {selected && (
+      {/* Expense detail bottom sheet — rendered via portal to guarantee z-index stacking */}
+      {selected && typeof document !== "undefined" && createPortal(
         <div
           className="fixed inset-0 z-[60] bg-black/45 flex items-end"
           onClick={() => setSelected(null)}
@@ -236,7 +237,8 @@ export default function HistoryPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
