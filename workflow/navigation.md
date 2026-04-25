@@ -1,11 +1,11 @@
 ---
 id: "011"
 title: Navigation and Pages
-status: verify
+status: done
 source: commission seed
 started: 2026-04-20T01:00:00Z
-completed:
-verdict:
+completed: 2026-04-25
+verdict: PASSED
 score: 1.0
 worktree:
 issue:
