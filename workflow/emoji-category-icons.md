@@ -1,9 +1,9 @@
 ---
 id: "021"
 title: Emoji Category Icons — Replace Lucide Icons Everywhere
-status: ideation
+status: build
 source: captain feedback
-started:
+started: 2026-04-25
 completed:
 verdict:
 score: 0.9

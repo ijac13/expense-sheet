@@ -1,9 +1,9 @@
 ---
 id: "019"
 title: UI Fixes — Round 3 Captain Review
-status: ideation
+status: build
 source: captain feedback
-started:
+started: 2026-04-25
 completed:
 verdict:
 score: 1.0

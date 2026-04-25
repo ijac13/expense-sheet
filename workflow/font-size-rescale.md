@@ -1,9 +1,9 @@
 ---
 id: "020"
 title: Font Size Rescale — Current Large as New Default
-status: ideation
+status: build
 source: captain feedback
-started:
+started: 2026-04-25
 completed:
 verdict:
 score: 0.8

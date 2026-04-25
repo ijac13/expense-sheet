@@ -1,7 +1,7 @@
 ---
 id: "017"
 title: Firebase Functions — Data Persistence to Google Sheets
-status: build
+status: verify
 source: captain feedback
 started: 2026-04-22
 completed:
