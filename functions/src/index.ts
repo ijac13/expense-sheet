@@ -12,13 +12,16 @@ export const helloWorld = functionsV1.https.onRequest((request, response) => {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-const SHEET_NAME = "Expenses";
-const USERS_SHEET_NAME = "Users";
-const HEADER = ["id", "date", "amount", "category_id", "paid_by", "created_by", "notes", "created_at"];
+const EXPENSES_TAB = "Expenses";
+const USERS_TAB = "Users";
+const SUBSCRIPTIONS_TAB = "Subscriptions";
+
+const EXPENSES_HEADER = ["id", "date", "amount", "category_id", "paid_by", "created_by", "notes", "created_at"];
+const SUBSCRIPTIONS_HEADER = ["id", "name", "amount", "category_id", "frequency", "due_day", "due_month", "paid_by", "is_active"];
 
 function setCors(res: { set: (key: string, value: string) => void }) {
   res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type");
 }
 
@@ -43,10 +46,27 @@ function rowToExpense(row: (string | null | undefined)[]): Record<string, unknow
 }
 
 function rowToUser(row: (string | null | undefined)[]): Record<string, unknown> {
+  // Sheet columns: id | email | name  (captain swapped name/email in sheet)
+  const id = row[0] ?? "";
+  const col1 = row[1] ?? "";
+  const col2 = row[2] ?? "";
+  // Detect which column is email by checking for "@"
+  const email = col1.includes("@") ? col1 : col2;
+  const name = col1.includes("@") ? (col2 || col1) : (col1 || col2);
+  return { id, name, email };
+}
+
+function rowToSubscription(row: (string | null | undefined)[]): Record<string, unknown> {
   return {
     id: row[0] ?? "",
     name: row[1] ?? "",
-    email: row[2] ?? "",
+    amount: Number(row[2] ?? 0),
+    category_id: row[3] ?? "",
+    frequency: row[4] ?? "monthly",
+    due_day: Number(row[5] ?? 1),
+    due_month: row[6] ? Number(row[6]) : undefined,
+    paid_by: row[7] ?? "",
+    is_active: row[8] !== "false",
   };
 }
 
@@ -56,7 +76,6 @@ function rowToUser(row: (string | null | undefined)[]): Record<string, unknown> 
 export const api = onRequest(async (req, res) => {
   setCors(res);
 
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     res.status(204).send("");
     return;
@@ -74,89 +93,172 @@ export const api = onRequest(async (req, res) => {
     const sheets = await getSheetsClient();
 
     // -----------------------------------------------------------------------
-    // GET /api/users — return all user rows from the Users tab
+    // /api/users — GET
     // -----------------------------------------------------------------------
-    if (req.method === "GET" && path.includes("users")) {
+    if (path.includes("users")) {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: `${USERS_SHEET_NAME}!A:C`,
+        range: `${USERS_TAB}!A:C`,
       });
       const rows = response.data.values ?? [];
-
-      // Skip header row
-      const users = rows.slice(1).map(rowToUser);
-      res.status(200).json(users);
+      res.status(200).json(rows.slice(1).map(rowToUser));
       return;
     }
 
     // -----------------------------------------------------------------------
-    // GET — return all expense rows
+    // /api/subscriptions — GET / POST / PATCH
+    // -----------------------------------------------------------------------
+    if (path.includes("subscriptions")) {
+      // GET — return all subscriptions
+      if (req.method === "GET") {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${SUBSCRIPTIONS_TAB}!A:I`,
+        });
+        const rows = response.data.values ?? [];
+        res.status(200).json(rows.slice(1).map(rowToSubscription));
+        return;
+      }
+
+      // POST — add a new subscription
+      if (req.method === "POST") {
+        const body = req.body as Record<string, unknown>;
+        const id = `sub-${Date.now()}`;
+        const row = [
+          id,
+          String(body.name ?? ""),
+          String(body.amount ?? 0),
+          String(body.category_id ?? ""),
+          String(body.frequency ?? "monthly"),
+          String(body.due_day ?? 1),
+          String(body.due_month ?? ""),
+          String(body.paid_by ?? ""),
+          "true",
+        ];
+
+        // Ensure header row
+        const existing = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${SUBSCRIPTIONS_TAB}!A1:I1`,
+        });
+        const firstRow = existing.data.values?.[0];
+        if (!firstRow || firstRow[0] !== "id") {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `${SUBSCRIPTIONS_TAB}!A1:I1`,
+            valueInputOption: "RAW",
+            requestBody: { values: [SUBSCRIPTIONS_HEADER] },
+          });
+        }
+
+        await sheets.spreadsheets.values.append({
+          spreadsheetId,
+          range: `${SUBSCRIPTIONS_TAB}!A:I`,
+          valueInputOption: "RAW",
+          insertDataOption: "INSERT_ROWS",
+          requestBody: { values: [row] },
+        });
+
+        res.status(201).json(rowToSubscription(row));
+        return;
+      }
+
+      // PATCH — update or cancel a subscription by id
+      if (req.method === "PATCH") {
+        const body = req.body as Record<string, unknown>;
+        const targetId = String(body.id ?? "");
+
+        // Find the row
+        const allRows = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${SUBSCRIPTIONS_TAB}!A:I`,
+        });
+        const rows = allRows.data.values ?? [];
+        const rowIndex = rows.findIndex((r, i) => i > 0 && r[0] === targetId);
+        if (rowIndex === -1) {
+          res.status(404).json({ error: "Subscription not found" });
+          return;
+        }
+
+        const existing = rows[rowIndex];
+        const updated = [
+          existing[0],
+          body.name !== undefined ? String(body.name) : existing[1],
+          existing[2],
+          body.category_id !== undefined ? String(body.category_id) : existing[3],
+          existing[4],
+          body.due_day !== undefined ? String(body.due_day) : existing[5],
+          body.due_month !== undefined ? String(body.due_month) : existing[6],
+          existing[7],
+          body.is_active !== undefined ? String(body.is_active) : existing[8],
+        ];
+
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `${SUBSCRIPTIONS_TAB}!A${rowIndex + 1}:I${rowIndex + 1}`,
+          valueInputOption: "RAW",
+          requestBody: { values: [updated] },
+        });
+
+        res.status(200).json(rowToSubscription(updated));
+        return;
+      }
+
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // /api (expenses) — GET / POST
     // -----------------------------------------------------------------------
     if (req.method === "GET") {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: `${SHEET_NAME}!A:H`,
+        range: `${EXPENSES_TAB}!A:H`,
       });
       const rows = response.data.values ?? [];
-
-      // Skip header row
-      const expenses = rows.slice(1).map(rowToExpense);
-      res.status(200).json(expenses);
+      res.status(200).json(rows.slice(1).map(rowToExpense));
       return;
     }
 
-    // -----------------------------------------------------------------------
-    // POST — append one row
-    // -----------------------------------------------------------------------
     if (req.method === "POST") {
-      const body = req.body as {
-        date?: string;
-        amount?: number;
-        category_id?: string;
-        paid_by?: string;
-        created_by?: string;
-        notes?: string;
-      };
-
+      const body = req.body as Record<string, unknown>;
       const id = `exp-${Date.now()}`;
       const created_at = new Date().toISOString();
       const row = [
         id,
-        body.date ?? new Date().toISOString().split("T")[0],
+        String(body.date ?? new Date().toISOString().split("T")[0]),
         String(body.amount ?? 0),
-        body.category_id ?? "",
-        body.paid_by ?? "",
-        body.created_by ?? "",
-        body.notes ?? "",
+        String(body.category_id ?? ""),
+        String(body.paid_by ?? ""),
+        String(body.created_by ?? ""),
+        String(body.notes ?? ""),
         created_at,
       ];
 
-      // Ensure header row exists — check if sheet has any data
       const existing = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: `${SHEET_NAME}!A1:H1`,
+        range: `${EXPENSES_TAB}!A1:H1`,
       });
       const firstRow = existing.data.values?.[0];
       if (!firstRow || firstRow[0] !== "id") {
-        // Write header first
         await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: `${SHEET_NAME}!A1:H1`,
+          range: `${EXPENSES_TAB}!A1:H1`,
           valueInputOption: "RAW",
-          requestBody: { values: [HEADER] },
+          requestBody: { values: [EXPENSES_HEADER] },
         });
       }
 
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: `${SHEET_NAME}!A:H`,
+        range: `${EXPENSES_TAB}!A:H`,
         valueInputOption: "RAW",
         insertDataOption: "INSERT_ROWS",
         requestBody: { values: [row] },
       });
 
-      const expense = rowToExpense(row);
-      res.status(201).json(expense);
+      res.status(201).json(rowToExpense(row));
       return;
     }
 
