@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { useState } from "react";
 import { Category, DEFAULT_CATEGORIES } from "../../lib/categories";
 import {
@@ -129,6 +131,9 @@ export default function CategoryManagementPage() {
 
   return (
     <div className="max-w-lg mx-auto p-4">
+      <Link href="/settings" className="flex items-center gap-1 text-sm text-base-content/60 mb-4">
+        <ChevronLeft size={16} /> Settings
+      </Link>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">Category Management</h1>
         {!isFormOpen && (
