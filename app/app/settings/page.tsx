@@ -12,9 +12,9 @@ export default function SettingsPage() {
   const [fontSize, setFontSizeState] = useState<FontSize>("medium");
 
   const FONT_OPTIONS: { value: FontSize; label: string; description: string }[] = [
-    { value: "small",  label: t("settings.small"),  description: "14px" },
-    { value: "medium", label: t("settings.medium"), description: "16px" },
-    { value: "large",  label: t("settings.large"),  description: "18px" },
+    { value: "small",  label: t("settings.small"),  description: "16px" },
+    { value: "medium", label: t("settings.medium"), description: "18px" },
+    { value: "large",  label: t("settings.large"),  description: "20px" },
   ];
 
   useEffect(() => {
