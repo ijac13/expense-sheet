@@ -20,6 +20,7 @@ import {
 import { getMonthlySummary, getAnnualSummary } from "../lib/reportService";
 import DrillDown from "./DrillDown";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { USERS } from "../lib/users";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -243,22 +244,16 @@ export default function ReportsPage() {
         </div>
 
         {/* Payer filter */}
-        <div className="flex gap-1 bg-base-200 rounded-xl p-1">
-          {(["all", "user1", "user2"] as PayerFilter[]).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPayer(p)}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                payer === p
-                  ? "bg-primary text-primary-content"
-                  : "text-base-content/60"
-              }`}
-            >
-              {p === "all" ? "All" : p === "user1" ? "Me" : "Partner"}
-            </button>
+        <select
+          value={payer}
+          onChange={e => setPayer(e.target.value as PayerFilter)}
+          className="w-full px-3 py-2 rounded-xl bg-base-200 text-sm font-medium outline-none"
+        >
+          <option value="all">All Users</option>
+          {USERS.map(u => (
+            <option key={u.id} value={u.id}>{u.name}</option>
           ))}
-        </div>
+        </select>
       </div>
 
       {/* ------------------------------------------------------------------ */}
