@@ -1,11 +1,10 @@
 "use client";
-import { Package } from "lucide-react";
-import { CATEGORY_ICONS } from "../lib/categories";
 
 interface Category {
   id: string;
   name_en: string;
   name_zh?: string;
+  icon?: string;
 }
 
 interface Props {
@@ -18,7 +17,6 @@ export default function CategoryPicker({ categories, selectedId, onSelect }: Pro
   return (
     <div className="grid grid-cols-4 gap-1 px-2 pb-4">
       {categories.map(cat => {
-        const Icon = CATEGORY_ICONS[cat.id] ?? Package;
         const selected = cat.id === selectedId;
         return (
           <button
@@ -32,7 +30,7 @@ export default function CategoryPicker({ categories, selectedId, onSelect }: Pro
                   ? "bg-primary border-primary text-primary-content"
                   : "bg-base-100 border-base-300 text-base-content"}`}
             >
-              <Icon size={22} strokeWidth={1.6} />
+              <span className="text-2xl">{cat.icon ?? "💰"}</span>
             </span>
             <span className={`text-[13px] leading-tight text-center ${selected ? "font-medium text-base-content" : "text-base-content/70"}`}>
               {cat.name_en}
