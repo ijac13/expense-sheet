@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Subscription, MOCK_SUBSCRIPTIONS, getNextDueDate } from "../lib/subscriptions";
-import { addSubscription, updateSubscription, cancelSubscription } from "../lib/subscriptionService";
+import { useState, useEffect } from "react";
+import { Subscription, getNextDueDate } from "../lib/subscriptions";
+import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription } from "../lib/subscriptionService";
 import { DEFAULT_CATEGORIES } from "../lib/categories";
 
 type ModalMode = "add" | "edit" | null;
@@ -42,7 +42,15 @@ const defaultAddForm: AddFormState = {
 };
 
 export default function SubscriptionsPage() {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>(MOCK_SUBSCRIPTIONS);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getSubscriptions()
+      .then(setSubscriptions)
+      .catch(() => setSubscriptions([]))
+      .finally(() => setLoading(false));
+  }, []);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addForm, setAddForm] = useState<AddFormState>(defaultAddForm);
@@ -77,59 +85,78 @@ export default function SubscriptionsPage() {
     setEditingId(null);
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     const amount = parseFloat(addForm.amount);
     if (!addForm.name.trim() || isNaN(amount) || amount <= 0) return;
     const due_day = Math.max(1, Math.min(31, parseInt(addForm.due_day) || 1));
     const due_month = addForm.frequency === "annual"
       ? Math.max(1, Math.min(12, parseInt(addForm.due_month) || 1))
       : undefined;
-    const newSub = addSubscription({
-      name: addForm.name.trim(),
-      amount,
-      category_id: addForm.category_id,
-      frequency: addForm.frequency,
-      due_day,
-      due_month,
-      paid_by: "user1",
-    });
-    setSubscriptions((prev) => [...prev, newSub]);
-    closeModal();
+    try {
+      const newSub = await addSubscription({
+        name: addForm.name.trim(),
+        amount,
+        category_id: addForm.category_id,
+        frequency: addForm.frequency,
+        due_day,
+        due_month,
+        paid_by: "user1",
+      });
+      setSubscriptions((prev) => [...prev, newSub]);
+      closeModal();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to add subscription");
+    }
   }
 
-  function handleEdit() {
+  async function handleEdit() {
     if (!editingId) return;
     const due_day = Math.max(1, Math.min(31, parseInt(editForm.due_day) || 1));
     const due_month = subscriptions.find((s) => s.id === editingId)?.frequency === "annual"
       ? Math.max(1, Math.min(12, parseInt(editForm.due_month) || 1))
       : undefined;
-    const updates: Parameters<typeof updateSubscription>[1] = {
+    const updates = {
       name: editForm.name.trim() || undefined,
       category_id: editForm.category_id,
       due_day,
       due_month,
     };
-    updateSubscription(editingId, updates);
-    setSubscriptions((prev) =>
-      prev.map((s) =>
-        s.id === editingId
-          ? { ...s, ...updates, due_month: due_month ?? s.due_month }
-          : s
-      )
-    );
-    closeModal();
+    try {
+      await updateSubscription(editingId, updates);
+      setSubscriptions((prev) =>
+        prev.map((s) =>
+          s.id === editingId
+            ? { ...s, name: updates.name ?? s.name, category_id: updates.category_id ?? s.category_id, due_day: updates.due_day ?? s.due_day, due_month: due_month ?? s.due_month }
+            : s
+        )
+      );
+      closeModal();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update subscription");
+    }
   }
 
-  function handleCancel(id: string) {
-    cancelSubscription(id);
-    setSubscriptions((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, is_active: false } : s))
-    );
+  async function handleCancel(id: string) {
+    try {
+      await cancelSubscription(id);
+      setSubscriptions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, is_active: false } : s))
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to cancel subscription");
+    }
   }
 
   const editingFrequency = editingId
     ? subscriptions.find((s) => s.id === editingId)?.frequency
     : undefined;
+
+  if (loading) return (
+    <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-6">
+      <h1 className="text-2xl font-bold mb-4">Subscriptions</h1>
+      <div className="flex justify-center py-16"><span className="loading loading-spinner loading-md text-primary" /></div>
+    </main>
+  );
 
   return (
     <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-6">
