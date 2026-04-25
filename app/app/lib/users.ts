@@ -1,6 +1,6 @@
 export const USERS = [
-  { id: "user1", name: "User 1", email: "" },
-  { id: "user2", name: "User 2", email: "" },
+  { id: "user1", name: "ijac", email: "ijac.wei@gmail.com" },
+  { id: "user2", name: "wei", email: "wei7780@gmail.com" },
 ] as const;
 
 export type UserId = typeof USERS[number]["id"];
