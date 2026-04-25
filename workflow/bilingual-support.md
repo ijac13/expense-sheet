@@ -1,11 +1,11 @@
 ---
 id: "007"
 title: Bilingual Support
-status: verify
+status: done
 source: commission seed
 started: 2026-04-21T03:30:00Z
-completed:
-verdict:
+completed: 2026-04-25
+verdict: PASSED
 score: 0.6
 worktree: feature/007-bilingual-support
 issue:

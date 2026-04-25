@@ -1,11 +1,11 @@
 ---
 id: "012"
 title: Expense History
-status: verify
+status: done
 source: commission seed
 started: 2026-04-20T10:00:00Z
-completed:
-verdict:
+completed: 2026-04-25
+verdict: PASSED
 score: 0.8
 worktree: feature/012-history
 issue:

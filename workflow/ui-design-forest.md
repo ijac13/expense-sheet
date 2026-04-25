@@ -1,11 +1,11 @@
 ---
 id: "015"
 title: UI Design — Forest Theme
-status: verify
+status: done
 source: captain design
 started: 2026-04-22T05:00:00Z
-completed:
-verdict:
+completed: 2026-04-25
+verdict: PASSED
 score: 0.9
 worktree:
 issue:

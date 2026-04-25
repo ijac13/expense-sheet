@@ -1,11 +1,11 @@
 ---
 id: "005"
 title: Reports
-status: verify
+status: done
 source: commission seed
 started: 2026-04-21T02:00:00Z
-completed:
-verdict:
+completed: 2026-04-25
+verdict: PASSED
 score: 0.7
 worktree:
 issue:

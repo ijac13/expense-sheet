@@ -1,11 +1,11 @@
 ---
 id: "003"
 title: Category System
-status: verify
+status: done
 source: commission seed
 started: 2026-04-20T10:30:00Z
-completed:
-verdict:
+completed: 2026-04-25
+verdict: PASSED
 score: 0.8
 worktree: feature/003-category-system
 issue:

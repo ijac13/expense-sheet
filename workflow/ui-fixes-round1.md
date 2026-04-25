@@ -1,11 +1,11 @@
 ---
 id: "016"
 title: UI Fixes — Round 1 Captain Review
-status: verify
+status: done
 source: captain review
 started: 2026-04-22T08:00:00Z
-completed:
-verdict:
+completed: 2026-04-25
+verdict: PASSED
 score: 1.0
 worktree:
 issue:

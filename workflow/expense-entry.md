@@ -1,11 +1,11 @@
 ---
 id: "002"
 title: Expense Entry
-status: verify
+status: done
 source: commission seed
 started: 2026-04-18T15:53:07Z
-completed:
-verdict:
+completed: 2026-04-25
+verdict: PASSED
 score: 1.0
 worktree: feature/002-expense-entry
 issue:
