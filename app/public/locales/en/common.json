@@ -1,5 +1,5 @@
 {
-  "tabs": { "home": "Home", "history": "History", "reports": "Reports", "subscriptions": "Recurring", "settings": "Settings" },
+  "tabs": { "home": "Home", "history": "History", "reports": "Reports", "subscriptions": "Subscriptions", "settings": "Settings" },
   "home": { "title": "Add Expense", "amount_label": "Amount (TWD)", "logged_today": "logged today", "notes_placeholder": "Notes (optional)", "log_another": "Log another", "save": "Save", "paid_by": "Paid by", "today": "Today", "yesterday": "Yesterday" },
   "history": { "title": "History", "no_expenses": "No expenses yet", "entries": "entries" },
   "reports": { "title": "Reports", "monthly": "Monthly", "annual": "Annual", "all": "All", "total": "Total", "by_category": "By Category", "by_payer": "By Payer", "back": "Back", "no_data": "No data" },

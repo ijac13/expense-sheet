@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Package } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
-import { DEFAULT_CATEGORIES, CATEGORY_ICONS, getDefaultCategory, saveLastCategory } from "./lib/categories";
+import { DEFAULT_CATEGORIES, getDefaultCategory, saveLastCategory } from "./lib/categories";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
 import { USERS, DEFAULT_USER, type UserId } from "./lib/users";
 
@@ -25,9 +25,9 @@ export default function HomePage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   const selectedCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId);
-  const SelectedIcon = selectedCat ? (CATEGORY_ICONS[selectedCat.id] ?? Package) : Package;
   const paidByUser = USERS.find(u => u.id === paidBy);
   const nextUser = USERS[(USERS.findIndex(u => u.id === paidBy) + 1) % USERS.length];
 
@@ -50,7 +50,7 @@ export default function HomePage() {
     setAmount(a => a + key);
   }
 
-  async function handleConfirm(andContinue = false) {
+  async function handleConfirm() {
     let val: number;
     try { val = Function(`"use strict"; return (${amount || "0"})`)() as number; }
     catch { return; }
@@ -63,7 +63,9 @@ export default function HomePage() {
       const updated = await getTodayExpenses();
       setExpenses(updated);
       setAmount("");
-      if (!andContinue) setNote("");
+      setNote("");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save expense";
       setSubmitError(msg);
@@ -111,7 +113,7 @@ export default function HomePage() {
             onClick={() => {}}
             className="flex items-center gap-2 px-3 py-2 bg-base-200 rounded-xl text-sm"
           >
-            <SelectedIcon size={16} strokeWidth={1.6} />
+            <span className="text-base">{selectedCat?.icon}</span>
             <span className="text-base-content/70">{selectedCat?.name_en}</span>
           </button>
           <button
@@ -159,8 +161,8 @@ export default function HomePage() {
       </div>
 
       {/* Calculator — always visible at bottom */}
-      <div className="shrink-0 bg-base-100 border-t border-base-300 px-3 pt-2 pb-20">
-        <div className="grid grid-cols-4 gap-1.5 mb-1.5">
+      <div className="shrink-0 bg-base-100 border-t border-base-300 px-3 pt-1 pb-20">
+        <div className="grid grid-cols-4 gap-1 mb-1">
           {KEYS.flat().map((key, i) => {
             if (key === "") return <div key={i} />;
             const isOp = ["+","-","×","÷","(",")"].includes(key);
@@ -169,7 +171,7 @@ export default function HomePage() {
               <button
                 key={i}
                 onClick={() => handleKey(key)}
-                className={`h-12 rounded-xl text-lg font-medium transition-all active:scale-95
+                className={`h-10 rounded-xl text-lg font-medium transition-all active:scale-95
                   ${isDel ? "bg-base-200 text-base-content/70 border border-base-300"
                   : isOp ? "bg-secondary/20 text-secondary border border-secondary/30"
                   : "bg-white border border-base-300 text-base-content"}`}
@@ -179,20 +181,14 @@ export default function HomePage() {
             );
           })}
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-1 gap-1">
           <button
-            onClick={() => handleConfirm(true)}
+            onClick={() => handleConfirm()}
             disabled={submitting}
-            className="h-12 rounded-xl bg-base-200 text-sm font-semibold text-base-content/70 active:bg-base-300 disabled:opacity-50"
+            className={`h-12 rounded-xl font-semibold active:opacity-80 disabled:opacity-50 transition-colors
+              ${saved ? "bg-success text-success-content" : "bg-primary text-primary-content"}`}
           >
-            {t("home.log_another")}
-          </button>
-          <button
-            onClick={() => handleConfirm(false)}
-            disabled={submitting}
-            className="h-12 rounded-xl bg-primary text-primary-content font-semibold active:opacity-80 disabled:opacity-50"
-          >
-            {submitting ? "Saving..." : t("home.save")}
+            {saved ? "✓ Saved" : submitting ? "Saving..." : t("home.save")}
           </button>
         </div>
       </div>
