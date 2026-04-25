@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Package, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getAllExpenses } from "../lib/historyService";
-import { DEFAULT_CATEGORIES, CATEGORY_ICONS } from "../lib/categories";
+import { DEFAULT_CATEGORIES } from "../lib/categories";
 import { Expense } from "../lib/expenses";
 import { USERS } from "../lib/users";
 
@@ -88,7 +88,6 @@ export default function HistoryPage() {
   }, [groups]);
 
   const selectedCat = selected ? DEFAULT_CATEGORIES.find(c => c.id === selected.category_id) : null;
-  const SelectedIcon = selectedCat ? (CATEGORY_ICONS[selectedCat.id] ?? Package) : Package;
   const selectedPaidBy = selected ? USERS.find(u => u.id === selected.paid_by) : null;
   const selectedCreatedBy = selected ? USERS.find(u => u.id === selected.created_by) : null;
 
@@ -137,11 +136,11 @@ export default function HistoryPage() {
                 {dayGroups.map((group) => (
                   <div key={group.date}>
                     {/* Date group header */}
-                    <div className="flex justify-between items-center px-4 pt-3 pb-1">
+                    <div className="flex justify-between items-center px-4 pt-3 pb-1.5 border-b border-base-300/60">
                       <span className="text-[11px] uppercase tracking-wider text-base-content/50 font-medium">
                         {formatDateHeader(group.date)}
                       </span>
-                      <span className="text-[11px] uppercase tracking-wider text-base-content/50 font-medium">
+                      <span className="text-sm font-semibold text-base-content">
                         NT${group.total.toLocaleString()}
                       </span>
                     </div>
@@ -150,7 +149,6 @@ export default function HistoryPage() {
                     <div className="divide-y divide-base-300">
                       {group.expenses.map((expense) => {
                         const cat = DEFAULT_CATEGORIES.find(c => c.id === expense.category_id);
-                        const Icon = cat ? (CATEGORY_ICONS[cat.id] ?? Package) : Package;
                         const paidByUser = USERS.find(u => u.id === expense.paid_by);
                         return (
                           <button
@@ -159,7 +157,7 @@ export default function HistoryPage() {
                             className="w-full grid grid-cols-[44px_1fr_auto] gap-3 items-center px-4 py-3 hover:bg-base-200 transition-colors text-left"
                           >
                             <span className="grid place-items-center w-10 h-10 rounded-xl bg-white border border-base-300">
-                              <Icon size={22} strokeWidth={1.6} className="text-base-content" />
+                              <span className="text-xl">{cat?.icon ?? "💰"}</span>
                             </span>
                             <div className="min-w-0">
                               <div className="text-[15px] font-medium">{cat?.name_en ?? expense.category_id}</div>
@@ -188,7 +186,7 @@ export default function HistoryPage() {
       {/* Expense detail bottom sheet */}
       {selected && (
         <div
-          className="fixed inset-0 z-30 bg-black/45 flex items-end"
+          className="fixed inset-0 z-[60] bg-black/45 flex items-end"
           onClick={() => setSelected(null)}
         >
           <div
@@ -207,7 +205,7 @@ export default function HistoryPage() {
             {/* Category icon + name */}
             <div className="flex items-center gap-4 px-5 pt-2 pb-4 border-b border-base-300">
               <span className="grid place-items-center w-14 h-14 rounded-2xl bg-primary/10 text-primary">
-                <SelectedIcon size={28} strokeWidth={1.5} />
+                <span className="text-3xl">{selectedCat?.icon ?? "💰"}</span>
               </span>
               <div>
                 <div className="text-xl font-semibold">{selectedCat?.name_en ?? selected.category_id}</div>
