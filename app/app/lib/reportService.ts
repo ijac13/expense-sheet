@@ -13,27 +13,21 @@ import {
   PayerFilter,
 } from "./reportTypes";
 import { Expense } from "./expenses";
+import { DEFAULT_CATEGORIES } from "./categories";
 
 const API_BASE = "/api";
 
 // ---------------------------------------------------------------------------
-// Category metadata — display names and icons
+// Category metadata — resolved from DEFAULT_CATEGORIES (has both en + zh names)
 // ---------------------------------------------------------------------------
-const CATEGORY_META: Record<string, { name: string; icon: string }> = {
-  "eating-out":        { name: "Eating Out",       icon: "🍜" },
-  groceries:           { name: "Groceries",         icon: "🥬" },
-  transportation:      { name: "Transportation",    icon: "🚌" },
-  "daily-necessities": { name: "Daily Necessities", icon: "🧴" },
-  entertainment:       { name: "Entertainment",     icon: "🎬" },
-  medical:             { name: "Medical",           icon: "🏥" },
-  digital:             { name: "Digital",           icon: "💻" },
-  shopping:            { name: "Shopping",          icon: "🛒" },
-  fuel:                { name: "Fuel",              icon: "⛽" },
-  tolls:               { name: "Tolls",             icon: "🛣️" },
-  rent:                { name: "Rent",              icon: "🏠" },
-  clothing:            { name: "Clothing",          icon: "👗" },
-  equipment:           { name: "Equipment",         icon: "🔧" },
-};
+function getCatMeta(catId: string): { name_en: string; name_zh: string; icon: string } {
+  const cat = DEFAULT_CATEGORIES.find((c) => c.id === catId);
+  return {
+    name_en: cat?.name_en ?? catId,
+    name_zh: cat?.name_zh ?? catId,
+    icon: cat?.icon ?? "📦",
+  };
+}
 
 import { USERS } from "./users";
 
@@ -73,14 +67,18 @@ function buildCategoryBreakdown(expenses: Expense[]): CategoryBreakdown[] {
   }
   const grandTotal = expenses.reduce((s, e) => s + e.amount, 0);
   return Object.entries(map)
-    .map(([cat_id, { total, count }]) => ({
-      category_id: cat_id,
-      category_name: CATEGORY_META[cat_id]?.name ?? cat_id,
-      icon: CATEGORY_META[cat_id]?.icon ?? "📦",
-      total,
-      count,
-      percentage: grandTotal > 0 ? Math.round((total / grandTotal) * 100) : 0,
-    }))
+    .map(([cat_id, { total, count }]) => {
+      const meta = getCatMeta(cat_id);
+      return {
+        category_id: cat_id,
+        category_name: meta.name_en,
+        category_name_zh: meta.name_zh,
+        icon: meta.icon,
+        total,
+        count,
+        percentage: grandTotal > 0 ? Math.round((total / grandTotal) * 100) : 0,
+      };
+    })
     .sort((a, b) => b.total - a.total);
 }
 
@@ -218,14 +216,18 @@ export async function getExpensesByCategory(
 
   return expenses
     .sort((a, b) => b.date.localeCompare(a.date))
-    .map((e) => ({
-      id: e.id,
-      date: e.date,
-      amount: e.amount,
-      category_id: e.category_id,
-      category_name: CATEGORY_META[e.category_id]?.name ?? e.category_id,
-      icon: CATEGORY_META[e.category_id]?.icon ?? "📦",
-      paid_by: getPayerName(e.paid_by),
-      notes: e.notes ?? "",
-    }));
+    .map((e) => {
+      const meta = getCatMeta(e.category_id);
+      return {
+        id: e.id,
+        date: e.date,
+        amount: e.amount,
+        category_id: e.category_id,
+        category_name: meta.name_en,
+        category_name_zh: meta.name_zh,
+        icon: meta.icon,
+        paid_by: getPayerName(e.paid_by),
+        notes: e.notes ?? "",
+      };
+    });
 }

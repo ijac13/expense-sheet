@@ -108,10 +108,13 @@ function DeltaBadge({ current, previous }: { current: number; previous: number }
 function CategoryRow({
   cat,
   onDrillDown,
+  lang,
 }: {
   cat: CategoryBreakdown;
   onDrillDown: (cat: CategoryBreakdown) => void;
+  lang: string;
 }) {
+  const displayName = lang === "zh" && cat.category_name_zh ? cat.category_name_zh : cat.category_name;
   return (
     <button
       type="button"
@@ -120,7 +123,7 @@ function CategoryRow({
     >
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-baseline">
-          <span className="font-medium text-sm truncate">{cat.category_name}</span>
+          <span className="font-medium text-sm truncate">{displayName}</span>
           <span className="font-mono font-semibold text-sm ml-2 shrink-0">
             NT${cat.total.toLocaleString()}
           </span>
@@ -235,9 +238,6 @@ function InsightsCard() {
     <div className="bg-base-200 rounded-2xl p-5 space-y-3">
       <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">{t("reports.insights_title")}</div>
       <p className="text-sm text-error/80">{t("reports.insights_error")}</p>
-      {errorMsg && (
-        <p className="text-xs text-base-content/40 font-mono break-all bg-base-300 rounded px-2 py-1">{errorMsg}</p>
-      )}
       <button onClick={generate} className="btn btn-ghost btn-sm">{t("errors.retry")}</button>
     </div>
   );
@@ -262,7 +262,8 @@ function InsightsCard() {
 // Main page
 // ---------------------------------------------------------------------------
 export default function ReportsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
   const now = new Date();
   const [mounted, setMounted] = useState(false);
   const [period, setPeriod] = useState<ReportPeriod>("monthly");
@@ -327,7 +328,11 @@ export default function ReportsPage() {
         year={period === "monthly" ? year : annualYear}
         month={period === "monthly" ? month : null}
         categoryId={drillDownCategory.category_id}
-        categoryName={drillDownCategory.category_name}
+        categoryName={
+          lang === "zh" && drillDownCategory.category_name_zh
+            ? drillDownCategory.category_name_zh
+            : drillDownCategory.category_name
+        }
         icon={drillDownCategory.icon}
         periodLabel={
           period === "monthly"
@@ -454,11 +459,14 @@ export default function ReportsPage() {
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart
-                        data={monthly.categories}
+                        data={monthly.categories.map(c => ({
+                          ...c,
+                          display_name: lang === "zh" && c.category_name_zh ? c.category_name_zh : c.category_name,
+                        }))}
                         margin={{ top: 4, right: 8, left: 0, bottom: 40 }}
                       >
                         <XAxis
-                          dataKey="category_name"
+                          dataKey="display_name"
                           tick={{ fontSize: 10 }}
                           angle={-35}
                           textAnchor="end"
@@ -485,6 +493,7 @@ export default function ReportsPage() {
                         key={cat.category_id}
                         cat={cat}
                         onDrillDown={setDrillDownCategory}
+                        lang={lang}
                       />
                     ))}
                   </div>
@@ -597,23 +606,26 @@ export default function ReportsPage() {
                       onClick={() => setChartType(ct)}
                       className={`btn btn-xs ${chartType === ct ? "btn-primary" : "btn-ghost"}`}
                     >
-                      {ct === "pie" ? "Donut" : "Bar"}
+                      {ct === "pie" ? t("reports.donut") : t("reports.bar")}
                     </button>
                   ))}
                 </div>
 
-                {/* Chart */}
+                {/* Chart — annual */}
                 {mounted && (
                   chartType === "pie" ? (
                     <DonutChart categories={annual.categories} totalLabel={t("reports.total")} />
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart
-                        data={annual.categories}
+                        data={annual.categories.map(c => ({
+                          ...c,
+                          display_name: lang === "zh" && c.category_name_zh ? c.category_name_zh : c.category_name,
+                        }))}
                         margin={{ top: 4, right: 8, left: 0, bottom: 40 }}
                       >
                         <XAxis
-                          dataKey="category_name"
+                          dataKey="display_name"
                           tick={{ fontSize: 10 }}
                           angle={-35}
                           textAnchor="end"
@@ -640,6 +652,7 @@ export default function ReportsPage() {
                         key={cat.category_id}
                         cat={cat}
                         onDrillDown={setDrillDownCategory}
+                        lang={lang}
                       />
                     ))}
                   </div>

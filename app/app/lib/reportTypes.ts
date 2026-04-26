@@ -1,6 +1,7 @@
 export interface CategoryBreakdown {
   category_id: string;
-  category_name: string;
+  category_name: string;     // English
+  category_name_zh: string;  // Traditional Chinese
   icon: string;
   total: number;
   count: number;
@@ -52,7 +53,8 @@ export interface ReportExpense {
   date: string;
   amount: number;
   category_id: string;
-  category_name: string;
+  category_name: string;     // English
+  category_name_zh: string;  // Traditional Chinese
   icon: string;
   paid_by: string;
   notes: string;
