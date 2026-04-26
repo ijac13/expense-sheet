@@ -2,13 +2,15 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { DEFAULT_USER, USERS } from "../lib/users";
+import { USERS } from "../lib/users";
 import { getFontSize, setFontSize, type FontSize } from "../components/FontSizeProvider";
 import LanguageToggle from "../components/LanguageToggle";
+import { useAuth } from "../lib/authContext";
 
 export default function SettingsPage() {
   const { t } = useTranslation();
-  const currentUser = USERS.find(u => u.id === DEFAULT_USER);
+  const { resolvedUserId, signOut } = useAuth();
+  const currentUser = USERS.find(u => u.id === resolvedUserId);
   const [fontSize, setFontSizeState] = useState<FontSize>("medium");
 
   const FONT_OPTIONS: { value: FontSize; label: string; description: string }[] = [
@@ -30,9 +32,14 @@ export default function SettingsPage() {
     <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-20">
       <h1 className="text-2xl font-semibold mb-1">{t("settings.title")}</h1>
       {currentUser && (
-        <p className="text-sm text-base-content/50 mb-6">
-          {t("settings.signed_in_as")} <span className="font-medium text-base-content/70">{currentUser.name}</span>
-        </p>
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-sm text-base-content/50">
+            {t("settings.signed_in_as")} <span className="font-medium text-base-content/70">{currentUser.name}</span>
+          </p>
+          <button onClick={signOut} className="btn btn-ghost btn-xs text-error">
+            Sign out
+          </button>
+        </div>
       )}
 
       <div className="space-y-4">

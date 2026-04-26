@@ -24,3 +24,9 @@ out/
 
 # Worktrees
 .worktrees/
+
+# Claude Code
+.claude/
+
+# Feedback screenshots (personal)
+feedback-screenshots/

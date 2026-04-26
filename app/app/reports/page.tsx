@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -133,6 +133,111 @@ function CategoryRow({
         <div className="text-xs text-base-content/50 mt-0.5">{cat.percentage}%</div>
       </div>
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Insights card
+// ---------------------------------------------------------------------------
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
+
+function InsightsCard() {
+  const [state, setState] = useState<"idle" | "loading" | "done" | "insufficient" | "error">("idle");
+  const [insights, setInsights] = useState("");
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function startTimer() {
+    setElapsed(0);
+    timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
+  }
+  function stopTimer() {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  }
+  useEffect(() => () => stopTimer(), []);
+
+  async function generate() {
+    setState("loading");
+    startTimer();
+    try {
+      const res = await fetch(`${API_BASE}/api/insights`, { method: "POST" });
+      const data = await res.json();
+      stopTimer();
+      if (data.insufficient_data) { setState("insufficient"); return; }
+      if (data.insights) { setInsights(data.insights); setState("done"); }
+      else setState("error");
+    } catch {
+      stopTimer();
+      setState("error");
+    }
+  }
+
+  // Render markdown-ish bold (**text**) as <strong>
+  function renderInsights(text: string) {
+    return text.split("\n").map((line, i) => {
+      const parts = line.split(/\*\*(.*?)\*\*/g);
+      return (
+        <p key={i} className={line.trim() === "" ? "mt-2" : "leading-relaxed"}>
+          {parts.map((part, j) => j % 2 === 1 ? <strong key={j}>{part}</strong> : part)}
+        </p>
+      );
+    });
+  }
+
+  if (state === "idle") return (
+    <div className="bg-base-200 rounded-2xl p-5 space-y-3">
+      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">AI Insights</div>
+      <p className="text-sm text-base-content/70">
+        Get a plain-language analysis of your spending patterns — what's changed, what looks unusual, and what's going well.
+      </p>
+      <button onClick={generate} className="btn btn-primary btn-sm w-full">
+        Generate Insights
+      </button>
+    </div>
+  );
+
+  if (state === "loading") return (
+    <div className="bg-base-200 rounded-2xl p-5 flex flex-col items-center gap-3 py-8">
+      <span className="loading loading-spinner loading-md text-primary" />
+      <p className="text-sm text-base-content/70 text-center">
+        Analysing your spending…
+      </p>
+      <p className="text-xs text-base-content/40">
+        Usually takes about 10 seconds{elapsed > 0 ? ` · ${elapsed}s` : ""}
+      </p>
+    </div>
+  );
+
+  if (state === "insufficient") return (
+    <div className="bg-base-200 rounded-2xl p-5">
+      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-2">AI Insights</div>
+      <p className="text-sm text-base-content/60">
+        Not enough data yet. Track at least a few days of expenses first.
+      </p>
+    </div>
+  );
+
+  if (state === "error") return (
+    <div className="bg-base-200 rounded-2xl p-5 space-y-3">
+      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">AI Insights</div>
+      <p className="text-sm text-error/80">Something went wrong. Try again?</p>
+      <button onClick={generate} className="btn btn-ghost btn-sm">Retry</button>
+    </div>
+  );
+
+  // done
+  return (
+    <div className="bg-base-200 rounded-2xl p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">AI Insights</div>
+        <button onClick={() => setState("idle")} className="text-xs text-base-content/40 hover:text-base-content/70">
+          Regenerate
+        </button>
+      </div>
+      <div className="text-sm text-base-content/80 space-y-1">
+        {renderInsights(insights)}
+      </div>
+    </div>
   );
 }
 
@@ -424,10 +529,8 @@ export default function ReportsPage() {
                   </div>
                 </div>
 
-                {/* Insights stub */}
-                <div className="p-4 bg-base-200 rounded-xl text-sm text-base-content/50">
-                  Insights coming soon...
-                </div>
+                {/* AI Insights */}
+                <InsightsCard />
               </>
             ) : null}
           </>
@@ -566,10 +669,8 @@ export default function ReportsPage() {
                   </div>
                 </div>
 
-                {/* Insights stub */}
-                <div className="p-4 bg-base-200 rounded-xl text-sm text-base-content/50">
-                  Insights coming soon...
-                </div>
+                {/* AI Insights */}
+                <InsightsCard />
               </>
             )}
           </>

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Subscription, getNextDueDate } from "../lib/subscriptions";
 import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription } from "../lib/subscriptionService";
 import { DEFAULT_CATEGORIES } from "../lib/categories";
+import { USERS } from "../lib/users";
 
 type ModalMode = "add" | "edit" | null;
 
@@ -198,7 +199,7 @@ export default function SubscriptionsPage() {
                             <span>Due {formatDueDate(nextDue)}</span>
                           </div>
                           <div className="text-xs text-base-content/40">
-                            Paid by {sub.paid_by}
+                            Paid by {USERS.find(u => u.id === sub.paid_by)?.name ?? sub.paid_by}
                           </div>
                         </div>
                       </div>

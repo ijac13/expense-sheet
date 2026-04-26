@@ -22,17 +22,13 @@ export default function CategoryPicker({ categories, selectedId, onSelect }: Pro
           <button
             key={cat.id}
             onClick={() => onSelect(cat.id)}
-            className="flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-colors active:bg-base-200"
+            className={`flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-colors active:bg-base-200
+              ${selected ? "ring-2 ring-primary ring-offset-1 ring-offset-base-100" : ""}`}
           >
-            <span
-              className={`grid place-items-center w-12 h-12 rounded-xl border transition-colors
-                ${selected
-                  ? "bg-primary border-primary text-primary-content"
-                  : "bg-base-100 border-base-300 text-base-content"}`}
-            >
+            <span className="grid place-items-center w-12 h-12 rounded-xl bg-base-100 border border-base-300">
               <span className="text-2xl">{cat.icon ?? "💰"}</span>
             </span>
-            <span className={`text-[13px] leading-tight text-center ${selected ? "font-medium text-base-content" : "text-base-content/70"}`}>
+            <span className={`text-[13px] leading-tight text-center ${selected ? "font-medium text-primary" : "text-base-content/70"}`}>
               {cat.name_en}
             </span>
           </button>

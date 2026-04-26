@@ -1,6 +1,10 @@
 import * as functionsV1 from "firebase-functions";
 import { onRequest } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import { google } from "googleapis";
+import Anthropic from "@anthropic-ai/sdk";
+
+const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
 
 // ---------------------------------------------------------------------------
 // Legacy health check — kept for backwards compatibility
@@ -73,7 +77,7 @@ function rowToSubscription(row: (string | null | undefined)[]): Record<string, u
 // ---------------------------------------------------------------------------
 // HTTP API function
 // ---------------------------------------------------------------------------
-export const api = onRequest(async (req, res) => {
+export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
   setCors(res);
 
   if (req.method === "OPTIONS") {
@@ -205,6 +209,141 @@ export const api = onRequest(async (req, res) => {
       }
 
       res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // /api/insights — POST (generates AI spending analysis)
+    // -----------------------------------------------------------------------
+    if (path.includes("insights")) {
+      if (req.method !== "POST") {
+        res.status(405).json({ error: "Method not allowed" });
+        return;
+      }
+
+      // Fetch all expenses and subscriptions
+      const [expResponse, subResponse] = await Promise.all([
+        sheets.spreadsheets.values.get({ spreadsheetId, range: `${EXPENSES_TAB}!A:H` }),
+        sheets.spreadsheets.values.get({ spreadsheetId, range: `${SUBSCRIPTIONS_TAB}!A:I` }),
+      ]);
+
+      const allExpenses = (expResponse.data.values ?? []).slice(1).map(rowToExpense);
+      const subscriptions = (subResponse.data.values ?? []).slice(1).map(rowToSubscription)
+        .filter((s) => s.is_active);
+
+      // Determine data tier based on how much history exists
+      const now = new Date();
+      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const lastYear = `${now.getFullYear() - 1}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+      const oldestDate = allExpenses.reduce((min, e) => {
+        const d = String(e.date);
+        return d < min ? d : min;
+      }, String(now.toISOString().split("T")[0]));
+
+      const daysSinceFirst = Math.floor(
+        (now.getTime() - new Date(oldestDate + "T00:00:00").getTime()) / 86400000
+      );
+
+      // Require at least 3 days of data
+      if (allExpenses.length === 0 || daysSinceFirst < 3) {
+        res.status(200).json({ insufficient_data: true });
+        return;
+      }
+
+      // Tier: "week" (<30 days), "month" (1–2 months), "full" (2+ months)
+      const monthsWithData = new Set(allExpenses.map((e) => String(e.date).slice(0, 7)));
+      const tier = daysSinceFirst < 30 ? "week" : monthsWithData.size < 2 ? "month" : "full";
+
+      function monthOffset(n: number): string {
+        const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      }
+
+      function sumByCategory(expenses: typeof allExpenses): Record<string, number> {
+        const map: Record<string, number> = {};
+        for (const e of expenses) {
+          const cat = String(e.category_id);
+          map[cat] = (map[cat] ?? 0) + Number(e.amount);
+        }
+        return map;
+      }
+
+      const recentExp = allExpenses.filter((e) => String(e.date).startsWith(thisMonth));
+      const recentBycat = sumByCategory(recentExp.length > 0 ? recentExp : allExpenses);
+
+      const prev3Avg: Record<string, number> = {};
+      if (tier === "full") {
+        const prev3ByMonth: Record<string, Record<string, number>> = {};
+        for (let i = 1; i <= 3; i++) {
+          const mk = monthOffset(i);
+          prev3ByMonth[mk] = sumByCategory(allExpenses.filter((e) => String(e.date).startsWith(mk)));
+        }
+        const allCats = new Set(Object.keys(recentBycat));
+        for (const cat of allCats) {
+          const months = Object.values(prev3ByMonth).filter((m) => m[cat] !== undefined);
+          if (months.length > 0) {
+            prev3Avg[cat] = months.reduce((s, m) => s + (m[cat] ?? 0), 0) / months.length;
+          }
+        }
+      }
+
+      const lastYearBycat = tier === "full"
+        ? sumByCategory(allExpenses.filter((e) => String(e.date).startsWith(lastYear)))
+        : {};
+
+      const subSummary = subscriptions.map((s) => ({
+        name: s.name,
+        amount: s.amount,
+        frequency: s.frequency,
+        category: s.category_id,
+      }));
+
+      const formatCats = (obj: Record<string, number>) =>
+        Object.entries(obj)
+          .sort((a, b) => b[1] - a[1])
+          .map(([k, v]) => `  ${k}: NT$${Math.round(v).toLocaleString()}`)
+          .join("\n") || "  (no data)";
+
+      const periodLabel = tier === "week"
+        ? `last ${daysSinceFirst} days`
+        : now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+      const tierNote = tier === "week"
+        ? `Note: only ${daysSinceFirst} days of data available. Skip any comparisons — just observe what's been spent so far and give early encouragement or a gentle heads-up if anything looks high.`
+        : tier === "month"
+        ? "Note: about 1 month of data. No multi-month comparison available — focus on this month's patterns and subscriptions."
+        : "Full history available. Include month-over-month and year-over-year comparisons where relevant.";
+
+      const prompt = `You are a warm, knowledgeable financial advisor for a household of two in Taiwan. Analyse their spending and give concise, practical, kind advice — like a trusted friend who knows about money. Not clinical. Not cheerleader-y.
+
+${tierNote}
+
+## Spending so far (${periodLabel}) by category
+${formatCats(recentBycat)}
+
+${tier === "full" ? `## Previous 3-month average by category\n${formatCats(prev3Avg)}\n\n## Same month last year by category\n${formatCats(lastYearBycat)}` : ""}
+
+## Active subscriptions
+${subSummary.length > 0
+  ? subSummary.map((s) => `  ${s.name}: NT$${Number(s.amount).toLocaleString()}/${s.frequency} (${s.category})`).join("\n")
+  : "  (none)"}
+
+Write a short insights report with exactly these sections:
+1. **Spending overview** — one sentence summary appropriate to the data available
+2. **Watch out** — top 2–3 categories that look high or worth watching, with a specific warm suggestion. Include subscriptions if relevant.
+3. **Doing well** — 1–2 positive observations or encouragements
+Keep the total response under 250 words. Use NT$ for amounts. Be specific to their actual categories.`;
+
+      const client = new Anthropic({ apiKey: anthropicKey.value() });
+      const message = await client.messages.create({
+        model: "claude-3-5-haiku-20241022",
+        max_tokens: 600,
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const text = message.content[0].type === "text" ? message.content[0].text : "";
+      res.status(200).json({ insights: text });
       return;
     }
 
