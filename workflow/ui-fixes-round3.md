@@ -1,11 +1,11 @@
 ---
 id: "019"
 title: UI Fixes — Round 3 Captain Review
-status: verify
+status: done
 source: captain feedback
 started: 2026-04-25
 completed:
-verdict:
+verdict: PASSED
 score: 1.0
 worktree:
 issue:
