@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ReportExpense, PayerFilter } from "../lib/reportTypes";
 import { getExpensesByCategory } from "../lib/reportService";
+import { USERS } from "../lib/users";
 
 interface Props {
   year: number;
@@ -126,7 +127,7 @@ export default function DrillDown({
                       {expense.notes && (
                         <div className="text-sm mt-0.5 truncate">{expense.notes}</div>
                       )}
-                      <div className="text-xs text-base-content/50 mt-0.5">{expense.paid_by}</div>
+                      <div className="text-xs text-base-content/50 mt-0.5">{USERS.find(u => u.id === expense.paid_by)?.name ?? expense.paid_by}</div>
                     </div>
                     <div className="text-right ml-4">
                       <div className="font-mono font-semibold">

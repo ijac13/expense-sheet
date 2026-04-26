@@ -2,13 +2,16 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, onAuthStateChanged } from "firebase/auth";
 import { getFirebaseAuth } from "./firebase";
-import { GoogleAuthProvider, signInWithRedirect, signOut } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { getUserByEmail, type UserId } from "./users";
 
 const googleProvider = new GoogleAuthProvider();
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  resolvedUserId: UserId | null;
+  unauthorizedEmail: boolean;
   signIn: () => void;
   signOut: () => void;
   hasReauthed: boolean;
@@ -21,6 +24,8 @@ const INACTIVITY_MS = 60_000; // 1 minute
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resolvedUserId, setResolvedUserId] = useState<UserId | null>(null);
+  const [unauthorizedEmail, setUnauthorizedEmail] = useState(false);
   const [hasReauthed, setHasReauthed] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -33,10 +38,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(getFirebaseAuth(), (u) => {
-      setUser(u);
+    const auth = getFirebaseAuth();
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) {
+        const resolved = getUserByEmail(u.email);
+        if (resolved) {
+          setUser(u);
+          setResolvedUserId(resolved.id);
+          setUnauthorizedEmail(false);
+          resetTimer();
+        } else {
+          signOut(auth);
+          setUser(null);
+          setResolvedUserId(null);
+          setUnauthorizedEmail(true);
+        }
+      } else {
+        setUser(null);
+        setResolvedUserId(null);
+        if (timerRef.current) clearTimeout(timerRef.current);
+      }
       setLoading(false);
-      if (u) resetTimer();
     });
     return () => { unsub(); if (timerRef.current) clearTimeout(timerRef.current); };
   }, []);
@@ -52,8 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user,
       loading,
-      signIn: () => signInWithRedirect(getFirebaseAuth(), googleProvider),
-      signOut: () => { signOut(getFirebaseAuth()); setHasReauthed(false); },
+      resolvedUserId,
+      unauthorizedEmail,
+      signIn: () => { setUnauthorizedEmail(false); signInWithPopup(getFirebaseAuth(), googleProvider); },
+      signOut: () => { signOut(getFirebaseAuth()); setHasReauthed(false); setUnauthorizedEmail(false); },
       hasReauthed,
       setHasReauthed,
     }}>

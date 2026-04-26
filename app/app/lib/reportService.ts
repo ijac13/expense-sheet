@@ -35,10 +35,11 @@ const CATEGORY_META: Record<string, { name: string; icon: string }> = {
   equipment:           { name: "Equipment",         icon: "🔧" },
 };
 
-const PAYER_NAMES: Record<string, string> = {
-  user1: "Me",
-  user2: "Partner",
-};
+import { USERS } from "./users";
+
+function getPayerName(userId: string): string {
+  return USERS.find(u => u.id === userId)?.name ?? userId;
+}
 
 // ---------------------------------------------------------------------------
 // Data fetcher — cached per call (no module-level cache to avoid stale data)
@@ -91,7 +92,7 @@ function buildPayerBreakdown(expenses: Expense[]): PayerBreakdown[] {
   const grandTotal = expenses.reduce((s, e) => s + e.amount, 0);
   return Object.entries(map).map(([pid, total]) => ({
     payer_id: pid,
-    payer_name: PAYER_NAMES[pid] ?? pid,
+    payer_name: getPayerName(pid),
     total,
     percentage: grandTotal > 0 ? Math.round((total / grandTotal) * 100) : 0,
   }));
@@ -224,7 +225,7 @@ export async function getExpensesByCategory(
       category_id: e.category_id,
       category_name: CATEGORY_META[e.category_id]?.name ?? e.category_id,
       icon: CATEGORY_META[e.category_id]?.icon ?? "📦",
-      paid_by: PAYER_NAMES[e.paid_by] ?? e.paid_by,
+      paid_by: getPayerName(e.paid_by),
       notes: e.notes ?? "",
     }));
 }

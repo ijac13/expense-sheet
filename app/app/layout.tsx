@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import TabBar from "./components/TabBar";
+import AuthGuard from "./components/AuthGuard";
 import { AuthProvider } from "./lib/authContext";
 import FontSizeProvider from "./components/FontSizeProvider";
 import Providers from "./providers";
@@ -29,8 +30,10 @@ export default function RootLayout({
         <FontSizeProvider>
           <Providers>
             <AuthProvider>
-              <div className="pb-16">{children}</div>
-              <TabBar />
+              <AuthGuard>
+                <div className="pb-16">{children}</div>
+                <TabBar />
+              </AuthGuard>
             </AuthProvider>
           </Providers>
         </FontSizeProvider>
