@@ -74,6 +74,55 @@ function rowToSubscription(row: (string | null | undefined)[]): Record<string, u
   };
 }
 
+// Insert a data row at position 2 (right after the header) so the sheet stays DESC.
+// Ensures the header row exists first.
+async function insertRowAtTop(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  tabName: string,
+  header: string[],
+  dataRow: string[]
+): Promise<void> {
+  const colLetter = String.fromCharCode(64 + header.length);
+
+  // Ensure header row
+  const existing = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${tabName}!A1:${colLetter}1`,
+  });
+  if (!existing.data.values?.[0]?.[0] || existing.data.values[0][0] !== "id") {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${tabName}!A1:${colLetter}1`,
+      valueInputOption: "RAW",
+      requestBody: { values: [header] },
+    });
+  }
+
+  // Get sheetId for this tab
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" });
+  const sheetId = meta.data.sheets?.find((s) => s.properties?.title === tabName)?.properties?.sheetId ?? 0;
+
+  // Insert an empty row at index 1 (after header)
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{ insertDimension: {
+        range: { sheetId, dimension: "ROWS", startIndex: 1, endIndex: 2 },
+        inheritFromBefore: false,
+      }}],
+    },
+  });
+
+  // Write data into the new row 2
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${tabName}!A2:${colLetter}2`,
+    valueInputOption: "RAW",
+    requestBody: { values: [dataRow] },
+  });
+}
+
 // Resolve a user ID to their display name using the Users tab.
 // Falls back to the raw value if no match found.
 async function resolveUserDisplayNames(
@@ -152,6 +201,10 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       if (req.method === "POST") {
         const body = req.body as Record<string, unknown>;
         const id = `sub-${Date.now()}`;
+
+        const paidById = String(body.paid_by ?? "");
+        const nameMap = await resolveUserDisplayNames(sheets, spreadsheetId, [paidById]);
+
         const row = [
           id,
           String(body.name ?? ""),
@@ -160,32 +213,11 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           String(body.frequency ?? "monthly"),
           String(body.due_day ?? 1),
           String(body.due_month ?? ""),
-          String(body.paid_by ?? ""),
+          nameMap.get(paidById) ?? paidById,
           "true",
         ];
 
-        // Ensure header row
-        const existing = await sheets.spreadsheets.values.get({
-          spreadsheetId,
-          range: `${SUBSCRIPTIONS_TAB}!A1:I1`,
-        });
-        const firstRow = existing.data.values?.[0];
-        if (!firstRow || firstRow[0] !== "id") {
-          await sheets.spreadsheets.values.update({
-            spreadsheetId,
-            range: `${SUBSCRIPTIONS_TAB}!A1:I1`,
-            valueInputOption: "RAW",
-            requestBody: { values: [SUBSCRIPTIONS_HEADER] },
-          });
-        }
-
-        await sheets.spreadsheets.values.append({
-          spreadsheetId,
-          range: `${SUBSCRIPTIONS_TAB}!A:I`,
-          valueInputOption: "RAW",
-          insertDataOption: "INSERT_ROWS",
-          requestBody: { values: [row] },
-        });
+        await insertRowAtTop(sheets, spreadsheetId, SUBSCRIPTIONS_TAB, SUBSCRIPTIONS_HEADER, row);
 
         res.status(201).json(rowToSubscription(row));
         return;
@@ -501,27 +533,7 @@ Keep the total response under 250 words. Use NT$ for amounts. Be specific to the
         created_at,
       ];
 
-      const existing = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `${EXPENSES_TAB}!A1:H1`,
-      });
-      const firstRow = existing.data.values?.[0];
-      if (!firstRow || firstRow[0] !== "id") {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId,
-          range: `${EXPENSES_TAB}!A1:H1`,
-          valueInputOption: "RAW",
-          requestBody: { values: [EXPENSES_HEADER] },
-        });
-      }
-
-      await sheets.spreadsheets.values.append({
-        spreadsheetId,
-        range: `${EXPENSES_TAB}!A:H`,
-        valueInputOption: "RAW",
-        insertDataOption: "INSERT_ROWS",
-        requestBody: { values: [row] },
-      });
+      await insertRowAtTop(sheets, spreadsheetId, EXPENSES_TAB, EXPENSES_HEADER, row);
 
       res.status(201).json(rowToExpense(row));
       return;
