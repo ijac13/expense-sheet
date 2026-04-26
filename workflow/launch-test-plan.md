@@ -32,6 +32,23 @@ Structured rollout from staging validation through production migration, replaci
 
 **Pass criteria:** Both users complete the checklist above with no blocking issues.
 
+### Phase 1 測試清單 — Wei（繁體中文）
+
+**目標：** 確認兩位使用者在正式上線前，核心功能都能正常運作。
+
+- [ ] 使用 Google 帳號登入 staging 環境
+- [ ] 輸入一筆消費 — 確認幾秒內出現在 Google 試算表
+- [ ] 在「紀錄」頁面編輯一筆消費，再刪除它
+- [ ] 新增一筆訂閱 — 確認出現在「訂閱」頁面
+- [ ] 取消一筆訂閱
+- [ ] 查看「報表」— 確認金額正確、顯示真實姓名（不是「user1」/「user2」）
+- [ ] 首頁日期左右切換，確認日期正確遞增遞減
+- [ ] 選擇類別、新增備註、切換付款人，功能正常
+- [ ] 閒置超過 1 分鐘後自動登出
+- [ ] 在「設定」頁面手動登出正常
+
+**通過標準：** 以上所有項目測試通過，無重大問題。
+
 ---
 
 ## Phase 2 — Production Setup
