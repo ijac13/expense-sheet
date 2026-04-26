@@ -95,9 +95,13 @@ export default function HomePage() {
   function formatDateLabel(d: string) {
     const today = localDateStr(new Date());
     const yesterday = localDateStr(new Date(new Date().setDate(new Date().getDate() - 1)));
-    if (d === today) return t("home.today");
-    if (d === yesterday) return t("home.yesterday");
-    return new Date(d + "T00:00:00").toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", { month: "short", day: "numeric" });
+    const tomorrow = localDateStr(new Date(new Date().setDate(new Date().getDate() + 1)));
+    const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dow = DOW[new Date(d + "T00:00:00").getDay()];
+    if (d === today) return `${t("home.today")} ${d}`;
+    if (d === yesterday) return `${t("home.yesterday")} ${d}`;
+    if (d === tomorrow) return `${t("home.tomorrow")} ${d}`;
+    return `${d} ${dow}`;
   }
 
   return (

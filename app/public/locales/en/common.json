@@ -1,6 +1,6 @@
 {
   "tabs": { "home": "Home", "history": "History", "reports": "Reports", "subscriptions": "Subscriptions", "settings": "Settings" },
-  "home": { "title": "Add Expense", "amount_label": "Amount (TWD)", "logged_today": "logged today", "notes_placeholder": "Notes (optional)", "log_another": "Log another", "save": "Save", "paid_by": "Paid by", "today": "Today", "yesterday": "Yesterday" },
+  "home": { "title": "Add Expense", "amount_label": "Amount (TWD)", "logged_today": "logged today", "notes_placeholder": "Notes (optional)", "log_another": "Log another", "save": "Save", "paid_by": "Paid by", "today": "Today", "yesterday": "Yesterday", "tomorrow": "Tomorrow" },
   "history": {
     "title": "History",
     "no_expenses": "No expenses yet",

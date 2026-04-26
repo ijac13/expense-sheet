@@ -1,6 +1,6 @@
 {
   "tabs": { "home": "首頁", "history": "紀錄", "reports": "報表", "subscriptions": "訂閱", "settings": "設定" },
-  "home": { "title": "新增支出", "amount_label": "金額（台幣）", "logged_today": "筆今日紀錄", "notes_placeholder": "備註（選填）", "log_another": "再記一筆", "save": "儲存", "paid_by": "付款人", "today": "今天", "yesterday": "昨天" },
+  "home": { "title": "新增支出", "amount_label": "金額（台幣）", "logged_today": "筆今日紀錄", "notes_placeholder": "備註（選填）", "log_another": "再記一筆", "save": "儲存", "paid_by": "付款人", "today": "今天", "yesterday": "昨天", "tomorrow": "明天" },
   "history": {
     "title": "歷史紀錄",
     "no_expenses": "尚無支出",
