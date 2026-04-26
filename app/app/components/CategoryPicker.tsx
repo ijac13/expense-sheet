@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "react-i18next";
 
 interface Category {
   id: string;
@@ -14,10 +15,14 @@ interface Props {
 }
 
 export default function CategoryPicker({ categories, selectedId, onSelect }: Props) {
+  const { i18n } = useTranslation();
+  const lang = i18n.language;
+
   return (
     <div className="grid grid-cols-4 gap-1 px-2 pb-4">
       {categories.map(cat => {
         const selected = cat.id === selectedId;
+        const label = lang === "zh" && cat.name_zh ? cat.name_zh : cat.name_en;
         return (
           <button
             key={cat.id}
@@ -29,7 +34,7 @@ export default function CategoryPicker({ categories, selectedId, onSelect }: Pro
               <span className="text-2xl">{cat.icon ?? "💰"}</span>
             </span>
             <span className={`text-[13px] leading-tight text-center ${selected ? "font-medium text-primary" : "text-base-content/70"}`}>
-              {cat.name_en}
+              {label}
             </span>
           </button>
         );

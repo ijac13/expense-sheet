@@ -23,7 +23,8 @@ const KEYS = [
 ];
 
 export default function HomePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
   const { resolvedUserId } = useAuth();
   const [categoryId, setCategoryId] = useState<string>(() => getDefaultCategory());
   const [amount, setAmount] = useState("");
@@ -96,7 +97,7 @@ export default function HomePage() {
     const yesterday = localDateStr(new Date(new Date().setDate(new Date().getDate() - 1)));
     if (d === today) return t("home.today");
     if (d === yesterday) return t("home.yesterday");
-    return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return new Date(d + "T00:00:00").toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", { month: "short", day: "numeric" });
   }
 
   return (
@@ -107,7 +108,7 @@ export default function HomePage() {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-sm opacity-80">
             <span>{selectedCat?.icon}</span>
-            <span>{selectedCat?.name_en}</span>
+            <span>{lang === "zh" && selectedCat?.name_zh ? selectedCat.name_zh : selectedCat?.name_en}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs opacity-70">

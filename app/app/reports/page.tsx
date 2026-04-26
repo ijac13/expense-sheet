@@ -43,7 +43,7 @@ function segmentProps(percent: number, offset: number, total: number) {
   return { strokeDasharray: `${dash} ${circumference - dash}`, strokeDashoffset: dashOffset };
 }
 
-function DonutChart({ categories }: { categories: CategoryBreakdown[] }) {
+function DonutChart({ categories, totalLabel }: { categories: CategoryBreakdown[]; totalLabel: string }) {
   const total = categories.reduce((s, c) => s + c.total, 0);
   if (total === 0) return null;
 
@@ -74,7 +74,7 @@ function DonutChart({ categories }: { categories: CategoryBreakdown[] }) {
             />
           );
         })}
-        <text x={120} y={114} textAnchor="middle" fontSize={13} fill="currentColor" opacity={0.5}>Total</text>
+        <text x={120} y={114} textAnchor="middle" fontSize={13} fill="currentColor" opacity={0.5}>{totalLabel}</text>
         <text x={120} y={134} textAnchor="middle" fontSize={18} fontWeight={600} fill="currentColor">
           {`NT$${(total / 1000).toFixed(0)}k`}
         </text>
@@ -450,7 +450,7 @@ export default function ReportsPage() {
                 {/* Chart */}
                 {mounted && (
                   chartType === "pie" ? (
-                    <DonutChart categories={monthly.categories} />
+                    <DonutChart categories={monthly.categories} totalLabel={t("reports.total")} />
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart
@@ -605,7 +605,7 @@ export default function ReportsPage() {
                 {/* Chart */}
                 {mounted && (
                   chartType === "pie" ? (
-                    <DonutChart categories={annual.categories} />
+                    <DonutChart categories={annual.categories} totalLabel={t("reports.total")} />
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart
