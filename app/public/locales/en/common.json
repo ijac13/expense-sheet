@@ -1,0 +1,10 @@
+{
+  "tabs": { "home": "Home", "history": "History", "reports": "Reports", "subscriptions": "Subscriptions", "settings": "Settings" },
+  "home": { "title": "Add Expense", "amount_label": "Amount (TWD)", "logged_today": "logged today", "notes_placeholder": "Notes (optional)", "log_another": "Log another", "save": "Save", "paid_by": "Paid by", "today": "Today", "yesterday": "Yesterday" },
+  "history": { "title": "History", "no_expenses": "No expenses yet", "entries": "entries" },
+  "reports": { "title": "Reports", "monthly": "Monthly", "annual": "Annual", "all": "All", "total": "Total", "by_category": "By Category", "by_payer": "By Payer", "back": "Back", "no_data": "No data" },
+  "settings": { "title": "Settings", "signed_in_as": "Signed in as", "font_size": "Font Size", "small": "Small", "medium": "Medium", "large": "Large", "language": "Language", "category_management": "Category Management", "user_management": "User Management" },
+  "categories": { "eating-out": "Eating Out", "daily-necessities": "Daily Necessities", "groceries": "Groceries", "medical": "Medical", "travel": "Travel", "transportation": "Transportation", "digital": "Digital", "babies": "Babies", "clothing": "Clothing", "sports": "Sports", "gifts": "Gifts", "tuition": "Tuition", "tolls": "Tolls", "equipment": "Equipment", "fuel": "Fuel", "entertainment": "Entertainment", "rent": "Rent", "shopping": "Shopping", "car-repair": "Car Repair", "donate": "Donate", "mortgage": "Mortgage", "other": "Other" },
+  "errors": { "load_failed": "Failed to load", "retry": "Retry", "no_longer_exists": "This expense no longer exists." },
+  "common": { "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "save": "Save", "back": "Back", "twd": "TWD" }
+}

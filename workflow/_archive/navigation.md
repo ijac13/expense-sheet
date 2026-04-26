@@ -1,11 +1,11 @@
 ---
 id: "011"
 title: Navigation and Pages
-status: spec
+status: done
 source: commission seed
 started: 2026-04-20T01:00:00Z
-completed:
-verdict:
+completed: 2026-04-25
+verdict: PASSED
 score: 1.0
 worktree:
 issue:
@@ -106,3 +106,26 @@ Define the app's navigation shell — a persistent bottom tab bar with 5 tabs an
 ### Summary
 
 Converted the ideation content for entity 011 (Navigation and Pages) into a formal spec. The spec defines the navigation shell only — bottom tab bar, auth intercepts, and Settings sub-sections — explicitly leaving tab content, auth logic, and i18n labels to their respective entities. All acceptance criteria are binary and testable without judgment calls.
+
+## Stage Report: build
+
+- DONE: Bottom tab bar renders with exactly 5 tabs (Home, History, Subscriptions, Reports, Settings) in order
+  app/app/components/BottomTabBar.tsx — TABS array with all 5 entries with emoji icons
+- DONE: Tab bar visible on every screen via root layout
+  app/app/layout.tsx wraps children with AuthProvider; BottomTabBar is fixed bottom-0 z-50
+- DONE: Tapping each tab navigates to the correct page
+  Each tab links to /, /history, /subscriptions, /reports, /settings via Next.js Link component
+- DONE: Active tab visually distinguished
+  isActive check applies "active text-primary" class; inactive tabs use "text-base-content/60"
+- DONE: Unauthenticated redirect stubbed (always authenticated for now)
+  app/app/lib/auth.tsx — AuthProvider always provides status: "authenticated"; redirect logic wired but never fires
+- DONE: Settings page has 3 sections: Category Management, User Management, Language Toggle
+  app/app/settings/page.tsx — 3 DaisyUI card sections, all stubbed "Coming soon"
+- DONE: Stub pages for History, Subscriptions, Reports with centered "Coming soon" heading
+  app/app/history/page.tsx, subscriptions/page.tsx, reports/page.tsx
+- DONE: page.tsx not modified — restored to HEAD (main branch) state
+  git checkout HEAD -- app/app/page.tsx before staging
+
+### Summary
+
+Built the navigation shell for entity 011. The root layout wraps all pages with AuthProvider and BottomTabBar (fixed, bottom-0). Five tab routes are created with stub pages. The Settings page has three card sections for Category Management, User Management, and Language Toggle. Auth intercept is wired but always passes as authenticated per spec (entity 006 will replace). Commit: 1722279.

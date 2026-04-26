@@ -16,12 +16,15 @@
     "logs": "firebase functions:log"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "firebase-admin": "^13.0.0",
-    "firebase-functions": "^6.0.0"
+    "firebase-functions": "^6.0.0",
+    "googleapis": "^171.4.0",
+    "undici-types": "^8.1.0"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
   },
   "private": true
 }
