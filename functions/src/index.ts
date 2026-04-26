@@ -25,7 +25,7 @@ const SUBSCRIPTIONS_HEADER = ["id", "name", "amount", "category_id", "frequency"
 
 function setCors(res: { set: (key: string, value: string) => void }) {
   res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+  res.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type");
 }
 
@@ -72,6 +72,30 @@ function rowToSubscription(row: (string | null | undefined)[]): Record<string, u
     paid_by: row[7] ?? "",
     is_active: row[8] !== "false",
   };
+}
+
+// Resolve a user ID to their display name using the Users tab.
+// Falls back to the raw value if no match found.
+async function resolveUserDisplayNames(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  ids: string[]
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>(ids.map((id) => [id, id]));
+  try {
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${USERS_TAB}!A:C`,
+    });
+    const userRows = (resp.data.values ?? []).slice(1).map(rowToUser);
+    for (const id of ids) {
+      const user = userRows.find((u) => u.id === id);
+      if (user) result.set(id, String(user.name));
+    }
+  } catch {
+    // ignore — fall back to raw IDs
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -348,8 +372,103 @@ Keep the total response under 250 words. Use NT$ for amounts. Be specific to the
     }
 
     // -----------------------------------------------------------------------
-    // /api (expenses) — GET / POST
+    // /api (expenses) — PATCH / DELETE / GET / POST
     // -----------------------------------------------------------------------
+
+    // PATCH — update an expense by id
+    if (req.method === "PATCH") {
+      const body = req.body as Record<string, unknown>;
+      const targetId = String(body.id ?? "");
+      if (!targetId) { res.status(400).json({ error: "id is required" }); return; }
+
+      const allRows = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${EXPENSES_TAB}!A:H`,
+      });
+      const rows = allRows.data.values ?? [];
+      const rowIndex = rows.findIndex((r, i) => i > 0 && r[0] === targetId);
+      if (rowIndex === -1) {
+        res.status(404).json({ error: "Expense not found" });
+        return;
+      }
+
+      const existing = rows[rowIndex];
+      let paidByDisplay = existing[4] ?? "";
+      if (body.paid_by !== undefined) {
+        const nameMap = await resolveUserDisplayNames(sheets, spreadsheetId, [String(body.paid_by)]);
+        paidByDisplay = nameMap.get(String(body.paid_by)) ?? String(body.paid_by);
+      }
+
+      const updated = [
+        existing[0],
+        body.date !== undefined ? String(body.date) : (existing[1] ?? ""),
+        body.amount !== undefined ? String(body.amount) : (existing[2] ?? ""),
+        body.category_id !== undefined ? String(body.category_id) : (existing[3] ?? ""),
+        paidByDisplay,
+        existing[5] ?? "",
+        body.notes !== undefined ? String(body.notes) : (existing[6] ?? ""),
+        existing[7] ?? "",
+      ];
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${EXPENSES_TAB}!A${rowIndex + 1}:H${rowIndex + 1}`,
+        valueInputOption: "RAW",
+        requestBody: { values: [updated] },
+      });
+
+      res.status(200).json(rowToExpense(updated));
+      return;
+    }
+
+    // DELETE — remove an expense by id
+    if (req.method === "DELETE") {
+      const body = req.body as Record<string, unknown>;
+      const targetId = String(body.id ?? "");
+      if (!targetId) { res.status(400).json({ error: "id is required" }); return; }
+
+      const allRows = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${EXPENSES_TAB}!A:A`,
+      });
+      const rows = allRows.data.values ?? [];
+      const rowIndex = rows.findIndex((r, i) => i > 0 && r[0] === targetId);
+      if (rowIndex === -1) {
+        res.status(404).json({ error: "Expense not found" });
+        return;
+      }
+
+      // Get the sheet ID for batchUpdate
+      const meta = await sheets.spreadsheets.get({
+        spreadsheetId,
+        fields: "sheets.properties",
+      });
+      const sheetMeta = meta.data.sheets?.find(
+        (s) => s.properties?.title === EXPENSES_TAB
+      );
+      const sheetId = sheetMeta?.properties?.sheetId ?? 0;
+
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{
+            deleteDimension: {
+              range: {
+                sheetId,
+                dimension: "ROWS",
+                startIndex: rowIndex,
+                endIndex: rowIndex + 1,
+              },
+            },
+          }],
+        },
+      });
+
+      res.status(200).json({ deleted: true });
+      return;
+    }
+
+    // GET — return all expenses
     if (req.method === "GET") {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
@@ -360,17 +479,24 @@ Keep the total response under 250 words. Use NT$ for amounts. Be specific to the
       return;
     }
 
+    // POST — add a new expense
     if (req.method === "POST") {
       const body = req.body as Record<string, unknown>;
       const id = `exp-${Date.now()}`;
       const created_at = new Date().toISOString();
+
+      // Resolve user IDs to display names for the sheet
+      const paidById = String(body.paid_by ?? "");
+      const createdById = String(body.created_by ?? "");
+      const nameMap = await resolveUserDisplayNames(sheets, spreadsheetId, [paidById, createdById]);
+
       const row = [
         id,
         String(body.date ?? new Date().toISOString().split("T")[0]),
         String(body.amount ?? 0),
         String(body.category_id ?? ""),
-        String(body.paid_by ?? ""),
-        String(body.created_by ?? ""),
+        nameMap.get(paidById) ?? paidById,
+        nameMap.get(createdById) ?? createdById,
         String(body.notes ?? ""),
         created_at,
       ];

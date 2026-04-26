@@ -5,6 +5,7 @@ import { Subscription, getNextDueDate } from "../lib/subscriptions";
 import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription } from "../lib/subscriptionService";
 import { DEFAULT_CATEGORIES } from "../lib/categories";
 import { USERS } from "../lib/users";
+import { useTranslation } from "react-i18next";
 
 type ModalMode = "add" | "edit" | null;
 
@@ -43,6 +44,7 @@ const defaultAddForm: AddFormState = {
 };
 
 export default function SubscriptionsPage() {
+  const { t } = useTranslation();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,8 +64,9 @@ export default function SubscriptionsPage() {
     due_month: "1",
   });
 
-  const active = subscriptions.filter((s) => s.is_active);
-  const cancelled = subscriptions.filter((s) => !s.is_active);
+  // Sort newest first (IDs are timestamp-based: sub-{ms})
+  const active = subscriptions.filter((s) => s.is_active).sort((a, b) => b.id.localeCompare(a.id));
+  const cancelled = subscriptions.filter((s) => !s.is_active).sort((a, b) => b.id.localeCompare(a.id));
 
   function openAdd() {
     setAddForm(defaultAddForm);
@@ -154,7 +157,7 @@ export default function SubscriptionsPage() {
 
   if (loading) return (
     <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-6">
-      <h1 className="text-2xl font-bold mb-4">Subscriptions</h1>
+      <h1 className="text-2xl font-bold mb-4">{t("subscriptions.title")}</h1>
       <div className="flex justify-center py-16"><span className="loading loading-spinner loading-md text-primary" /></div>
     </main>
   );
@@ -163,17 +166,17 @@ export default function SubscriptionsPage() {
     <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Subscriptions</h1>
+        <h1 className="text-2xl font-bold">{t("subscriptions.title")}</h1>
         <button className="btn btn-primary btn-sm gap-1" onClick={openAdd}>
           <span className="text-lg leading-none">+</span>
-          Add
+          {t("subscriptions.add")}
         </button>
       </div>
 
       {/* Active subscriptions */}
       {active.length > 0 && (
         <section className="mb-6">
-          <div className="text-xs text-base-content/50 uppercase tracking-wide mb-2">Active</div>
+          <div className="text-xs text-base-content/50 uppercase tracking-wide mb-2">{t("subscriptions.active")}</div>
           <div className="space-y-2">
             {active.map((sub) => {
               const cat = getCategoryDisplay(sub.category_id);
@@ -191,15 +194,15 @@ export default function SubscriptionsPage() {
                           <div>
                             <span className="font-medium text-base-content">NT${sub.amount.toLocaleString()}</span>
                             <span className="mx-1.5 text-base-content/30">·</span>
-                            <span>{sub.frequency === "monthly" ? "Monthly" : "Annual"}</span>
+                            <span>{sub.frequency === "monthly" ? t("subscriptions.monthly") : t("subscriptions.annual")}</span>
                           </div>
                           <div>
                             <span>{cat.name}</span>
                             <span className="mx-1.5 text-base-content/30">·</span>
-                            <span>Due {formatDueDate(nextDue)}</span>
+                            <span>{t("subscriptions.due")} {formatDueDate(nextDue)}</span>
                           </div>
                           <div className="text-xs text-base-content/40">
-                            Paid by {USERS.find(u => u.id === sub.paid_by)?.name ?? sub.paid_by}
+                            {t("subscriptions.paid_by")} {USERS.find(u => u.id === sub.paid_by)?.name ?? sub.paid_by}
                           </div>
                         </div>
                       </div>
@@ -208,13 +211,13 @@ export default function SubscriptionsPage() {
                           className="btn btn-ghost btn-xs"
                           onClick={() => openEdit(sub)}
                         >
-                          Edit
+                          {t("common.edit")}
                         </button>
                         <button
                           className="btn btn-ghost btn-xs text-error"
                           onClick={() => handleCancel(sub.id)}
                         >
-                          Cancel
+                          {t("subscriptions.cancel")}
                         </button>
                       </div>
                     </div>
@@ -229,7 +232,7 @@ export default function SubscriptionsPage() {
       {/* Cancelled subscriptions */}
       {cancelled.length > 0 && (
         <section>
-          <div className="text-xs text-base-content/50 uppercase tracking-wide mb-2">Cancelled</div>
+          <div className="text-xs text-base-content/50 uppercase tracking-wide mb-2">{t("subscriptions.cancelled")}</div>
           <div className="space-y-2">
             {cancelled.map((sub) => {
               const cat = getCategoryDisplay(sub.category_id);
@@ -248,7 +251,7 @@ export default function SubscriptionsPage() {
                           </div>
                         </div>
                       </div>
-                      <span className="badge badge-ghost badge-sm shrink-0">Cancelled</span>
+                      <span className="badge badge-ghost badge-sm shrink-0">{t("subscriptions.cancelled")}</span>
                     </div>
                   </div>
                 </div>
@@ -259,17 +262,17 @@ export default function SubscriptionsPage() {
       )}
 
       {active.length === 0 && cancelled.length === 0 && (
-        <p className="text-base-content/50 text-center mt-12">No subscriptions yet. Tap + Add to get started.</p>
+        <p className="text-base-content/50 text-center mt-12">{t("subscriptions.empty")}</p>
       )}
 
       {/* Add Modal */}
       {modalMode === "add" && (
         <div className="modal modal-open">
           <div className="modal-box w-full max-w-sm">
-            <h3 className="font-bold text-lg mb-4">Add Subscription</h3>
+            <h3 className="font-bold text-lg mb-4">{t("subscriptions.add_title")}</h3>
             <div className="space-y-3">
               <div>
-                <label className="label label-text text-xs">Name</label>
+                <label className="label label-text text-xs">{t("subscriptions.name")}</label>
                 <input
                   type="text"
                   className="input input-bordered w-full"
@@ -279,7 +282,7 @@ export default function SubscriptionsPage() {
                 />
               </div>
               <div>
-                <label className="label label-text text-xs">Amount (NT$)</label>
+                <label className="label label-text text-xs">{t("subscriptions.amount_label")}</label>
                 <input
                   type="number"
                   className="input input-bordered w-full"
@@ -290,7 +293,7 @@ export default function SubscriptionsPage() {
                 />
               </div>
               <div>
-                <label className="label label-text text-xs">Category</label>
+                <label className="label label-text text-xs">{t("common.category")}</label>
                 <select
                   className="select select-bordered w-full"
                   value={addForm.category_id}
@@ -304,27 +307,27 @@ export default function SubscriptionsPage() {
                 </select>
               </div>
               <div>
-                <label className="label label-text text-xs">Frequency</label>
+                <label className="label label-text text-xs">{t("subscriptions.frequency")}</label>
                 <div className="join w-full">
                   <button
                     type="button"
                     className={`join-item btn flex-1 ${addForm.frequency === "monthly" ? "btn-primary" : "btn-outline"}`}
                     onClick={() => setAddForm((f) => ({ ...f, frequency: "monthly" }))}
                   >
-                    Monthly
+                    {t("subscriptions.monthly")}
                   </button>
                   <button
                     type="button"
                     className={`join-item btn flex-1 ${addForm.frequency === "annual" ? "btn-primary" : "btn-outline"}`}
                     onClick={() => setAddForm((f) => ({ ...f, frequency: "annual" }))}
                   >
-                    Annual
+                    {t("subscriptions.annual")}
                   </button>
                 </div>
               </div>
               {addForm.frequency === "annual" && (
                 <div>
-                  <label className="label label-text text-xs">Due Month (1–12)</label>
+                  <label className="label label-text text-xs">{t("subscriptions.due_month_label")}</label>
                   <input
                     type="number"
                     className="input input-bordered w-full"
@@ -336,7 +339,7 @@ export default function SubscriptionsPage() {
                 </div>
               )}
               <div>
-                <label className="label label-text text-xs">Due Day (1–31)</label>
+                <label className="label label-text text-xs">{t("subscriptions.due_day_label")}</label>
                 <input
                   type="number"
                   className="input input-bordered w-full"
@@ -349,10 +352,10 @@ export default function SubscriptionsPage() {
             </div>
             <div className="modal-action mt-4">
               <button className="btn btn-ghost" onClick={closeModal}>
-                Cancel
+                {t("common.cancel")}
               </button>
               <button className="btn btn-primary" onClick={handleAdd}>
-                Add
+                {t("subscriptions.add")}
               </button>
             </div>
           </div>
@@ -364,10 +367,10 @@ export default function SubscriptionsPage() {
       {modalMode === "edit" && (
         <div className="modal modal-open">
           <div className="modal-box w-full max-w-sm">
-            <h3 className="font-bold text-lg mb-4">Edit Subscription</h3>
+            <h3 className="font-bold text-lg mb-4">{t("subscriptions.edit_title")}</h3>
             <div className="space-y-3">
               <div>
-                <label className="label label-text text-xs">Name</label>
+                <label className="label label-text text-xs">{t("subscriptions.name")}</label>
                 <input
                   type="text"
                   className="input input-bordered w-full"
@@ -376,7 +379,7 @@ export default function SubscriptionsPage() {
                 />
               </div>
               <div>
-                <label className="label label-text text-xs">Category</label>
+                <label className="label label-text text-xs">{t("common.category")}</label>
                 <select
                   className="select select-bordered w-full"
                   value={editForm.category_id}
@@ -391,7 +394,7 @@ export default function SubscriptionsPage() {
               </div>
               {editingFrequency === "annual" && (
                 <div>
-                  <label className="label label-text text-xs">Due Month (1–12)</label>
+                  <label className="label label-text text-xs">{t("subscriptions.due_month_label")}</label>
                   <input
                     type="number"
                     className="input input-bordered w-full"
@@ -403,7 +406,7 @@ export default function SubscriptionsPage() {
                 </div>
               )}
               <div>
-                <label className="label label-text text-xs">Due Day (1–31)</label>
+                <label className="label label-text text-xs">{t("subscriptions.due_day_label")}</label>
                 <input
                   type="number"
                   className="input input-bordered w-full"
@@ -416,10 +419,10 @@ export default function SubscriptionsPage() {
             </div>
             <div className="modal-action mt-4">
               <button className="btn btn-ghost" onClick={closeModal}>
-                Cancel
+                {t("common.cancel")}
               </button>
               <button className="btn btn-primary" onClick={handleEdit}>
-                Save
+                {t("common.save")}
               </button>
             </div>
           </div>

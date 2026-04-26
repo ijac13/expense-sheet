@@ -21,6 +21,7 @@ import { getMonthlySummary, getAnnualSummary } from "../lib/reportService";
 import DrillDown from "./DrillDown";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { USERS } from "../lib/users";
+import { useTranslation } from "react-i18next";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -142,8 +143,10 @@ function CategoryRow({
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 function InsightsCard() {
+  const { t } = useTranslation();
   const [state, setState] = useState<"idle" | "loading" | "done" | "insufficient" | "error">("idle");
   const [insights, setInsights] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -158,16 +161,27 @@ function InsightsCard() {
 
   async function generate() {
     setState("loading");
+    setErrorMsg("");
     startTimer();
     try {
       const res = await fetch(`${API_BASE}/api/insights`, { method: "POST" });
-      const data = await res.json();
+      const data = await res.json() as Record<string, unknown>;
       stopTimer();
+      if (!res.ok) {
+        const detail = String(data.detail ?? data.error ?? `Server error ${res.status}`);
+        setErrorMsg(detail);
+        setState("error");
+        return;
+      }
       if (data.insufficient_data) { setState("insufficient"); return; }
-      if (data.insights) { setInsights(data.insights); setState("done"); }
-      else setState("error");
-    } catch {
+      if (data.insights) { setInsights(String(data.insights)); setState("done"); }
+      else {
+        setErrorMsg("No insights returned from API.");
+        setState("error");
+      }
+    } catch (err) {
       stopTimer();
+      setErrorMsg(err instanceof Error ? err.message : "Network error — check your connection.");
       setState("error");
     }
   }
@@ -186,12 +200,12 @@ function InsightsCard() {
 
   if (state === "idle") return (
     <div className="bg-base-200 rounded-2xl p-5 space-y-3">
-      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">AI Insights</div>
+      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">{t("reports.insights_title")}</div>
       <p className="text-sm text-base-content/70">
-        Get a plain-language analysis of your spending patterns — what's changed, what looks unusual, and what's going well.
+        {t("reports.insights_description")}
       </p>
       <button onClick={generate} className="btn btn-primary btn-sm w-full">
-        Generate Insights
+        {t("reports.generate_insights")}
       </button>
     </div>
   );
@@ -200,28 +214,31 @@ function InsightsCard() {
     <div className="bg-base-200 rounded-2xl p-5 flex flex-col items-center gap-3 py-8">
       <span className="loading loading-spinner loading-md text-primary" />
       <p className="text-sm text-base-content/70 text-center">
-        Analysing your spending…
+        {t("reports.insights_loading")}
       </p>
       <p className="text-xs text-base-content/40">
-        Usually takes about 10 seconds{elapsed > 0 ? ` · ${elapsed}s` : ""}
+        {t("reports.insights_eta")}{elapsed > 0 ? ` · ${elapsed}s` : ""}
       </p>
     </div>
   );
 
   if (state === "insufficient") return (
     <div className="bg-base-200 rounded-2xl p-5">
-      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-2">AI Insights</div>
+      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-2">{t("reports.insights_title")}</div>
       <p className="text-sm text-base-content/60">
-        Not enough data yet. Track at least a few days of expenses first.
+        {t("reports.insights_insufficient")} {t("reports.insights_insufficient_msg")}
       </p>
     </div>
   );
 
   if (state === "error") return (
     <div className="bg-base-200 rounded-2xl p-5 space-y-3">
-      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">AI Insights</div>
-      <p className="text-sm text-error/80">Something went wrong. Try again?</p>
-      <button onClick={generate} className="btn btn-ghost btn-sm">Retry</button>
+      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">{t("reports.insights_title")}</div>
+      <p className="text-sm text-error/80">{t("reports.insights_error")}</p>
+      {errorMsg && (
+        <p className="text-xs text-base-content/40 font-mono break-all bg-base-300 rounded px-2 py-1">{errorMsg}</p>
+      )}
+      <button onClick={generate} className="btn btn-ghost btn-sm">{t("errors.retry")}</button>
     </div>
   );
 
@@ -229,9 +246,9 @@ function InsightsCard() {
   return (
     <div className="bg-base-200 rounded-2xl p-5 space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">AI Insights</div>
+        <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">{t("reports.insights_title")}</div>
         <button onClick={() => setState("idle")} className="text-xs text-base-content/40 hover:text-base-content/70">
-          Regenerate
+          {t("reports.regenerate")}
         </button>
       </div>
       <div className="text-sm text-base-content/80 space-y-1">
@@ -245,6 +262,7 @@ function InsightsCard() {
 // Main page
 // ---------------------------------------------------------------------------
 export default function ReportsPage() {
+  const { t } = useTranslation();
   const now = new Date();
   const [mounted, setMounted] = useState(false);
   const [period, setPeriod] = useState<ReportPeriod>("monthly");
@@ -328,7 +346,7 @@ export default function ReportsPage() {
       {/* Header */}
       {/* ------------------------------------------------------------------ */}
       <div className="sticky top-0 bg-base-100 px-4 pt-6 pb-3 border-b border-base-300 z-10">
-        <h1 className="text-2xl font-semibold mb-3">Reports</h1>
+        <h1 className="text-2xl font-semibold mb-3">{t("reports.title")}</h1>
 
         {/* Period toggle */}
         <div className="flex gap-1 bg-base-200 rounded-xl p-1 mb-3">
@@ -343,7 +361,7 @@ export default function ReportsPage() {
                   : "text-base-content/60"
               }`}
             >
-              {p}
+              {t(`reports.${p}`)}
             </button>
           ))}
         </div>
@@ -354,7 +372,7 @@ export default function ReportsPage() {
           onChange={e => setPayer(e.target.value as PayerFilter)}
           className="w-full px-3 py-2 rounded-xl bg-base-200 text-sm font-medium outline-none"
         >
-          <option value="all">All Users</option>
+          <option value="all">{t("reports.all_users")}</option>
           {USERS.map(u => (
             <option key={u.id} value={u.id}>{u.name}</option>
           ))}
@@ -391,14 +409,14 @@ export default function ReportsPage() {
 
             {monthly && monthly.total === 0 ? (
               <div className="text-center py-16 text-base-content/40">
-                <div className="font-medium">No data for this period</div>
-                <div className="text-sm mt-1">Try a different month</div>
+                <div className="font-medium">{t("reports.no_data_period")}</div>
+                <div className="text-sm mt-1">{t("reports.try_different_month")}</div>
               </div>
             ) : monthly ? (
               <>
                 {/* Summary header */}
                 <div className="bg-base-200 rounded-2xl p-5">
-                  <div className="text-xs text-base-content/50 uppercase tracking-wide mb-1">Total Spending</div>
+                  <div className="text-xs text-base-content/50 uppercase tracking-wide mb-1">{t("reports.total_spending")}</div>
                   <div className="flex items-baseline gap-1">
                     <span className="text-[40px] font-medium leading-none">
                       NT${Math.floor(monthly.total).toLocaleString()}
@@ -410,7 +428,7 @@ export default function ReportsPage() {
                   <div className="flex items-center gap-2 mt-1.5">
                     <DeltaBadge current={monthly.total} previous={monthly.comparison.prev_month_total} />
                     <span className="text-xs text-base-content/50">
-                      vs {monthly.comparison.prev_month_label} · NT${Math.round(monthly.total / 30).toLocaleString()}/day avg
+                      vs {monthly.comparison.prev_month_label} · NT${Math.round(monthly.total / 30).toLocaleString()}{t("reports.day_avg")}
                     </span>
                   </div>
                 </div>
@@ -424,7 +442,7 @@ export default function ReportsPage() {
                       onClick={() => setChartType(ct)}
                       className={`btn btn-xs ${chartType === ct ? "btn-primary" : "btn-ghost"}`}
                     >
-                      {ct === "pie" ? "Donut" : "Bar"}
+                      {ct === "pie" ? t("reports.donut") : t("reports.bar")}
                     </button>
                   ))}
                 </div>
@@ -448,7 +466,7 @@ export default function ReportsPage() {
                         />
                         <YAxis tick={{ fontSize: 10 }} width={50} />
                         <Tooltip
-                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, "Amount"]}
+                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, t("reports.amount")]}
                         />
                         <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
                       </BarChart>
@@ -459,7 +477,7 @@ export default function ReportsPage() {
                 {/* Category list */}
                 <div className="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
                   <div className="px-4 pt-3 pb-1 text-xs text-base-content/50 uppercase tracking-wide font-semibold">
-                    By Category
+                    {t("reports.by_category")}
                   </div>
                   <div className="divide-y divide-base-300">
                     {monthly.categories.map((cat) => (
@@ -475,7 +493,7 @@ export default function ReportsPage() {
                 {/* By payer */}
                 <div className="bg-base-200 rounded-2xl p-4">
                   <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-2">
-                    By Payer
+                    {t("reports.by_payer")}
                   </div>
                   <div className="space-y-2">
                     {monthly.payers.map((p) => (
@@ -495,7 +513,7 @@ export default function ReportsPage() {
                 {/* Comparison */}
                 <div className="bg-base-200 rounded-2xl p-4">
                   <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-3">
-                    Comparison
+                    {t("reports.comparison")}
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
@@ -556,7 +574,7 @@ export default function ReportsPage() {
               <>
                 {/* Summary header */}
                 <div className="bg-base-200 rounded-2xl p-5">
-                  <div className="text-xs text-base-content/50 uppercase tracking-wide mb-1">Annual Total</div>
+                  <div className="text-xs text-base-content/50 uppercase tracking-wide mb-1">{t("reports.annual_total")}</div>
                   <div className="flex items-baseline gap-1">
                     <span className="text-[40px] font-medium leading-none">
                       NT${Math.floor(annual.total).toLocaleString()}
@@ -566,7 +584,7 @@ export default function ReportsPage() {
                     </span>
                   </div>
                   <div className="text-xs text-base-content/50 mt-1.5">
-                    {annual.expense_count} transactions · NT${Math.round(annual.total / 12).toLocaleString()}/month avg
+                    {annual.expense_count} {t("reports.transactions")} · NT${Math.round(annual.total / 12).toLocaleString()}{t("reports.month_avg")}
                   </div>
                 </div>
 
@@ -603,7 +621,7 @@ export default function ReportsPage() {
                         />
                         <YAxis tick={{ fontSize: 10 }} width={50} />
                         <Tooltip
-                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, "Amount"]}
+                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, t("reports.amount")]}
                         />
                         <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
                       </BarChart>
@@ -614,7 +632,7 @@ export default function ReportsPage() {
                 {/* Category list */}
                 <div className="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
                   <div className="px-4 pt-3 pb-1 text-xs text-base-content/50 uppercase tracking-wide font-semibold">
-                    By Category
+                    {t("reports.by_category")}
                   </div>
                   <div className="divide-y divide-base-300">
                     {annual.categories.map((cat) => (
@@ -631,7 +649,7 @@ export default function ReportsPage() {
                 {mounted && (
                   <div className="bg-base-200 rounded-2xl p-4">
                     <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-3">
-                      Monthly Trend
+                      {t("reports.monthly_trend")}
                     </div>
                     <ResponsiveContainer width="100%" height={160}>
                       <BarChart
@@ -641,7 +659,7 @@ export default function ReportsPage() {
                         <XAxis dataKey="label" tick={{ fontSize: 10 }} />
                         <YAxis tick={{ fontSize: 10 }} width={50} />
                         <Tooltip
-                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, "Amount"]}
+                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, t("reports.amount")]}
                         />
                         <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
                       </BarChart>
@@ -652,7 +670,7 @@ export default function ReportsPage() {
                 {/* By payer */}
                 <div className="bg-base-200 rounded-2xl p-4">
                   <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-2">
-                    By Payer
+                    {t("reports.by_payer")}
                   </div>
                   <div className="space-y-2">
                     {annual.payers.map((p) => (
