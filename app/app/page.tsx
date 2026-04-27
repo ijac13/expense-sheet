@@ -153,7 +153,7 @@ export default function HomePage() {
           <button onClick={() => stepDate(-1)} className="w-6 h-6 grid place-items-center rounded-full bg-base-200 active:bg-base-300">
             <ChevronLeft size={14} />
           </button>
-          <span className="text-xs font-medium text-base-content/70">{formatDateLabel(date)} · {date}</span>
+          <span className="text-xs font-medium text-base-content/70">{formatDateLabel(date)}</span>
           <button onClick={() => stepDate(1)} className="w-6 h-6 grid place-items-center rounded-full bg-base-200 active:bg-base-300">
             <ChevronRight size={14} />
           </button>

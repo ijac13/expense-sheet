@@ -170,9 +170,9 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
     const sheets = await getSheetsClient();
 
     // -----------------------------------------------------------------------
-    // /api/users — GET
+    // /api/users — GET  (check AFTER migrate-users to avoid substring collision)
     // -----------------------------------------------------------------------
-    if (path.includes("users")) {
+    if (path.includes("users") && !path.includes("migrate-users")) {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
         range: `${USERS_TAB}!A:C`,
