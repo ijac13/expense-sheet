@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { Subscription, getNextDueDate } from "../lib/subscriptions";
 import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription } from "../lib/subscriptionService";
 import { DEFAULT_CATEGORIES } from "../lib/categories";
-import { USERS } from "../lib/users";
+import { USERS, DEFAULT_USER } from "../lib/users";
+import { useAuth } from "../lib/authContext";
 import { useTranslation } from "react-i18next";
 
 type ModalMode = "add" | "edit" | null;
@@ -45,6 +46,8 @@ const defaultAddForm: AddFormState = {
 
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
+  const { resolvedUserId } = useAuth();
+  const currentUserId = resolvedUserId ?? DEFAULT_USER;
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -104,7 +107,7 @@ export default function SubscriptionsPage() {
         frequency: addForm.frequency,
         due_day,
         due_month,
-        paid_by: "user1",
+        paid_by: currentUserId,
       });
       setSubscriptions((prev) => [...prev, newSub]);
       closeModal();

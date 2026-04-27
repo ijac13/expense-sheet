@@ -404,6 +404,69 @@ Keep the total response under 250 words. Use NT$ for amounts. Be specific to the
     }
 
     // -----------------------------------------------------------------------
+    // /api/migrate-users — POST (one-time: replace user IDs with display names)
+    // -----------------------------------------------------------------------
+    if (path.includes("migrate-users")) {
+      if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+      // Load user map once
+      const usersResp = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${USERS_TAB}!A:C` });
+      const userRows = (usersResp.data.values ?? []).slice(1).map(rowToUser);
+      const idToName = new Map(userRows.map((u) => [String(u.id), String(u.name)]));
+
+      function resolveStatic(val: string): string {
+        return idToName.get(val) ?? val;
+      }
+
+      let expensesFixed = 0;
+      let subscriptionsFixed = 0;
+
+      // --- Expenses ---
+      const expResp = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${EXPENSES_TAB}!A:H` });
+      const expRows = expResp.data.values ?? [];
+      const expUpdates: { range: string; values: string[][] }[] = [];
+      for (let i = 1; i < expRows.length; i++) {
+        const r = expRows[i];
+        const origPaid = String(r[4] ?? "");
+        const origCreated = String(r[5] ?? "");
+        const newPaid = resolveStatic(origPaid);
+        const newCreated = resolveStatic(origCreated);
+        if (newPaid !== origPaid || newCreated !== origCreated) {
+          const updated = [...r];
+          updated[4] = newPaid;
+          updated[5] = newCreated;
+          expUpdates.push({ range: `${EXPENSES_TAB}!A${i + 1}:H${i + 1}`, values: [updated.map(String)] });
+          expensesFixed++;
+        }
+      }
+      for (const upd of expUpdates) {
+        await sheets.spreadsheets.values.update({ spreadsheetId, range: upd.range, valueInputOption: "RAW", requestBody: { values: upd.values } });
+      }
+
+      // --- Subscriptions ---
+      const subResp = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SUBSCRIPTIONS_TAB}!A:I` });
+      const subRows = subResp.data.values ?? [];
+      const subUpdates: { range: string; values: string[][] }[] = [];
+      for (let i = 1; i < subRows.length; i++) {
+        const r = subRows[i];
+        const origPaid = String(r[7] ?? "");
+        const newPaid = resolveStatic(origPaid);
+        if (newPaid !== origPaid) {
+          const updated = [...r];
+          updated[7] = newPaid;
+          subUpdates.push({ range: `${SUBSCRIPTIONS_TAB}!A${i + 1}:I${i + 1}`, values: [updated.map(String)] });
+          subscriptionsFixed++;
+        }
+      }
+      for (const upd of subUpdates) {
+        await sheets.spreadsheets.values.update({ spreadsheetId, range: upd.range, valueInputOption: "RAW", requestBody: { values: upd.values } });
+      }
+
+      res.status(200).json({ expensesFixed, subscriptionsFixed });
+      return;
+    }
+
+    // -----------------------------------------------------------------------
     // /api (expenses) — PATCH / DELETE / GET / POST
     // -----------------------------------------------------------------------
 
