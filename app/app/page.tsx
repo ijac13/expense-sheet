@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
 import { DEFAULT_CATEGORIES, getDefaultCategory, saveLastCategory } from "./lib/categories";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
-import { DEFAULT_USER, type UserId } from "./lib/users";
+import { DEFAULT_USER, USERS, type UserId } from "./lib/users";
 import { useAuth } from "./lib/authContext";
 
 function localDateStr(d: Date): string {
@@ -70,7 +70,8 @@ export default function HomePage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await addExpense({ amount: val, category_id: categoryId, date, paid_by: paidBy, created_by: paidBy, notes: note });
+      const paidByName = USERS.find(u => u.id === paidBy)?.name ?? paidBy;
+      await addExpense({ amount: val, category_id: categoryId, date, paid_by: paidByName, created_by: paidByName, notes: note });
       const updated = await getTodayExpenses();
       setExpenses(updated);
       setAmount("");

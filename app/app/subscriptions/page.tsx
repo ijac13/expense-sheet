@@ -107,7 +107,7 @@ export default function SubscriptionsPage() {
         frequency: addForm.frequency,
         due_day,
         due_month,
-        paid_by: currentUserId,
+        paid_by: USERS.find(u => u.id === currentUserId)?.name ?? currentUserId,
       });
       setSubscriptions((prev) => [...prev, newSub]);
       closeModal();

@@ -123,14 +123,22 @@ async function insertRowAtTop(
   });
 }
 
+// Static fallback for legacy client-side user IDs (user1/user2 → display name).
+// The Google Sheet's Users tab uses email as the id column, so these can't be
+// resolved dynamically. This map ensures new writes always use display names.
+const LEGACY_USER_MAP: Record<string, string> = {
+  "user1": "ijac",
+  "user2": "wei",
+};
+
 // Resolve a user ID to their display name using the Users tab.
-// Falls back to the raw value if no match found.
+// Falls back to LEGACY_USER_MAP, then to the raw value.
 async function resolveUserDisplayNames(
   sheets: ReturnType<typeof google.sheets>,
   spreadsheetId: string,
   ids: string[]
 ): Promise<Map<string, string>> {
-  const result = new Map<string, string>(ids.map((id) => [id, id]));
+  const result = new Map<string, string>(ids.map((id) => [id, LEGACY_USER_MAP[id] ?? id]));
   try {
     const resp = await sheets.spreadsheets.values.get({
       spreadsheetId,
@@ -142,7 +150,7 @@ async function resolveUserDisplayNames(
       if (user) result.set(id, String(user.name));
     }
   } catch {
-    // ignore — fall back to raw IDs
+    // ignore — fall back to LEGACY_USER_MAP or raw IDs
   }
   return result;
 }
@@ -413,6 +421,8 @@ Keep the total response under 250 words. Use NT$ for amounts. Be specific to the
       const usersResp = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${USERS_TAB}!A:C` });
       const userRows = (usersResp.data.values ?? []).slice(1).map(rowToUser);
       const idToName = new Map(userRows.map((u) => [String(u.id), String(u.name)]));
+      // Also cover legacy client-side IDs
+      for (const [k, v] of Object.entries(LEGACY_USER_MAP)) idToName.set(k, v);
 
       function resolveStatic(val: string): string {
         return idToName.get(val) ?? val;
