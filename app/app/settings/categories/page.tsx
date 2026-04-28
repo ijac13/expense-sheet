@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Category, DEFAULT_CATEGORIES } from "../../lib/categories";
 import {
   addCategory,
@@ -24,6 +25,7 @@ interface FormState {
 const emptyForm: FormState = { icon: "", name_en: "", name_zh: "", error: "" };
 
 export default function CategoryManagementPage() {
+  const { t } = useTranslation();
   const [categories, setCategories] = useState<Category[]>(() =>
     DEFAULT_CATEGORIES.map((c) => ({ ...c, is_active: c.is_active ?? true }))
   );
@@ -53,11 +55,11 @@ export default function CategoryManagementPage() {
 
   function handleSave() {
     if (!form.name_en.trim()) {
-      setForm((f) => ({ ...f, error: "English name is required" }));
+      setForm((f) => ({ ...f, error: t("cat_mgmt.error_en_required") }));
       return;
     }
     if (!form.name_zh.trim()) {
-      setForm((f) => ({ ...f, error: "Chinese name is required" }));
+      setForm((f) => ({ ...f, error: t("cat_mgmt.error_zh_required") }));
       return;
     }
 
@@ -66,7 +68,7 @@ export default function CategoryManagementPage() {
         (c) => c.name_en.toLowerCase() === form.name_en.trim().toLowerCase()
       );
       if (duplicate) {
-        setForm((f) => ({ ...f, error: "Name already exists" }));
+        setForm((f) => ({ ...f, error: t("cat_mgmt.error_duplicate") }));
         return;
       }
       const currentMax = active.length > 0 ? Math.max(...active.map((c) => c.sort_order)) : 0;
@@ -82,7 +84,7 @@ export default function CategoryManagementPage() {
         (c) => c.id !== editId && c.name_en.toLowerCase() === form.name_en.trim().toLowerCase()
       );
       if (duplicate) {
-        setForm((f) => ({ ...f, error: "Name already exists" }));
+        setForm((f) => ({ ...f, error: t("cat_mgmt.error_duplicate") }));
         return;
       }
       const data = { icon: form.icon.trim() || "📦", name_en: form.name_en.trim(), name_zh: form.name_zh.trim() };
@@ -132,13 +134,13 @@ export default function CategoryManagementPage() {
   return (
     <div className="max-w-lg mx-auto p-4">
       <Link href="/settings" className="flex items-center gap-1 text-sm text-base-content/60 mb-4">
-        <ChevronLeft size={16} /> Settings
+        <ChevronLeft size={16} /> {t("settings.title")}
       </Link>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">Category Management</h1>
+        <h1 className="text-xl font-bold">{t("cat_mgmt.title")}</h1>
         {!isFormOpen && (
           <button className="btn btn-primary btn-sm" onClick={openAdd}>
-            + Add Category
+            {t("cat_mgmt.add")}
           </button>
         )}
       </div>
@@ -148,12 +150,12 @@ export default function CategoryManagementPage() {
         <div className="card bg-base-200 mb-4">
           <div className="card-body p-4">
             <h2 className="card-title text-base">
-              {formMode?.type === "add" ? "New Category" : "Edit Category"}
+              {formMode?.type === "add" ? t("cat_mgmt.form_add") : t("cat_mgmt.form_edit")}
             </h2>
             <div className="form-control gap-3">
               <div>
                 <label className="label pb-1">
-                  <span className="label-text">Emoji Icon</span>
+                  <span className="label-text">{t("cat_mgmt.icon_label")}</span>
                 </label>
                 <input
                   type="text"
@@ -166,7 +168,7 @@ export default function CategoryManagementPage() {
               </div>
               <div>
                 <label className="label pb-1">
-                  <span className="label-text">Name EN <span className="text-error">*</span></span>
+                  <span className="label-text">{t("cat_mgmt.name_en")} <span className="text-error">*</span></span>
                 </label>
                 <input
                   type="text"
@@ -178,7 +180,7 @@ export default function CategoryManagementPage() {
               </div>
               <div>
                 <label className="label pb-1">
-                  <span className="label-text">Name 繁中 <span className="text-error">*</span></span>
+                  <span className="label-text">{t("cat_mgmt.name_zh")} <span className="text-error">*</span></span>
                 </label>
                 <input
                   type="text"
@@ -193,17 +195,17 @@ export default function CategoryManagementPage() {
               )}
               <div className="flex gap-2 mt-1">
                 <button className="btn btn-primary btn-sm" onClick={handleSave}>
-                  Save
+                  {t("common.save")}
                 </button>
                 <button className="btn btn-ghost btn-sm" onClick={closeForm}>
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 {formMode?.type === "edit" && (
                   <button
                     className="btn btn-warning btn-sm ml-auto"
                     onClick={() => formMode.type === "edit" && handleArchive(formMode.id)}
                   >
-                    Archive
+                    {t("cat_mgmt.archive")}
                   </button>
                 )}
               </div>
@@ -215,7 +217,7 @@ export default function CategoryManagementPage() {
       {/* Active Categories */}
       <div className="mb-4">
         <h2 className="font-semibold text-sm text-base-content/60 mb-2">
-          Active ({active.length})
+          {t("cat_mgmt.active")} ({active.length})
         </h2>
         <div className="flex flex-col gap-1">
           {active.map((cat, idx) => (
@@ -248,9 +250,8 @@ export default function CategoryManagementPage() {
                 <button
                   className="btn btn-ghost btn-xs"
                   onClick={() => openEdit(cat)}
-                  aria-label="Edit"
                 >
-                  Edit
+                  {t("common.edit")}
                 </button>
               </div>
             </div>
@@ -266,7 +267,7 @@ export default function CategoryManagementPage() {
             onClick={() => setArchivedOpen((o) => !o)}
           >
             <span>{archivedOpen ? "▾" : "▸"}</span>
-            <span>Archived ({archived.length})</span>
+            <span>{t("cat_mgmt.archived")} ({archived.length})</span>
           </button>
           {archivedOpen && (
             <div className="flex flex-col gap-1">
@@ -284,7 +285,7 @@ export default function CategoryManagementPage() {
                     className="btn btn-ghost btn-xs"
                     onClick={() => handleRestore(cat.id)}
                   >
-                    Restore
+                    {t("cat_mgmt.restore")}
                   </button>
                 </div>
               ))}

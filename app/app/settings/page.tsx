@@ -37,7 +37,7 @@ export default function SettingsPage() {
             {t("settings.signed_in_as")} <span className="font-medium text-base-content/70">{currentUser.name}</span>
           </p>
           <button onClick={signOut} className="btn btn-ghost btn-xs text-error">
-            Sign out
+            {t("settings.sign_out")}
           </button>
         </div>
       )}

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface User {
   id: string;
@@ -12,6 +13,7 @@ interface User {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 export default function UsersPage() {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,23 +30,23 @@ export default function UsersPage() {
       })
       .catch(err => {
         console.error("Failed to load users:", err);
-        setError("Failed to load users");
+        setError(t("errors.load_failed"));
         setLoading(false);
       });
-  }, []);
+  }, [t]);
 
   return (
     <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-20">
       <Link href="/settings" className="flex items-center gap-1 text-sm text-base-content/60 mb-4">
-        <ChevronLeft size={16} /> Settings
+        <ChevronLeft size={16} /> {t("settings.title")}
       </Link>
-      <h1 className="text-2xl font-semibold mb-1">User Management</h1>
+      <h1 className="text-2xl font-semibold mb-1">{t("users.title")}</h1>
       <p className="text-sm text-base-content/50 mb-6">
-        Add or remove users by editing the Users tab in Google Sheets.
+        {t("users.description")}
       </p>
 
       {loading && (
-        <p className="text-sm text-base-content/50">Loading users...</p>
+        <p className="text-sm text-base-content/50">{t("users.loading")}</p>
       )}
 
       {error && (
@@ -60,12 +62,14 @@ export default function UsersPage() {
               </div>
               <div>
                 <div className="font-medium">{u.name}</div>
-                <div className="text-sm text-base-content/50">{u.email || (u.id.includes("@") ? u.id : "No email set")}</div>
+                <div className="text-sm text-base-content/50">
+                  {u.email || (u.id.includes("@") ? u.id : t("users.no_email"))}
+                </div>
               </div>
             </div>
           ))}
           {users.length === 0 && (
-            <p className="text-sm text-base-content/50">No users found in the Users tab.</p>
+            <p className="text-sm text-base-content/50">{t("users.empty")}</p>
           )}
         </div>
       )}

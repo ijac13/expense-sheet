@@ -80,7 +80,9 @@
     "due_month_label": "Due Month (1–12)",
     "due_day_label": "Due Day (1–31)"
   },
-  "settings": { "title": "Settings", "signed_in_as": "Signed in as", "font_size": "Font Size", "small": "Small", "medium": "Medium", "large": "Large", "language": "Language", "category_management": "Category Management", "user_management": "User Management" },
+  "settings": { "title": "Settings", "signed_in_as": "Signed in as", "sign_out": "Sign out", "font_size": "Font Size", "small": "Small", "medium": "Medium", "large": "Large", "language": "Language", "category_management": "Category Management", "user_management": "User Management" },
+  "users": { "title": "User Management", "description": "Add or remove users by editing the Users tab in Google Sheets.", "loading": "Loading users…", "no_email": "No email set", "empty": "No users found in the Users tab." },
+  "cat_mgmt": { "title": "Category Management", "add": "+ Add Category", "form_add": "New Category", "form_edit": "Edit Category", "icon_label": "Emoji Icon", "name_en": "Name EN", "name_zh": "Name 繁中", "error_en_required": "English name is required", "error_zh_required": "Chinese name is required", "error_duplicate": "Name already exists", "archive": "Archive", "restore": "Restore", "active": "Active", "archived": "Archived" },
   "categories": { "eating-out": "Eating Out", "daily-necessities": "Daily Necessities", "groceries": "Groceries", "medical": "Medical", "travel": "Travel", "transportation": "Transportation", "digital": "Digital", "babies": "Babies", "clothing": "Clothing", "sports": "Sports", "gifts": "Gifts", "tuition": "Tuition", "tolls": "Tolls", "equipment": "Equipment", "fuel": "Fuel", "entertainment": "Entertainment", "rent": "Rent", "shopping": "Shopping", "car-repair": "Car Repair", "donate": "Donate", "mortgage": "Mortgage", "other": "Other" },
   "errors": { "load_failed": "Failed to load", "retry": "Retry", "no_longer_exists": "This expense no longer exists." },
   "common": { "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "save": "Save", "back": "Back", "twd": "TWD", "category": "Category", "reset": "Reset", "apply": "Apply", "payer": "Payer" }
