@@ -1,11 +1,11 @@
 ---
 id: "014"
 title: Spending Insights
-status: ideation
+status: done
 source: captain observation
-started:
-completed:
-verdict:
+started: 2026-04-26
+completed: 2026-04-29
+verdict: PASSED
 score: 0.8
 worktree:
 issue:

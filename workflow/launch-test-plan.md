@@ -1,9 +1,9 @@
 ---
 id: "025"
 title: Launch Test Plan — Staging to Production
-status: ideation
+status: build
 source: captain plan
-started:
+started: 2026-04-29
 completed:
 verdict:
 score: 1.0
@@ -13,6 +13,8 @@ pr:
 ---
 
 Structured rollout from staging validation through production migration, replacing the existing expense app.
+
+**Current phase: Phase 1 — Staging UAT**
 
 ## Phase 1 — Staging UAT (both users)
 

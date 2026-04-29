@@ -1,11 +1,11 @@
 ---
 id: "026"
 title: UI Polish — Translation Gaps & Insights Error
-status: ideation
+status: done
 source: captain feedback
-started:
-completed:
-verdict:
+started: 2026-04-27
+completed: 2026-04-29
+verdict: PASSED
 score: 0.9
 worktree:
 issue:
