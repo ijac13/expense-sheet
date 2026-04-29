@@ -2,7 +2,7 @@
 
 ## Why I built this
 
-I've tracked my expenses for many years. The tools changed over time, but the analysis always ended up in a spreadsheet anyway — Excel, then Google Sheets. At some point I realized what I actually wanted was a simple mobile UI to remove the friction of adding expenses on the go, feeding data into a spreadsheet I already know how to analyze.
+I've tracked my expenses for many years. The tools changed over time, but the analysis always ended up in a spreadsheet anyway — Google Sheets. At some point I realized what I actually wanted was a simple mobile UI to reduce the friction of logging expenses on the go, feeding data into a spreadsheet I already know how to analyze.
 
 Third-party apps do a fine job at tracking and visualization. But when I need the raw data — to plan for retirement, to understand what I'm actually spending on, to run my own analysis — I have to export it first, and the structure is always a mystery until I do. That felt wrong.
 
