@@ -53,6 +53,17 @@ export default function SettingsPage() {
             <span>{t("settings.user_management")}</span>
             <span className="text-base-content/40">›</span>
           </Link>
+          {process.env.NEXT_PUBLIC_SPREADSHEET_ID && (
+            <a
+              href={`https://docs.google.com/spreadsheets/d/${process.env.NEXT_PUBLIC_SPREADSHEET_ID}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-4 bg-base-200 rounded-xl"
+            >
+              <span>{t("settings.open_sheet")}</span>
+              <span className="text-base-content/40">↗</span>
+            </a>
+          )}
         </div>
 
         {/* Font size */}

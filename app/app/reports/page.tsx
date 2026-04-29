@@ -149,7 +149,8 @@ function InsightsCard() {
   const { t } = useTranslation();
   const [state, setState] = useState<"idle" | "loading" | "done" | "insufficient" | "error">("idle");
   const [insights, setInsights] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [errorKey, setErrorKey] = useState("reports.insights_error");
+  const [insufficientDays, setInsufficientDays] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -164,27 +165,30 @@ function InsightsCard() {
 
   async function generate() {
     setState("loading");
-    setErrorMsg("");
+    setErrorKey("reports.insights_error");
     startTimer();
     try {
       const res = await fetch(`${API_BASE}/api/insights`, { method: "POST" });
       const data = await res.json() as Record<string, unknown>;
       stopTimer();
+      if (data.insufficient_data) {
+        setInsufficientDays(typeof data.days === "number" ? data.days : 0);
+        setState("insufficient");
+        return;
+      }
       if (!res.ok) {
-        const detail = String(data.detail ?? data.error ?? `Server error ${res.status}`);
-        setErrorMsg(detail);
+        const code = String(data.error_code ?? "");
+        if (code === "ai_error") setErrorKey("reports.insights_error_ai");
+        else if (code === "data_error") setErrorKey("reports.insights_error_data");
+        else setErrorKey("reports.insights_error");
         setState("error");
         return;
       }
-      if (data.insufficient_data) { setState("insufficient"); return; }
       if (data.insights) { setInsights(String(data.insights)); setState("done"); }
-      else {
-        setErrorMsg("No insights returned from API.");
-        setState("error");
-      }
-    } catch (err) {
+      else { setErrorKey("reports.insights_error"); setState("error"); }
+    } catch {
       stopTimer();
-      setErrorMsg(err instanceof Error ? err.message : "Network error — check your connection.");
+      setErrorKey("reports.insights_error_data");
       setState("error");
     }
   }
@@ -226,18 +230,22 @@ function InsightsCard() {
   );
 
   if (state === "insufficient") return (
-    <div className="bg-base-200 rounded-2xl p-5">
-      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-2">{t("reports.insights_title")}</div>
-      <p className="text-sm text-base-content/60">
-        {t("reports.insights_insufficient")} {t("reports.insights_insufficient_msg")}
+    <div className="bg-base-200 rounded-2xl p-5 space-y-2">
+      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">{t("reports.insights_title")}</div>
+      <p className="text-sm font-medium text-base-content/70">{t("reports.insights_insufficient")}</p>
+      <p className="text-sm text-base-content/50">
+        {insufficientDays > 0
+          ? `${insufficientDays} / 7 ${t("reports.insights_days_progress")}`
+          : null}
       </p>
+      <p className="text-sm text-base-content/50">{t("reports.insights_insufficient_msg")}</p>
     </div>
   );
 
   if (state === "error") return (
     <div className="bg-base-200 rounded-2xl p-5 space-y-3">
       <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">{t("reports.insights_title")}</div>
-      <p className="text-sm text-error/80">{t("reports.insights_error")}</p>
+      <p className="text-sm text-error/80">{t(errorKey)}</p>
       <button onClick={generate} className="btn btn-ghost btn-sm">{t("errors.retry")}</button>
     </div>
   );

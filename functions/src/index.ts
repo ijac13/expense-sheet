@@ -286,10 +286,17 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       }
 
       // Fetch all expenses and subscriptions
-      const [expResponse, subResponse] = await Promise.all([
-        sheets.spreadsheets.values.get({ spreadsheetId, range: `${EXPENSES_TAB}!A:H` }),
-        sheets.spreadsheets.values.get({ spreadsheetId, range: `${SUBSCRIPTIONS_TAB}!A:I` }),
-      ]);
+      let expResponse, subResponse;
+      try {
+        [expResponse, subResponse] = await Promise.all([
+          sheets.spreadsheets.values.get({ spreadsheetId, range: `${EXPENSES_TAB}!A:H` }),
+          sheets.spreadsheets.values.get({ spreadsheetId, range: `${SUBSCRIPTIONS_TAB}!A:I` }),
+        ]);
+      } catch (fetchErr) {
+        console.error("Sheets fetch error:", fetchErr);
+        res.status(503).json({ error_code: "data_error" });
+        return;
+      }
 
       const allExpenses = (expResponse.data.values ?? []).slice(1).map(rowToExpense);
       const subscriptions = (subResponse.data.values ?? []).slice(1).map(rowToSubscription)
@@ -309,9 +316,13 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         (now.getTime() - new Date(oldestDate + "T00:00:00").getTime()) / 86400000
       );
 
-      // Require at least 3 days of data
-      if (allExpenses.length === 0 || daysSinceFirst < 3) {
-        res.status(200).json({ insufficient_data: true });
+      // Require at least 7 days of data
+      if (allExpenses.length === 0) {
+        res.status(200).json({ insufficient_data: true, days: 0 });
+        return;
+      }
+      if (daysSinceFirst < 7) {
+        res.status(200).json({ insufficient_data: true, days: daysSinceFirst });
         return;
       }
 
@@ -399,14 +410,21 @@ Write a short insights report with exactly these sections:
 3. **Doing well** — 1–2 positive observations or encouragements
 Keep the total response under 250 words. Use NT$ for amounts. Be specific to their actual categories.`;
 
-      const client = new Anthropic({ apiKey: anthropicKey.value() });
-      const message = await client.messages.create({
-        model: "claude-3-5-haiku-20241022",
-        max_tokens: 600,
-        messages: [{ role: "user", content: prompt }],
-      });
+      let text: string;
+      try {
+        const client = new Anthropic({ apiKey: anthropicKey.value() });
+        const message = await client.messages.create({
+          model: "claude-3-5-haiku-20241022",
+          max_tokens: 600,
+          messages: [{ role: "user", content: prompt }],
+        });
+        text = message.content[0].type === "text" ? message.content[0].text : "";
+      } catch (aiErr) {
+        console.error("Anthropic API error:", aiErr);
+        res.status(503).json({ error_code: "ai_error" });
+        return;
+      }
 
-      const text = message.content[0].type === "text" ? message.content[0].text : "";
       res.status(200).json({ insights: text });
       return;
     }
