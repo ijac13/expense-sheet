@@ -12,6 +12,10 @@ Expense tracking is personal. Everyone has different categories, different habit
 
 One thing the agent convinced me of: a single Google Sheet is more than enough for 20 years of expense tracking. No database needed. Just one spreadsheet you already know how to use.
 
+## Demo
+
+[▶ Watch demo video](https://drive.google.com/file/d/10-bEYn38WeHTFioIc7MIFs3Lh2NwuHV0/view?usp=drivesdk)
+
 ---
 
 A household expense tracker for two, built on Next.js, Firebase, and Google Sheets.
