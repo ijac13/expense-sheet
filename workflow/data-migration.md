@@ -22,11 +22,15 @@ I have old expense data in Excel or CSV format with a different column structure
 - Write a migration script that reads the old file, transforms each row, and writes to the Expenses tab
 - Validate the result: row count matches, amounts sum correctly, no data lost
 
+## Source Data
+
+Old expense data is in a Google Spreadsheet:
+https://docs.google.com/spreadsheets/d/1Vt0wcrpZ2v9HkyRT1_e_KDm30stcppK0eBYKRT7JeGk/edit?usp=sharing
+
 ## Open questions (to answer when starting this entity)
 
-- Where is the old file? What format — Excel (.xlsx) or CSV?
-- What columns does it have?
-- Are there multiple files (e.g., one per year)?
+- What columns does the old sheet have?
+- Are there multiple tabs (e.g., one per year)?
 - Are categories in the old data names or codes? How do they map to the 22 default categories?
 - Does the old data have a "paid by" field, or was it single-user?
 
