@@ -12,55 +12,46 @@ issue:
 pr:
 ---
 
-Protect against runaway GCP bills — alert at a soft threshold (X) so I know costs are climbing, and automatically kill billing at a hard threshold (Y) before it gets out of hand.
+Protect against runaway GCP bills — alert at TWD $2,000 so I know costs are climbing, and automatically kill billing at TWD $2,500 before it goes further.
 
 ## Why This Matters
 
-The expense-sheet app runs on GCP (Firebase/Cloud Run). As usage grows, unexpected charges can accumulate silently. Two layers of protection are needed:
+The expense-sheet app (and future GCP projects) run on a single GCP billing account. Unexpected charges can accumulate silently. Two layers of protection:
 
-1. **Alert at X** — passive warning, no action. Just a heads-up: "you've spent $X."
-2. **Stop billing at Y** — active kill switch. When costs hit $Y, automatically sever the billing account from the project. This is nuclear but finite.
+1. **Alert at TWD $2,000** — email notification only, no action taken.
+2. **Kill billing at TWD $2,500** — automatically sever the billing account from the project. Nuclear but finite.
 
 ## How GCP Actually Works
 
-From the docs:
-
-**Budgets and alerts** (the alert-at-X part):
-- Create a GCP Budget on the billing account with threshold rules (e.g., 50%, 90%, 100% of a dollar amount, or explicit dollar values).
-- Default notification channels: email to Billing Admins/Project Owners, or Cloud Monitoring custom channels.
+**Budgets and alerts** (the alert layer):
+- GCP Budget with a threshold rule at TWD $2,000 → email to Billing Admin/Project Owner.
 - **Budgets do NOT cap spending.** Alerts are informational only.
-- Up to 50,000 budgets per billing account.
 
-**Programmatic billing disable** (the stop-at-Y part):
-- Pattern: Budget with Pub/Sub notification → Cloud Run Function → Cloud Billing API call.
+**Programmatic billing disable** (the kill layer):
+- Pattern: Budget at TWD $2,500 → Pub/Sub topic → Cloud Run Function → Cloud Billing API.
 - The function calls `billing.updateProjectBillingInfo({ billingAccountName: '' })` to remove the billing account link.
+- The function lives in the **same project** — it runs, kills billing, then dies with the project. That's fine; its job is done.
 - **Critical caveats:**
-  - There is a delay between incurring costs and receiving notifications — actual spend may overshoot Y.
-  - Disabling billing **terminates ALL Google Cloud services immediately**, including the Cloud Function itself if it lives in the same project.
-  - Resources may be irretrievably deleted. Manual re-enable required to restore.
+  - Notification delay means actual spend may slightly overshoot TWD $2,500.
+  - Disabling billing terminates ALL GCP services immediately. Resources may be irretrievably deleted.
+  - Manual re-enable required to restore. No automatic recovery.
   - Cannot disable billing on a project locked to a billing account.
 
 ## Success
 
-- A GCP Budget exists on the project's billing account with:
-  - Threshold at $X → email alert to me
-  - Threshold at $Y → Pub/Sub trigger
-- A Cloud Run function (or Cloud Function) subscribed to the Pub/Sub topic that:
-  - Checks current `costAmount` vs `budgetAmount`
-  - Calls the Cloud Billing API to detach the billing account when Y is exceeded
-  - Has a `SIMULATE` flag for safe dry-run testing before going live
-- The function runs in a **separate project** or has IAM scoped to avoid self-termination
-- Setup is documented so it can be re-enabled quickly if triggered
+- A GCP Budget on the billing account with:
+  - Threshold at TWD $2,000 → email alert
+  - Threshold at TWD $2,500 → Pub/Sub trigger
+- A Cloud Run function subscribed to the Pub/Sub topic that:
+  - Compares `costAmount` to the TWD $2,500 kill threshold
+  - Calls the Cloud Billing API to detach the billing account
+  - Has a `SIMULATE` flag for dry-run testing before going live
+- Setup documented: how to re-enable billing after it's been cut
 
 ### Out of Scope
 
-- Automatic re-enablement after billing is cut (manual only by design)
-- Per-service spend caps (this is project-level only)
-- Slack/webhook notifications (email is sufficient for now)
+- Automatic re-enablement (manual only, by design)
+- Per-service spend caps (project-level only)
+- Slack/webhook notifications (email is sufficient)
 - Forecasted spend alerts (actual spend only)
-
-## Open Questions
-
-1. What should X and Y be? (e.g., X = $10 alert, Y = $30 kill)
-2. Should the Cloud Function live in the same project or a separate "watchdog" project to avoid self-termination?
-3. Should there be a middle threshold (e.g., $Y/2) that alerts but doesn't kill?
+- Separate watchdog project (unnecessary — function doesn't need to survive after the kill)
