@@ -59,3 +59,14 @@ Wire the codebase to support two deployment targets — `staging` and `productio
 ### Summary
 
 Recovered prior ensign's WIP and resolved a gitignore conflict: the template env files were being ignored before they could be committed. Fixed by renaming to `.env.staging.example` (real `.env.staging` stays ignored), adding a `!.env*.example` exception in `app/.gitignore`. All three checklist items are complete. The captain's remaining work is in `STAGING_SETUP.md`: create the Firebase staging project, set up a service account, fill in the example files, and run the first deploy.
+
+## Stage Report: verify
+
+- DONE: All four AC items confirmed present and correct in the worktree
+  AC-1: `.firebaserc` has `production: expense-sheet-b2db8` and `staging: TODO_STAGING_PROJECT_ID`; AC-2: `functions/.env.staging.example` and `app/.env.staging.example` committed with TODO placeholders, real files gitignored; AC-3: `STAGING_SETUP.md` has 4-step manual checklist + deploy commands + post-deploy verification; AC-4: no changes to production keys or existing env files — build commit 868bfd5
+- DONE: Production deploy path still works (no regressions to existing config)
+  `.firebaserc` `default` key still points to `expense-sheet-b2db8`; change was additive only; existing `app/.env.local` untouched
+
+### Summary
+
+All four acceptance criteria pass against the codebase artifacts. The build was fully additive — no production config was modified. The only captain action required before staging is live: create the Firebase project, create a service account, fill in the two `.example` files, and run the first deploy per `STAGING_SETUP.md`.
