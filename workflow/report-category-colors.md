@@ -1,13 +1,13 @@
 ---
 id: "030"
 title: Report Category Bars Use Wrong Color
-status: spec
+status: build
 source: captain feedback
 started: 2026-05-03T09:03:27Z
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/spacedock-ensign-report-category-colors
 issue:
 pr:
 ---
