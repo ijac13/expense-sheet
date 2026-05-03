@@ -9,8 +9,8 @@ verdict:
 score: 1.0
 worktree: .worktrees/spacedock-ensign-staging-environment
 issue:
-pr:
-mod-block: merge:pr-merge
+pr: #2
+mod-block: 
 ---
 
 Set up a proper staging environment so future changes can be tested before hitting production.
