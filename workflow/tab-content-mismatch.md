@@ -41,3 +41,60 @@ The tab/page component is not unmounting or re-rendering on route change. Possib
 - **AC-1** Tapping any tab always renders that tab's content immediately
 - **AC-2** No flash of previous tab's content during transition
 - **AC-3** Reproducible on both iOS Safari and Android Chrome
+
+---
+
+## Spec
+
+### Goal
+
+Fix tab navigation so tapping a tab always replaces the content area with the correct page immediately. The bottom nav indicator and the content area must update in the same visible frame.
+
+### Root Cause
+
+`app/app/layout.tsx` renders `{children}` inside a `<div className="pb-16">` without a `loading.tsx` suspense boundary for any route segment. When the user taps a tab, Next.js App Router client-side navigation updates `pathname` (which drives TabBar immediately via `usePathname`) but holds the previous `children` visible until the incoming page component resolves. On mobile this lag is perceptible — sometimes lasting long enough to be the dominant visible state before the content swap completes.
+
+`HomePage` (`app/app/page.tsx`) compounds this: it sets `style={{ height: "100dvh" }}` and `overflow-hidden` on its `<main>`, making its stale content fill the entire viewport while History/other pages are loading, leaving no visual cue that a transition is in progress.
+
+The static export (`output: "export"` in `next.config.ts`) rules out server-rendering and confirms all navigation is client-side JavaScript, so a `loading.tsx` at the root segment is the correct fix surface.
+
+### User Stories
+
+- As a user tapping History, I see the history list immediately — not a frozen Home screen.
+- As a user tapping any tab, the content and the nav indicator change together in one visible update.
+
+### Acceptance Criteria
+
+All criteria are binary pass/fail. Each can be verified by manual tap on a real device or browser devtools mobile emulation.
+
+- **AC-1** Tapping History from Home replaces the category grid and numpad with the History page header and expense list within one animation frame (no stale Home content visible after the tap).
+- **AC-2** Tapping Reports, Subscriptions, or Settings from any other tab replaces the content area content with the target tab's page content before the next repaint.
+- **AC-3** A loading indicator (spinner or skeleton) appears in the content area for the duration of any async data fetch on the incoming page, replacing the previous tab's content — never showing the previous tab's content during the fetch.
+- **AC-4** The TabBar active indicator matches the rendered content: if History is highlighted, the history list (or its loading state) is visible, never the Home screen.
+- **AC-5** Behavior is reproducible on iOS Safari (iPhone, real device or simulator) and Android Chrome (real device or emulator).
+
+### Edge Cases
+
+- Tapping the already-active tab does nothing and does not blank the content area.
+- Rapidly tapping between tabs (two taps under 300ms apart) resolves to the last-tapped tab's content without showing an intermediate tab's content.
+- If data fetch for the incoming page fails, the content area shows an error state for that page — not the previous tab's content.
+- Navigating back using the browser back button restores the correct tab's content and updates the nav indicator.
+
+### Out of Scope
+
+- Animated slide or cross-fade transitions between tabs (purely visual polish, separate task).
+- Prefetching tab data before the user taps (performance optimization, separate task).
+- Changes to the TabBar indicator style or layout.
+- Any change to auth flow or AuthGuard behavior.
+- Fixing any bugs specific to individual tab pages (History filters, category editing, etc.) that are not caused by the navigation mismatch.
+
+## Stage Report: spec
+
+- DONE: Root cause identified with evidence from the codebase (specific file/component responsible for tab routing)
+  `app/app/layout.tsx` (no `loading.tsx` suspense boundary) + `app/app/page.tsx` (`height: 100dvh` + `overflow-hidden` fills viewport with stale content). `next.config.ts` confirms static export so all navigation is client-side. Screenshot `feedback-screenshots/history-002.png` confirms: History tab pill active, Home content visible.
+- DONE: Spec written with binary acceptance criteria covering the fix
+  AC-1 through AC-5 added above; each is independently testable by tap observation on device.
+
+### Summary
+
+Root cause is the missing `loading.tsx` suspense boundary in `app/app/layout.tsx`: Next.js App Router updates `pathname` (TabBar re-renders immediately) but holds previous `children` visible until the incoming page resolves, causing the stale-content window visible in the screenshot. `HomePage`'s full-viewport sizing (`height: 100dvh` + `overflow-hidden`) makes the stale Home content fill the entire screen during that window. The spec adds five binary acceptance criteria and two edge-case scenarios for rapid tapping and failed fetches.
