@@ -2,6 +2,6 @@
   "projects": {
     "default": "expense-sheet-b2db8",
     "production": "expense-sheet-b2db8",
-    "staging": "TODO_STAGING_PROJECT_ID"
+    "staging": "expense-sheet-staging"
   }
 }
