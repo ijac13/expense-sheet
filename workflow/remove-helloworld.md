@@ -1,7 +1,7 @@
 ---
 id: "034"
 title: Remove helloWorld Dead Code from Functions
-status: build
+status: verify
 source: captain
 started: 2026-05-03T09:41:34Z
 completed:
