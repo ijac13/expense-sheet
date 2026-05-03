@@ -1,13 +1,13 @@
 ---
 id: "033"
 title: Staging Icon and Environment Banner
-status: spec
+status: build
 source: captain
 started: 2026-05-03T09:41:34Z
 completed:
 verdict:
 score: 0.9
-worktree:
+worktree: .worktrees/spacedock-ensign-staging-icon-banner
 issue:
 pr:
 ---
@@ -16,8 +16,8 @@ Add a distinct PWA icon for staging and an in-app "STAGING" banner so it's obvio
 
 ## What the captain wants
 
-- **Production icon:** keep the existing "D" money/expense tracker icon
-- **Staging icon:** something visually distinct so the two home screen shortcuts look different at a glance
+- **Production icon:** use 💰 emoji as the expense tracker icon
+- **Staging icon:** something visually distinct so the two home screen shortcuts look different at a glance, like 🔧
 - **In-app staging banner:** a visible indicator inside the web app itself (e.g. a top bar or corner badge saying "STAGING") so there's no ambiguity while using it
 
 ## How this should work technically

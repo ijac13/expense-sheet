@@ -10,6 +10,7 @@ score: 1.0
 worktree: .worktrees/spacedock-ensign-workflow-verify-improvements
 issue:
 pr:
+mod-block: merge:pr-merge
 ---
 
 Improve the verify stage in the workflow so agents self-correct before the captain sees anything, and so every verify explicitly checks for PII/secrets in the public repo.
