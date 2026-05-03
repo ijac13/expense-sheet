@@ -1,9 +1,9 @@
 ---
 id: "030"
 title: Report Category Bars Use Wrong Color
-status: ideation
+status: spec
 source: captain feedback
-started:
+started: 2026-05-03T09:03:27Z
 completed:
 verdict:
 score: 0.85

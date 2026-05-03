@@ -1,9 +1,9 @@
 ---
 id: "031"
 title: Subscription Modal — Amount Not Editable and Duplicate on Add
-status: ideation
+status: spec
 source: captain feedback
-started:
+started: 2026-05-03T09:03:27Z
 completed:
 verdict:
 score: 0.9
