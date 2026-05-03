@@ -1,7 +1,7 @@
 ---
 id: "032"
 title: Workflow Verify Stage Improvements
-status: build
+status: verify
 source: captain
 started: 2026-05-03T09:38:20Z
 completed:
