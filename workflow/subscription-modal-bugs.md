@@ -1,13 +1,13 @@
 ---
 id: "031"
 title: Subscription Modal — Amount Not Editable and Duplicate on Add
-status: spec
+status: build
 source: captain feedback
 started: 2026-05-03T09:03:27Z
 completed:
 verdict:
 score: 0.9
-worktree:
+worktree: .worktrees/spacedock-ensign-subscription-modal-bugs
 issue:
 pr:
 ---

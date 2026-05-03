@@ -1,7 +1,7 @@
 ---
 id: "029"
 title: Tab Navigation Shows Wrong Content
-status: build
+status: verify
 source: captain feedback
 started: 2026-05-03T09:03:27Z
 completed:

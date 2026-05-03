@@ -1,7 +1,7 @@
 ---
 id: "030"
 title: Report Category Bars Use Wrong Color
-status: build
+status: verify
 source: captain feedback
 started: 2026-05-03T09:03:27Z
 completed:
