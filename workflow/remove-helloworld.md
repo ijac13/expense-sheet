@@ -29,3 +29,44 @@ The function is exported in `functions/src/index.ts` but never called by the fro
 - **AC-2** No other file in the repo references `helloWorld`
 - **AC-3** `firebase deploy --project staging --only functions` completes without the helloWorld build error
 - **AC-4** The `api` function is unaffected and still deploys successfully
+
+## Spec
+
+### Caller audit
+
+`grep -r "helloWorld"` across the full repo (excluding `node_modules` and `.git`) finds exactly one definition:
+
+```
+functions/src/index.ts:12: export const helloWorld = functionsV1.https.onRequest(...)
+```
+
+The only other matches are the workflow entity file and an archived historical document — neither is a caller. No frontend code, test, or configuration file references the symbol.
+
+### Change surface
+
+Two edits to `functions/src/index.ts`:
+
+1. Remove the `helloWorld` export block (lines 9–14, including the comment header).
+2. Remove the `import * as functionsV1 from "firebase-functions"` line (line 1) — it is exclusively used by `helloWorld` and becomes an unused import after the deletion.
+
+No other files require changes.
+
+### Binary acceptance criteria
+
+| # | Check | Pass condition |
+|---|-------|---------------|
+| AC-1 | `helloWorld` not exported | `grep "helloWorld" functions/src/index.ts` returns no matches |
+| AC-2 | No repo references | `grep -r "helloWorld" . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=workflow` returns no matches |
+| AC-3 | Build passes | `cd functions && npm run build` exits 0 |
+| AC-4 | `api` unaffected | `api` export still present in `functions/src/index.ts` and TypeScript build has no errors |
+
+## Stage Report: spec
+
+- DONE: Confirmed helloWorld has no callers anywhere in the codebase (grep evidence)
+  grep output: only match is `functions/src/index.ts:12` (the definition); workflow entity and archived doc are not callers
+- DONE: Spec written with binary AC
+  Binary AC table added to Spec section with four measurable pass conditions
+
+### Summary
+
+Grep across the full repo confirms `helloWorld` has a single occurrence — its own definition in `functions/src/index.ts`. The spec documents the two-line change required (remove the export block and its exclusive `functionsV1` import) and provides four binary AC checks covering export removal, repo-wide absence, TypeScript build, and `api` function preservation.
