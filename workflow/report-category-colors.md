@@ -94,3 +94,24 @@ Root cause confirmed by reading `page.tsx`: `CategoryRow` always fills bars with
 ### Summary
 
 Added `color: string` prop to `CategoryRow` and replaced the hardcoded `bg-primary` Tailwind class with an inline `backgroundColor: color` style. Both the monthly and annual category list renders now pass `DONUT_COLORS[i % DONUT_COLORS.length]` using the map index `i`, exactly mirroring the index-based color assignment in `DonutChart`. No other visual properties of the category rows were changed.
+
+## Stage Report: verify
+
+- DONE: AC-1 — Monthly view uses DONUT_COLORS[i % DONUT_COLORS.length] per category
+  Line 507: `color={DONUT_COLORS[i % DONUT_COLORS.length]}` in `monthly.categories.map((cat, i) => ...)`.
+- DONE: AC-2 — Annual view uses same index-based color formula
+  Line 667: `color={DONUT_COLORS[i % DONUT_COLORS.length]}` in `annual.categories.map((cat, i) => ...)`.
+- DONE: AC-3 — CategoryRow accepts color prop and applies inline backgroundColor, no Tailwind color class
+  Lines 112-117: `color: string` in props. Line 136: `style={{ width: \`${cat.percentage}%\`, backgroundColor: color }}`. No `bg-primary` on that div.
+- DONE: AC-4 — Fewer than 6 categories get distinct colors
+  DONUT_COLORS has 6 unique hex entries (line 29); indices 0–5 each map to a distinct color.
+- DONE: AC-5 — More than 6 categories wrap via modulo, matching DonutChart
+  Both map calls use `i % DONUT_COLORS.length`; DonutChart uses the identical formula at line 69 — 7th category index 6 % 6 = 0 in both.
+- DONE: AC-6 — No other visual appearance changes
+  CategoryRow button className, label, amount, percentage text, and hover class are untouched; only bar fill changed from Tailwind class to inline style.
+- DONE: PII/secrets check — no private data committed to branch
+  `page.tsx` contains only color hex codes, Tailwind classes, and component logic. No .env values, API keys, tokens, personal data, or private URLs found.
+
+### Summary
+
+All six acceptance criteria pass against the actual code in `app/app/reports/page.tsx`. The build correctly added a `color` prop to `CategoryRow`, drives it with `DONUT_COLORS[i % DONUT_COLORS.length]` in both monthly (line 507) and annual (line 667) map calls, and applies it via inline `backgroundColor` style with no Tailwind color class remaining. No PII or secrets were found in the changed file. Verdict: APPROVED.
