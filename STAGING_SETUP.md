@@ -46,11 +46,7 @@ This document covers the remaining manual steps to bring staging online, plus th
 17. Still on the **Project settings** page → **General** tab → scroll down to **Your apps**
 18. Click the `</>` (Web) icon to add a web app
 19. Give it a nickname (e.g., `expense-sheet-staging-web`) and click **Register app**
-20. The next screen shows your **Firebase SDK config** — a JS object with these keys:
-    ```
-    apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId
-    ```
-    Keep this screen open or copy the values — you need them in Step 3.
+20. The next screen shows your **Firebase SDK config** — a JS object with these keys: `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`. Keep this screen open or copy the values — you need them in Step 3.
 
 ---
 
