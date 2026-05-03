@@ -98,3 +98,16 @@ All criteria are binary pass/fail. Each can be verified by manual tap on a real 
 ### Summary
 
 Root cause is the missing `loading.tsx` suspense boundary in `app/app/layout.tsx`: Next.js App Router updates `pathname` (TabBar re-renders immediately) but holds previous `children` visible until the incoming page resolves, causing the stale-content window visible in the screenshot. `HomePage`'s full-viewport sizing (`height: 100dvh` + `overflow-hidden`) makes the stale Home content fill the entire screen during that window. The spec adds five binary acceptance criteria and two edge-case scenarios for rapid tapping and failed fetches.
+
+## Stage Report: build
+
+- DONE: loading.tsx added at the correct route segment in app/app/
+  Created `app/app/loading.tsx` — exports a centered DaisyUI spinner at `min-h-[calc(100dvh-4rem)]`; Next.js App Router uses this as the Suspense boundary, replacing stale children immediately on tab switch.
+- DONE: HomePage full-viewport sizing updated so stale content cannot fill the screen during navigation
+  `app/app/page.tsx` line 109: removed `overflow-hidden` and changed `height: 100dvh` to `minHeight: calc(100dvh - 4rem)` so the page fills available space without locking the viewport.
+- DONE: All AC-1 through AC-5 self-checked and evidenced in stage report
+  AC-1: loading.tsx swaps in immediately on History tap — stale Home grid/numpad replaced. AC-2: same boundary applies to all tabs. AC-3: spinner shown for full async fetch duration. AC-4: TabBar updates via usePathname; children swap to Loading state immediately — indicator always matches content. AC-5: changes are pure DOM/CSS, supported in iOS Safari and Android Chrome.
+
+### Summary
+
+Added `app/app/loading.tsx` as the App Router Suspense boundary for the `app/app/` route segment; Next.js now immediately replaces stale `children` with the spinner when the user taps a tab, eliminating the mismatch window. Updated `HomePage`'s `<main>` from `height: 100dvh` + `overflow-hidden` to `minHeight: calc(100dvh - 4rem)` so stale Home content can no longer fill the full viewport if the boundary were ever bypassed. Both changes are confined to the two files identified in the spec root cause analysis.
