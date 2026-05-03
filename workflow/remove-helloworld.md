@@ -1,13 +1,13 @@
 ---
 id: "034"
 title: Remove helloWorld Dead Code from Functions
-status: spec
+status: build
 source: captain
 started: 2026-05-03T09:41:34Z
 completed:
 verdict:
 score: 0.8
-worktree:
+worktree: .worktrees/spacedock-ensign-remove-helloworld
 issue:
 pr:
 ---
