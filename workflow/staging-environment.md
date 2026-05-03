@@ -70,3 +70,12 @@ Recovered prior ensign's WIP and resolved a gitignore conflict: the template env
 ### Summary
 
 All four acceptance criteria pass against the codebase artifacts. The build was fully additive — no production config was modified. The only captain action required before staging is live: create the Firebase project, create a service account, fill in the two `.example` files, and run the first deploy per `STAGING_SETUP.md`.
+
+## Stage Report: verify (cycle 2)
+
+- DONE: Rewrote STAGING_SETUP.md with granular step-by-step instructions for all four steps
+  Steps expanded: Firebase console nav paths, IAM service account creation, JSON key download, Sheets sharing, env copy commands, format examples, private key newline warning, secret command scope — see STAGING_SETUP.md
+
+### Summary
+
+Expanded STAGING_SETUP.md per captain's request: each step now includes exact console navigation paths, button labels, format examples for all env values, a private key newline warning, and a note that the ANTHROPIC_API_KEY secret only needs to be set once. Deploy commands and verification checklist were kept as-is. No structural changes — only existing steps were made more granular.
