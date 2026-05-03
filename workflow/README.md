@@ -91,6 +91,19 @@ A fresh agent (no context from build) deploys the feature to the staging environ
 - **Good:** Every acceptance criterion has a concrete result — screenshot, test output, or observed behavior. Staging is live and accessible for Captain's manual test. Backend explanation is in plain language, not code.
 - **Bad:** Criteria marked as passed without evidence. Staging not deployed or inaccessible. A report that just restates what was built rather than verifying it works.
 
+#### Rejection Protocol
+
+If any acceptance criterion fails, the verify agent MUST set the stage report verdict to REJECTED. Each failure must be listed with concrete evidence (file path, line number, observed vs. expected behaviour). Do not pass a failing AC silently to the captain. The FO will automatically route the findings back to build via the `feedback-to: build` mechanism. The build agent fixes the issues and re-commits; the verify agent then runs again from scratch. The captain only sees the feature once all ACs pass.
+
+#### Mandatory PII / Secrets Check
+
+Before marking verify complete, the agent must confirm all of the following. If any item fails, set verdict to REJECTED and cite the exact file and line.
+
+- No `.env` files containing real values are committed to the branch
+- No API keys, tokens, passwords, or secrets appear in any committed file
+- No personal data (real names, email addresses, phone numbers) appears in test fixtures, seed data, or comments
+- No private URLs or internal identifiers that should not be in a public repository appear in any committed file
+
 ### `done`
 
 Feature is shipped — verified, approved by Captain, and merged.
