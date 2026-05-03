@@ -7,7 +7,7 @@ started: 2026-05-03T09:38:20Z
 completed:
 verdict:
 score: 1.0
-worktree:
+worktree: .worktrees/spacedock-ensign-workflow-verify-improvements
 issue:
 pr:
 ---
