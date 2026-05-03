@@ -109,10 +109,12 @@ function CategoryRow({
   cat,
   onDrillDown,
   lang,
+  color,
 }: {
   cat: CategoryBreakdown;
   onDrillDown: (cat: CategoryBreakdown) => void;
   lang: string;
+  color: string;
 }) {
   const displayName = lang === "zh" && cat.category_name_zh ? cat.category_name_zh : cat.category_name;
   return (
@@ -130,8 +132,8 @@ function CategoryRow({
         </div>
         <div className="mt-1 h-1.5 bg-base-300 rounded-full overflow-hidden">
           <div
-            className="h-full bg-primary rounded-full"
-            style={{ width: `${cat.percentage}%` }}
+            className="h-full rounded-full"
+            style={{ width: `${cat.percentage}%`, backgroundColor: color }}
           />
         </div>
         <div className="text-xs text-base-content/50 mt-0.5">{cat.percentage}%</div>
@@ -496,12 +498,13 @@ export default function ReportsPage() {
                     {t("reports.by_category")}
                   </div>
                   <div className="divide-y divide-base-300">
-                    {monthly.categories.map((cat) => (
+                    {monthly.categories.map((cat, i) => (
                       <CategoryRow
                         key={cat.category_id}
                         cat={cat}
                         onDrillDown={setDrillDownCategory}
                         lang={lang}
+                        color={DONUT_COLORS[i % DONUT_COLORS.length]}
                       />
                     ))}
                   </div>
@@ -655,12 +658,13 @@ export default function ReportsPage() {
                     {t("reports.by_category")}
                   </div>
                   <div className="divide-y divide-base-300">
-                    {annual.categories.map((cat) => (
+                    {annual.categories.map((cat, i) => (
                       <CategoryRow
                         key={cat.category_id}
                         cat={cat}
                         onDrillDown={setDrillDownCategory}
                         lang={lang}
+                        color={DONUT_COLORS[i % DONUT_COLORS.length]}
                       />
                     ))}
                   </div>

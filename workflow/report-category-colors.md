@@ -81,3 +81,16 @@ Category progress bars in the "BY CATEGORY" list match the pie/donut slice color
 ### Summary
 
 Root cause confirmed by reading `page.tsx`: `CategoryRow` always fills bars with `bg-primary` (dark green) while `DonutChart` uses a `DONUT_COLORS` array by position index, with no color passed between them. Spec defines the fix as adding a `color` prop to `CategoryRow` driven by `DONUT_COLORS[index % DONUT_COLORS.length]` and replacing the Tailwind class with an inline `backgroundColor` style. Acceptance criteria are binary and cover both Monthly and Annual views, wrap behavior, and visual-only change constraint.
+
+## Stage Report: build
+
+- DONE: color prop added to CategoryRow and driven by DONUT_COLORS[index % DONUT_COLORS.length] in reports/page.tsx
+  `color: string` added to CategoryRow props; both monthly and annual `.map((cat, i) => ...)` calls pass `color={DONUT_COLORS[i % DONUT_COLORS.length]}`.
+- DONE: CategoryRow bar fill switched from bg-primary Tailwind class to inline backgroundColor style
+  Removed `bg-primary` from the bar div's `className`; replaced with `style={{ width: \`${cat.percentage}%\`, backgroundColor: color }}`.
+- DONE: AC-1 through AC-6 self-checked in stage report
+  AC-1: Monthly categories iterate with index `i`, passing `DONUT_COLORS[i % DONUT_COLORS.length]` — matches DonutChart's identical formula. AC-2: Annual categories use same pattern. AC-3: `color` prop applied via `backgroundColor` inline style, no Tailwind color class. AC-4: Up to 6 categories each get a distinct color from the 6-entry palette. AC-5: 7th category gets index 6 % 6 = 0, same as DonutChart. AC-6: Only the bar fill changed; layout, font, percentage text, amount, hover class are untouched.
+
+### Summary
+
+Added `color: string` prop to `CategoryRow` and replaced the hardcoded `bg-primary` Tailwind class with an inline `backgroundColor: color` style. Both the monthly and annual category list renders now pass `DONUT_COLORS[i % DONUT_COLORS.length]` using the map index `i`, exactly mirroring the index-based color assignment in `DonutChart`. No other visual properties of the category rows were changed.
