@@ -1,13 +1,13 @@
 ---
 id: "029"
 title: Tab Navigation Shows Wrong Content
-status: spec
+status: build
 source: captain feedback
 started: 2026-05-03T09:03:27Z
 completed:
 verdict:
 score: 0.9
-worktree:
+worktree: .worktrees/spacedock-ensign-tab-content-mismatch
 issue:
 pr:
 ---
