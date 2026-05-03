@@ -252,7 +252,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         const updated = [
           existing[0],
           body.name !== undefined ? String(body.name) : existing[1],
-          existing[2],
+          body.amount !== undefined ? String(body.amount) : existing[2],
           body.category_id !== undefined ? String(body.category_id) : existing[3],
           existing[4],
           body.due_day !== undefined ? String(body.due_day) : existing[5],
