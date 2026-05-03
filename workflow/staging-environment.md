@@ -46,3 +46,16 @@ Wire the codebase to support two deployment targets — `staging` and `productio
 - **AC-2** Env files exist for staging (with clear TODOs for captain to fill in project ID and Spreadsheet ID)
 - **AC-3** `STAGING_SETUP.md` documents exactly what the captain needs to do manually and what commands to run
 - **AC-4** Existing production config unchanged and still deployable
+
+## Stage Report: build
+
+- DONE: .firebaserc updated with both staging and production named targets
+  `production: expense-sheet-b2db8`, `staging: TODO_STAGING_PROJECT_ID` — commit 868bfd5
+- DONE: Staging env files created with clear TODOs for captain to fill in (project ID, spreadsheet ID, Firebase config keys)
+  `functions/.env.staging.example` and `app/.env.staging.example` committed as templates; real `.env.staging` files are gitignored — commit 868bfd5
+- DONE: STAGING_SETUP.md written — exact manual steps for captain plus deploy commands
+  Covers: create Firebase project, create service account, fill env files, set ANTHROPIC_API_KEY secret, deploy to staging vs production — commit 868bfd5
+
+### Summary
+
+Recovered prior ensign's WIP and resolved a gitignore conflict: the template env files were being ignored before they could be committed. Fixed by renaming to `.env.staging.example` (real `.env.staging` stays ignored), adding a `!.env*.example` exception in `app/.gitignore`. All three checklist items are complete. The captain's remaining work is in `STAGING_SETUP.md`: create the Firebase staging project, set up a service account, fill in the example files, and run the first deploy.
