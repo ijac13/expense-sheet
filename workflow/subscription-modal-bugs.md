@@ -109,4 +109,17 @@ Fix two bugs in the subscription modal: (A) allow the amount field to be edited,
 
 ### Summary
 
-Dug into `app/app/subscriptions/page.tsx` and `functions/src/index.ts`. Bug A root cause is that `amount` was never added to `EditFormState` and the edit modal has no amount input — the backend PATCH handler also ignores amount. Bug B root cause is the lack of a submission-in-flight guard on `handleAdd` and the Add button, allowing two concurrent POSTs. Spec written with 10 binary acceptance criteria, edge cases, and clear out-of-scope boundaries.
+Dug into `app/app/subscriptions/page.tsx` and `functions/src/index.ts`. Bug A root cause is that `amount` was never added to `EditFormState` and the edit modal has no amount input — the backend PATCH handler also ignores amount. Bug B root cause is the lack of a submission-in-flight guard on `handleAdd` and the Add button, allowing two concurrent POSTs. Spec written with 10 binary acceptance criteria, edge cases, and explicit out-of-scope section written to entity file.
+
+## Stage Report: build
+
+- DONE: EditFormState includes amount; edit modal amount field is pre-filled and editable; PATCH saves the new value
+  Added `amount: string` to `EditFormState` (page.tsx:33); `openEdit()` sets `amount: String(sub.amount)` (page.tsx:87); amount `<input>` added to edit modal (page.tsx:400–408); `handleEdit()` passes `amount` in updates (page.tsx:138); `subscriptionService.ts` type updated to include `amount`; backend PATCH writes `body.amount` instead of always preserving `existing[2]` (functions/src/index.ts:254).
+- DONE: handleAdd guarded with in-flight boolean; Add button disabled during submission
+  `addSubmitting` state added (page.tsx:71); `handleAdd` returns early if `addSubmitting`, sets true before POST, clears in `finally` (page.tsx:101,108,124); Add button `disabled={addSubmitting}` with loading spinner (page.tsx:376). Same pattern applied to `handleEdit` with `editSubmitting` (page.tsx:72,129,143,157); Save button `disabled={editSubmitting || !editForm.amount || parseFloat(editForm.amount) <= 0}` (page.tsx:455).
+- DONE: AC-1 through AC-10 self-checked in stage report
+  AC-1: `openEdit()` pre-fills amount — PASS. AC-2: number input in edit modal with onChange — PASS. AC-3: PATCH sends amount; optimistic update sets `amount: updates.amount` — PASS. AC-4: amount sent on every save, no duplicate — PASS. AC-5: Save disabled when amount empty/zero — PASS. AC-6: single POST per call — PASS. AC-7: `if (addSubmitting) return` prevents second tap — PASS. AC-8: Add button disabled with spinner during POST — PASS. AC-9: `finally { setAddSubmitting(false) }` restores button — PASS. AC-10: Save button disabled during edit POST — PASS.
+
+### Summary
+
+Fixed both bugs across three files. Bug A: added `amount` to `EditFormState`, populated it in `openEdit()`, rendered an editable number input in the edit modal, wired it through `handleEdit()` and the optimistic state update, updated `subscriptionService.ts` to accept `amount` in the PATCH type, and fixed the backend handler to write the new value instead of preserving the old one. Bug B: added `addSubmitting` and `editSubmitting` booleans; both submit handlers guard against re-entry and disable their respective buttons for the full duration of the in-flight request.

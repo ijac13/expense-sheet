@@ -30,6 +30,7 @@ interface AddFormState {
 
 interface EditFormState {
   name: string;
+  amount: string;
   category_id: string;
   due_day: string;
   due_month: string;
@@ -62,10 +63,13 @@ export default function SubscriptionsPage() {
   const [addForm, setAddForm] = useState<AddFormState>(defaultAddForm);
   const [editForm, setEditForm] = useState<EditFormState>({
     name: "",
+    amount: "",
     category_id: DEFAULT_CATEGORIES[0].id,
     due_day: "1",
     due_month: "1",
   });
+  const [addSubmitting, setAddSubmitting] = useState(false);
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   // Sort newest first (IDs are timestamp-based: sub-{ms})
   const active = subscriptions.filter((s) => s.is_active).sort((a, b) => b.id.localeCompare(a.id));
@@ -80,6 +84,7 @@ export default function SubscriptionsPage() {
     setEditingId(sub.id);
     setEditForm({
       name: sub.name,
+      amount: String(sub.amount),
       category_id: sub.category_id,
       due_day: String(sub.due_day),
       due_month: String(sub.due_month ?? 1),
@@ -93,12 +98,14 @@ export default function SubscriptionsPage() {
   }
 
   async function handleAdd() {
+    if (addSubmitting) return;
     const amount = parseFloat(addForm.amount);
     if (!addForm.name.trim() || isNaN(amount) || amount <= 0) return;
     const due_day = Math.max(1, Math.min(31, parseInt(addForm.due_day) || 1));
     const due_month = addForm.frequency === "annual"
       ? Math.max(1, Math.min(12, parseInt(addForm.due_month) || 1))
       : undefined;
+    setAddSubmitting(true);
     try {
       const newSub = await addSubscription({
         name: addForm.name.trim(),
@@ -113,33 +120,41 @@ export default function SubscriptionsPage() {
       closeModal();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to add subscription");
+    } finally {
+      setAddSubmitting(false);
     }
   }
 
   async function handleEdit() {
-    if (!editingId) return;
+    if (!editingId || editSubmitting) return;
+    const amount = parseFloat(editForm.amount);
+    if (isNaN(amount) || amount <= 0) return;
     const due_day = Math.max(1, Math.min(31, parseInt(editForm.due_day) || 1));
     const due_month = subscriptions.find((s) => s.id === editingId)?.frequency === "annual"
       ? Math.max(1, Math.min(12, parseInt(editForm.due_month) || 1))
       : undefined;
     const updates = {
       name: editForm.name.trim() || undefined,
+      amount,
       category_id: editForm.category_id,
       due_day,
       due_month,
     };
+    setEditSubmitting(true);
     try {
       await updateSubscription(editingId, updates);
       setSubscriptions((prev) =>
         prev.map((s) =>
           s.id === editingId
-            ? { ...s, name: updates.name ?? s.name, category_id: updates.category_id ?? s.category_id, due_day: updates.due_day ?? s.due_day, due_month: due_month ?? s.due_month }
+            ? { ...s, name: updates.name ?? s.name, amount: updates.amount, category_id: updates.category_id ?? s.category_id, due_day: updates.due_day ?? s.due_day, due_month: due_month ?? s.due_month }
             : s
         )
       );
       closeModal();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update subscription");
+    } finally {
+      setEditSubmitting(false);
     }
   }
 
@@ -357,8 +372,8 @@ export default function SubscriptionsPage() {
               <button className="btn btn-ghost" onClick={closeModal}>
                 {t("common.cancel")}
               </button>
-              <button className="btn btn-primary" onClick={handleAdd}>
-                {t("subscriptions.add")}
+              <button className="btn btn-primary" onClick={handleAdd} disabled={addSubmitting}>
+                {addSubmitting ? <span className="loading loading-spinner loading-xs" /> : t("subscriptions.add")}
               </button>
             </div>
           </div>
@@ -379,6 +394,16 @@ export default function SubscriptionsPage() {
                   className="input input-bordered w-full"
                   value={editForm.name}
                   onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="label label-text text-xs">{t("subscriptions.amount_label")}</label>
+                <input
+                  type="number"
+                  className="input input-bordered w-full"
+                  min="0"
+                  value={editForm.amount}
+                  onChange={(e) => setEditForm((f) => ({ ...f, amount: e.target.value }))}
                 />
               </div>
               <div>
@@ -424,8 +449,12 @@ export default function SubscriptionsPage() {
               <button className="btn btn-ghost" onClick={closeModal}>
                 {t("common.cancel")}
               </button>
-              <button className="btn btn-primary" onClick={handleEdit}>
-                {t("common.save")}
+              <button
+                className="btn btn-primary"
+                onClick={handleEdit}
+                disabled={editSubmitting || !editForm.amount || parseFloat(editForm.amount) <= 0}
+              >
+                {editSubmitting ? <span className="loading loading-spinner loading-xs" /> : t("common.save")}
               </button>
             </div>
           </div>
