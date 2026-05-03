@@ -1,7 +1,7 @@
 ---
 id: "031"
 title: Subscription Modal — Amount Not Editable and Duplicate on Add
-status: build
+status: verify
 source: captain feedback
 started: 2026-05-03T09:03:27Z
 completed:
