@@ -123,3 +123,14 @@ Dug into `app/app/subscriptions/page.tsx` and `functions/src/index.ts`. Bug A ro
 ### Summary
 
 Fixed both bugs across three files. Bug A: added `amount` to `EditFormState`, populated it in `openEdit()`, rendered an editable number input in the edit modal, wired it through `handleEdit()` and the optimistic state update, updated `subscriptionService.ts` to accept `amount` in the PATCH type, and fixed the backend handler to write the new value instead of preserving the old one. Bug B: added `addSubmitting` and `editSubmitting` booleans; both submit handlers guard against re-entry and disable their respective buttons for the full duration of the in-flight request.
+
+## Stage Report: verify
+
+- DONE: AC-1 through AC-10 verified against actual code with evidence (not restating build report)
+  AC-1 PASS: `openEdit()` line 87 sets `amount: String(sub.amount)` — pre-fills current value. AC-2 PASS: edit modal lines 400–408 has `type="number"` input with `onChange` handler — no `readOnly`/`disabled`. AC-3 PASS: `handleEdit()` line 148 optimistic update sets `amount: updates.amount`; PATCH sends `amount`; backend index.ts line 255 writes `body.amount !== undefined ? String(body.amount) : existing[2]`. AC-4 PASS: PATCH always sends current `editForm.amount` value, no regression path. AC-5 PASS: Save button line 455 `disabled={editSubmitting || !editForm.amount || parseFloat(editForm.amount) <= 0}` blocks zero/empty. AC-6 PASS: single POST per `handleAdd` call, one append to state. AC-7 PASS: `if (addSubmitting) return` at line 101 exits early on second tap. AC-8 PASS: Add button line 375 `disabled={addSubmitting}` + spinner at line 376. AC-9 PASS: `finally { setAddSubmitting(false) }` at line 124 restores button on success or error. AC-10 PASS: Save button line 455 `disabled={editSubmitting || ...}` covers edit in-flight state.
+- DONE: PII/secrets check passed
+  Only `.env.example` and `.env.staging.example` template files present — all values are empty or `TODO_*` placeholders, no real credentials committed.
+
+### Summary
+
+All 10 ACs verified by direct code inspection across `app/app/subscriptions/page.tsx`, `app/app/lib/subscriptionService.ts`, and `functions/src/index.ts`. Both bugs are correctly fixed: the edit modal now renders a fully editable amount input pre-filled from the subscription, and both Add and Save buttons are guarded by in-flight booleans that block re-entry and disable the button for the request duration. PII check clean — no real secrets in committed files.
