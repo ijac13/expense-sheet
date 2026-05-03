@@ -1,7 +1,7 @@
 ---
 id: "028"
 title: Staging Environment Setup
-status: build
+status: verify
 source: captain
 started: 2026-05-01T09:19:14Z
 completed:
@@ -10,6 +10,7 @@ score: 1.0
 worktree: .worktrees/spacedock-ensign-staging-environment
 issue:
 pr:
+mod-block: merge:pr-merge
 ---
 
 Set up a proper staging environment so future changes can be tested before hitting production.
