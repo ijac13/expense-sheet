@@ -9,8 +9,8 @@ verdict:
 score: 0.8
 worktree: .worktrees/spacedock-ensign-remove-helloworld
 issue:
-pr:
-mod-block: merge:pr-merge
+pr: #4
+mod-block: 
 ---
 
 Remove the unused `helloWorld` Cloud Function that was left over from the Firebase template. It failed to deploy to the staging project due to a Cloud Build permission issue, and it is not used anywhere in the app.
