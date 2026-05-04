@@ -114,3 +114,20 @@ Since actual icon PNG generation is outside the scope of this spec stage, the im
 ### Summary
 
 Explored the codebase: manifest is a static JSON file (not a TypeScript route handler), icons directory exists but only has a `.gitkeep`, and the root layout is the right mount point for a banner. The static export constraint (`output: "export"`) means manifest content must be swapped at build time via a prebuild script. Spec covers both the PWA icon approach (prebuild script + staging icon PNGs) and the in-app banner (StagingBanner component in root layout driven by `NEXT_PUBLIC_APP_ENV`).
+
+## Stage Report: build
+
+- DONE: NEXT_PUBLIC_APP_ENV=staging added to app/.env.staging and app/.env.staging.example
+  `.env.staging` updated (gitignored — not committed, as expected). `.env.staging.example` updated and committed with the new var.
+- DONE: manifest.staging.json created + prebuild script swaps it in when env=staging; production manifest unchanged
+  `app/public/manifest.staging.json` — orange theme (#f97316), name "Expense Tracker (Staging)", short_name "Expenses β", references `/icons/icon-staging-192x192.png` and `icon-staging-512x512.png`. `app/scripts/set-manifest.js` copies staging manifest over `manifest.json` when `NEXT_PUBLIC_APP_ENV=staging`; no-ops otherwise. `app/package.json` wired as `"prebuild": "node scripts/set-manifest.js"`.
+- DONE: Staging icon files exist in app/public/icons/ and are visually distinct from production
+  `icon-staging-192x192.png` (1373 bytes) and `icon-staging-512x512.png` (6847 bytes) generated via `scripts/generate-staging-icons.js` — orange (#f97316) background, white circle, orange "S" glyph. No external dependencies; pure Node.js Buffer + zlib PNG encoding.
+- DONE: StagingBanner component created and mounted in layout — renders only when NEXT_PUBLIC_APP_ENV=staging
+  `app/app/components/StagingBanner.tsx` — returns null unless `NEXT_PUBLIC_APP_ENV === "staging"`. Renders a fixed `z-50` orange top bar (h-6) with white "STAGING" label. Mounted in `app/app/layout.tsx` directly inside `<body>`, above all other content.
+- DONE: AC-1 through AC-6 self-checked in stage report
+  AC-1: staging icons in public/icons/ — distinct orange+S vs production "D". AC-2: production manifest.json untouched. AC-3: StagingBanner renders on every page when env=staging. AC-4: StagingBanner returns null on production. AC-5: driven by NEXT_PUBLIC_APP_ENV env var only. AC-6: .env.staging and .env.staging.example both updated.
+
+### Summary
+
+All 5 checklist items done. Worker created scripts and manifest; FO completed StagingBanner component, layout.tsx wiring, icon generation, and commit. The `app/.env.staging` file was intentionally not committed (gitignored); the `.example` template carries the new var for documentation.
