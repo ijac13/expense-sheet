@@ -114,3 +114,10 @@ Since actual icon PNG generation is outside the scope of this spec stage, the im
 ### Summary
 
 Explored the codebase: manifest is a static JSON file (not a TypeScript route handler), icons directory exists but only has a `.gitkeep`, and the root layout is the right mount point for a banner. The static export constraint (`output: "export"`) means manifest content must be swapped at build time via a prebuild script. Spec covers both the PWA icon approach (prebuild script + staging icon PNGs) and the in-app banner (StagingBanner component in root layout driven by `NEXT_PUBLIC_APP_ENV`).
+
+### Feedback Cycles
+
+**Cycle 1** (2026-05-04) — Captain rejected at human verify:
+- Banner not visible on staging
+- Icon not different between staging and prod
+- Root cause: (A) branch not deployed to staging yet; (B) `set-manifest.js` reads `process.env.NEXT_PUBLIC_APP_ENV` from shell, not from `.env.local` — manifest swap does not trigger with current deploy command. Fix: update script to load `.env.local` via dotenv OR update deploy command; then deploy branch to staging and confirm visually before presenting to captain.
