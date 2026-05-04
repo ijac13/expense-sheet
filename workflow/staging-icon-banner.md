@@ -1,7 +1,7 @@
 ---
 id: "033"
 title: Staging Icon and Environment Banner
-status: verify
+status: build
 source: captain
 started: 2026-05-03T09:41:34Z
 completed:
