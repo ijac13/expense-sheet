@@ -131,3 +131,24 @@ Explored the codebase: manifest is a static JSON file (not a TypeScript route ha
 ### Summary
 
 All 5 checklist items done. Worker created scripts and manifest; FO completed StagingBanner component, layout.tsx wiring, icon generation, and commit. The `app/.env.staging` file was intentionally not committed (gitignored); the `.example` template carries the new var for documentation.
+
+## Stage Report: verify
+
+- DONE: AC-1: staging icons exist in app/public/icons/ and are visually distinct (orange+S vs production)
+  `icon-staging-192x192.png` (1373 bytes) and `icon-staging-512x512.png` (6847 bytes) confirmed in `app/public/icons/`; generated with orange #f97316 background and white "S" — distinct from production icons
+- DONE: AC-2: production manifest.json is unchanged; manifest.staging.json references staging icons
+  `manifest.json` references `/icons/icon-192x192.png` and `/icons/icon-512x512.png` (production, theme `#5c1a5a`); `manifest.staging.json` references `/icons/icon-staging-192x192.png` and `icon-staging-512x512.png` (orange theme `#f97316`)
+- DONE: AC-3: StagingBanner renders on every page when NEXT_PUBLIC_APP_ENV=staging (check component + layout mount)
+  `StagingBanner.tsx` renders fixed orange `z-50` top bar with "STAGING" text when env=staging; mounted as first child of `<body>` in `app/app/layout.tsx` (line 31), covering all pages
+- DONE: AC-4: StagingBanner returns null when env is not staging
+  `StagingBanner.tsx` line 2: `if (process.env.NEXT_PUBLIC_APP_ENV !== "staging") return null;` — explicit null return for non-staging
+- DONE: AC-5: behaviour driven by NEXT_PUBLIC_APP_ENV env var only — no hardcoded project IDs
+  `StagingBanner.tsx` checks `NEXT_PUBLIC_APP_ENV`; `set-manifest.js` checks `process.env.NEXT_PUBLIC_APP_ENV`; no hardcoded project IDs found in any modified file
+- DONE: AC-6: app/.env.staging.example updated with NEXT_PUBLIC_APP_ENV
+  `.env.staging.example` line 25: `NEXT_PUBLIC_APP_ENV=staging` confirmed; committed in 8ed159e
+- DONE: PII check: no real .env values, API keys, or personal data committed to branch
+  Only `.env.staging.example` committed — all values are `TODO_*` placeholders; no real credentials; no private URLs; no `.env.staging` file committed (gitignored)
+
+### Summary
+
+All 6 ACs pass on direct file inspection. Production `manifest.json` is unchanged; `manifest.staging.json` correctly references staging icons; `StagingBanner` returns null for non-staging and renders a fixed orange bar for staging; all logic is driven by `NEXT_PUBLIC_APP_ENV` with no hardcoded IDs; `.env.staging.example` has the new var with a placeholder value only. PII check clean.
