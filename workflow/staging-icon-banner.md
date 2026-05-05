@@ -9,8 +9,8 @@ verdict:
 score: 0.9
 worktree: .worktrees/spacedock-ensign-staging-icon-banner
 issue:
-pr:
-mod-block: merge:pr-merge
+pr: #5
+mod-block: 
 ---
 
 Add a distinct PWA icon for staging and an in-app "STAGING" banner so it's obvious which environment you're using — especially when both are pinned to the mobile home screen.
