@@ -88,3 +88,20 @@ The Categories tab schema is known: `id | name_en | name_zh | icon | sort_order 
 ### Summary
 
 The bug is a fully unimplemented feature: `categoryService.ts` is entirely placeholder stubs and the backend `api` function has no `/api/categories` route. The fix requires adding a backend route (GET/POST/PATCH against the Categories sheet tab), replacing the frontend stubs with real fetch calls, and changing the page to load categories from the API instead of the hardcoded constant.
+
+## Stage Report: build
+
+- DONE: Backend `/api/categories` route handles GET, POST, and PATCH correctly
+  `functions/src/index.ts`: added `CATEGORIES_TAB`, `CATEGORIES_HEADER`, `rowToCategory`, and `/api/categories` branch (GET/POST/PATCH). PATCH extracts id from path segments. POST appends row with auto-generated `cat_NNN` id and `sort_order = max + 1`. `tsc --noEmit` passes clean.
+- DONE: `categoryService.ts` stubs replaced with real fetch calls
+  `app/app/lib/categoryService.ts` rewritten with `getCategories`, `addCategory`, `updateCategory`, `archiveCategory`, `restoreCategory`, `reorderCategory` — all calling `/api/categories`.
+- DONE: `categories/page.tsx` fetches on mount; optimistic update rolls back on error; duplicate guard added
+  `useState<Category[]>([])` replaces hardcoded init. `useEffect` calls `getCategories()` on mount. `handleSave` does optimistic placeholder, replaces on success, rolls back and re-opens form with error on failure. Client-side duplicate guard on `name_en` before API call.
+- DONE: `CategoryPicker` (or equivalent in expense entry) uses API-sourced categories
+  `app/app/page.tsx` (expense entry) and `app/app/expense/[id]/EditExpenseClient.tsx` both fetch categories via `getCategories()` on mount, falling back to `DEFAULT_CATEGORIES` on error.
+- DONE: AC-1 through AC-5 self-checked in stage report
+  AC-1: POST writes row, GET returns it on next call. AC-2: page fetches on mount, persisted categories visible after navigation. AC-3: both expense entry and edit screens use API-sourced list. AC-4: client-side duplicate guard on `name_en` shows error without calling API. AC-5: optimistic update rolled back and form re-opened with error message on POST failure.
+
+### Summary
+
+All three root-cause gaps are resolved: backend route added, service stubs replaced with real fetch calls, and the categories page now loads from the API on mount. The expense entry (home page) and edit expense screen were also updated to use API-sourced categories so new categories appear in the picker after creation. Both `tsc --noEmit` checks pass clean.
