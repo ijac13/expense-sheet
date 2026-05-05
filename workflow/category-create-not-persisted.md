@@ -105,3 +105,22 @@ The bug is a fully unimplemented feature: `categoryService.ts` is entirely place
 ### Summary
 
 All three root-cause gaps are resolved: backend route added, service stubs replaced with real fetch calls, and the categories page now loads from the API on mount. The expense entry (home page) and edit expense screen were also updated to use API-sourced categories so new categories appear in the picker after creation. Both `tsc --noEmit` checks pass clean.
+
+## Stage Report: verify
+
+- DONE: AC-1 POST to `/api/categories` appends a row; GET returns it — confirm the backend route writes to `CATEGORIES_TAB` and returns the full row list
+  `index.ts` lines 22–24: `CATEGORIES_TAB = "Categories"`. Lines 268–273: POST uses `spreadsheets.values.append` to `CATEGORIES_TAB!A:F`; returns `rowToCategory(row)`. GET (lines 212–219) reads full `CATEGORIES_TAB!A:F` and maps all rows via `rowToCategory`.
+- DONE: AC-2 Page loads from API on mount — confirm `useEffect` + `getCategories()` in categories/page.tsx
+  `page.tsx` line 30: `useState<Category[]>([])` — empty, no hardcoded fallback. Lines 36–43: `useEffect(() => { getCategories().then(setCategories)... }, [])` — single mount-time fetch with empty dep array.
+- DONE: AC-3 Expense entry and edit screen use API-sourced list — confirm both files call `getCategories()`
+  `app/page.tsx` line 7: imports `getCategories`; lines 55–64: `useEffect` calls `getCategories()`, filters active + sorts, updates `categories` state, fallback to `DEFAULT_CATEGORIES` on error. `EditExpenseClient.tsx` line 10: imports `getCategories`; lines 26–35: same `useEffect` pattern with `DEFAULT_CATEGORIES` fallback.
+- DONE: AC-4 Duplicate guard — confirm client-side check on `name_en` before POST
+  `page.tsx` lines 77–83: `active.some(c => c.name_en.toLowerCase() === form.name_en.trim().toLowerCase())` — sets form error and returns before any `addCategory` call if match found.
+- DONE: AC-5 Error rollback — confirm optimistic update is reverted and error shown on POST failure
+  `page.tsx` lines 107–113: catch block runs `setCategories(prev => prev.filter(c => c.id !== placeholder.id))` (rollback), then `setFormMode({ type: "add" })` and `setForm({ ...data, error: msg })` to re-open form with error text.
+- DONE: PII/secrets check passed
+  No hardcoded emails, API keys, or credentials in any of the five changed files. `SPREADSHEET_ID` accessed only via `process.env`; Anthropic key via `defineSecret`.
+
+### Summary
+
+All 5 ACs pass on direct code inspection. The backend route correctly appends to `CATEGORIES_TAB` and returns the full list; the categories page mounts with an empty state and fetches from the API; both expense entry and edit screens call `getCategories()` on mount; the duplicate guard fires before the POST; and the catch block rolls back the optimistic placeholder and re-opens the form with an error message. No PII or secrets found in the changed files. DONE.
