@@ -152,3 +152,26 @@ All 5 checklist items done. Worker created scripts and manifest; FO completed St
 ### Summary
 
 All 6 ACs pass on direct file inspection. Production `manifest.json` is unchanged; `manifest.staging.json` correctly references staging icons; `StagingBanner` returns null for non-staging and renders a fixed orange bar for staging; all logic is driven by `NEXT_PUBLIC_APP_ENV` with no hardcoded IDs; `.env.staging.example` has the new var with a placeholder value only. PII check clean.
+
+## Stage Report: verify (cycle 1)
+
+- DONE: AC-1: staging icons exist in app/public/icons/ and are visually distinct
+  `icon-staging-192x192.png` (1373 bytes) and `icon-staging-512x512.png` (6847 bytes) in `app/public/icons/`; orange #f97316 background with white "S" — visually distinct from production
+- DONE: AC-2: manifest.staging.json references staging icons; production manifest.json unchanged
+  `manifest.json` committed at HEAD references production icons (`icon-192x192.png`, theme `#5c1a5a`); `manifest.staging.json` references staging icons (theme `#f97316`). File had been overwritten by a test prebuild run — restored via `git restore app/public/manifest.json`
+- DONE: AC-3: StagingBanner renders when NEXT_PUBLIC_APP_ENV=staging
+  `StagingBanner.tsx`: renders fixed orange `z-50` h-6 bar with "STAGING" text when env=staging; mounted as first child of `<body>` in `layout.tsx` line 31
+- DONE: AC-4: StagingBanner returns null otherwise
+  `StagingBanner.tsx` line 2: `if (process.env.NEXT_PUBLIC_APP_ENV !== "staging") return null;` — explicit null return
+- DONE: AC-5: NEXT_PUBLIC_APP_ENV env var only — no hardcoded IDs
+  `StagingBanner.tsx` and `set-manifest.js` both read only `NEXT_PUBLIC_APP_ENV`; no hardcoded project IDs in any modified file
+- DONE: AC-6: .env.staging.example updated with NEXT_PUBLIC_APP_ENV
+  `.env.staging.example` line 25: `NEXT_PUBLIC_APP_ENV=staging` confirmed; committed in 8ed159e
+- DONE: Script fix: set-manifest.js reads .env.local before checking env var (dotenv-manual block present)
+  `set-manifest.js` lines 9–15: reads `.env.local`, splits on `\n`, sets `process.env` keys before the `NEXT_PUBLIC_APP_ENV` check — block confirmed present in commit 551bae7
+- DONE: PII/secrets check passed
+  Only `.env.staging.example` committed — all values are `TODO_*` placeholders; no real credentials committed
+
+### Summary
+
+All 6 ACs plus the script fix verified on direct file inspection. The one active finding: `manifest.json` on disk had been overwritten by a prior test run of the prebuild script (staging content); restored to production content via `git restore`. Committed state was already correct at HEAD (551bae7). Working tree is clean after restore.
