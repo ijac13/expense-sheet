@@ -304,3 +304,36 @@ Wrote a 7-step setup guide covering budget creation (USD thresholds), Pub/Sub to
 ### Summary
 
 Created `billing-guardrails/` with three files. The function parses the base64-encoded Pub/Sub budget notification, guards against acting below the USD $32 threshold, checks `billingEnabled` before calling the API to avoid redundant detach calls, and re-throws on API failure so Cloud Run marks the invocation failed. README documents the billing-account-level IAM requirement (the critical 403-prevention detail from the spec) and the full SIMULATE-then-arm workflow.
+
+---
+
+## Stage Report: verify
+
+- DONE: Function parses base64 Pub/Sub message and extracts `costAmount`
+  `index.js` line 25: `JSON.parse(Buffer.from(rawData, 'base64').toString())`, destructures `costAmount` at line 31
+- DONE: Threshold check at USD $32 (KILL_THRESHOLD_USD env var defaulting to 32)
+  `index.js` line 6: `parseFloat(process.env.KILL_THRESHOLD_USD || '32')`, guard at line 34
+- DONE: SIMULATE flag prevents actual billing detach when true
+  `index.js` lines 41–45: returns early with log message before any API call when `SIMULATE === 'true'`
+- DONE: Checks billing is already enabled before calling detach (no double-call)
+  `index.js` lines 49–58: calls `getProjectBillingInfo` and checks `billingEnabled` before proceeding
+- DONE: `@google-cloud/billing` in package.json dependencies
+  `package.json` line 11: `"@google-cloud/billing": "^4.1.0"`
+- DONE: README covers API enablement
+  `README.md` lines 8–14: four `gcloud services enable` commands
+- DONE: README covers billing-account-level IAM (`roles/billing.costsManager`)
+  `README.md` lines 33–42: explicit billing-account-level grant steps with role name
+- DONE: README covers deploy command
+  `README.md` lines 44–54: full `gcloud run deploy` command
+- DONE: README covers SIMULATE test
+  `README.md` lines 56–74: test publish command and expected log line
+- DONE: README covers arm step (SIMULATE=false)
+  `README.md` lines 76–88: redeploy command with `SIMULATE=false`
+- DONE: README covers re-enable procedure
+  `README.md` lines 92–104: four-step re-enable process with console path
+- FAILED: PII check — no hardcoded project IDs, credentials, or personal data committed
+  `README.md` lines 52, 53, 72, 82, 85, 86: real project ID `expense-sheet-b2db8` hardcoded in deploy commands instead of `<PROJECT_ID>` placeholder
+
+### Summary
+
+All functional ACs pass: base64 parse, threshold guard, SIMULATE short-circuit, billing-enabled pre-check, dependency declaration, and all six README documentation sections. PII check FAILED: `README.md` deploy examples contain the hardcoded GCP project ID `expense-sheet-b2db8` in six places. The spec's own reference deploy command uses `PROJECT_ID` as a placeholder; the README should match that pattern. Replace with `<PROJECT_ID>` before this stage can pass.
