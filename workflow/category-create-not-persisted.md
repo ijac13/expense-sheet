@@ -1,13 +1,13 @@
 ---
 id: "035"
 title: New Category Not Persisted After Creation
-status: build
+status: spec
 source: captain feedback
 started: 2026-05-04T05:47:31Z
 completed:
 verdict:
 score: 0.95
-worktree: .worktrees/spacedock-ensign-category-create-not-persisted
+worktree:
 issue:
 pr:
 ---
