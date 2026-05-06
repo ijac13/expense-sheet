@@ -1,17 +1,9 @@
-import * as functionsV1 from "firebase-functions";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
-
-// ---------------------------------------------------------------------------
-// Legacy health check — kept for backwards compatibility
-// ---------------------------------------------------------------------------
-export const helloWorld = functionsV1.https.onRequest((request, response) => {
-  response.json({ status: "ok", app: "expense-tracker" });
-});
 
 // ---------------------------------------------------------------------------
 // Helpers
