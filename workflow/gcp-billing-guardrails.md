@@ -1,7 +1,7 @@
 ---
 id: "027"
 title: GCP Billing Guardrails
-status: build
+status: verify
 source: captain
 started: 2026-05-06T05:04:43Z
 completed:
