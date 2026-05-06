@@ -50,3 +50,27 @@ Update `workflow/README.md` — the `### verify` stage definition:
 - **AC-2** The verify stage definition includes a mandatory PII/secrets check as a named required step before the stage can be marked complete
 - **AC-3** The PII check lists concrete items to inspect: .env files, API keys, personal data in fixtures, private URLs
 - **AC-4** The updated README is the only file changed — no entity files, no code, no other scaffolding
+
+## Stage Report: build
+
+- DONE: verify stage definition explicitly states AC failures must be marked REJECTED to trigger the build feedback loop
+  Added "Rejection Protocol" subsection to `### verify` in workflow/README.md; states REJECTED verdict required, evidence required, FO auto-routes to build.
+- DONE: verify stage definition includes a named mandatory PII/secrets check with concrete items listed
+  Added "Mandatory PII / Secrets Check" subsection listing .env files, API keys/tokens/passwords, personal data in fixtures, and private URLs — each as a concrete bullet; failure triggers REJECTED with file+line citation.
+- DONE: No other file changed
+  Only `workflow/README.md` was edited; entity file receives this stage report appended to its body only.
+
+### Summary
+
+Added two subsections to the `### verify` stage definition in workflow/README.md: a Rejection Protocol that mandates REJECTED verdict and evidence listing for any failing AC (routing back to build via the existing feedback-to mechanism), and a Mandatory PII/Secrets Check with four concrete line items that must all pass before verify can be marked complete. No other files were modified.
+
+## Stage Report: verify
+
+- DONE: All 4 ACs verified against the actual README.md diff with evidence
+  Commit ad2b1f5 diff confirms: "Rejection Protocol" subsection added (AC-1 pass); "Mandatory PII / Secrets Check" named step added (AC-2 pass); four concrete items listed (.env files, API keys, personal data, private URLs — AC-3 pass); only workflow/README.md content changed, entity file received mandatory stage report append only (AC-4 pass).
+- DONE: PII/secrets check passed on the branch itself
+  Scanned README.md diff and entity file diff — no real values, API keys, personal data, or private URLs found. Only documentation text describing what to check for.
+
+### Summary
+
+All four ACs pass against commit ad2b1f5. The README.md diff adds exactly the two subsections specified: Rejection Protocol (AC-1) and Mandatory PII / Secrets Check (AC-2, AC-3). The entity file change is the mandatory build stage report append, not a spec violation — AC-4 intent (no code, no other scaffolding changed) is fully met. Branch PII check is clean.
