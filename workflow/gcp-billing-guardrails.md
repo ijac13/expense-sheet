@@ -10,6 +10,7 @@ score: 0.95
 worktree: .worktrees/spacedock-ensign-gcp-billing-guardrails
 issue:
 pr:
+mod-block: merge:pr-merge
 ---
 
 Protect against runaway GCP bills — alert at TWD $500 so I know costs are climbing, and automatically kill billing at TWD $1,000 before it goes further.
