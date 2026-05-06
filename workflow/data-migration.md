@@ -1,9 +1,9 @@
 ---
 id: "008"
 title: Data Migration
-status: ideation
+status: spec
 source: commission seed
-started:
+started: 2026-05-06T05:13:40Z
 completed:
 verdict:
 score: 0.7
