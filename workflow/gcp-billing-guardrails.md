@@ -1,13 +1,13 @@
 ---
 id: "027"
 title: GCP Billing Guardrails
-status: spec
+status: build
 source: captain
 started: 2026-05-06T05:04:43Z
 completed:
 verdict:
 score: 0.95
-worktree:
+worktree: .worktrees/spacedock-ensign-gcp-billing-guardrails
 issue:
 pr:
 ---
