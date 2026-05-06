@@ -48,8 +48,8 @@ gcloud run deploy billing-kill-function \
   --source . \
   --region us-central1 \
   --trigger-topic billing-kill-trigger \
-  --set-env-vars PROJECT_ID=expense-sheet-b2db8,SIMULATE=true \
-  --service-account billing-kill-sa@expense-sheet-b2db8.iam.gserviceaccount.com \
+  --set-env-vars PROJECT_ID=<YOUR_PROJECT_ID>,SIMULATE=true \
+  --service-account billing-kill-sa@<YOUR_PROJECT_ID>.iam.gserviceaccount.com \
   --runtime nodejs20
 ```
 
@@ -69,7 +69,7 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
   --limit 20 --format "table(timestamp,textPayload)"
 ```
 
-Expected log line: `SIMULATE mode: would detach billing from project expense-sheet-b2db8`
+Expected log line: `SIMULATE mode: would detach billing from project <YOUR_PROJECT_ID>`
 
 Confirm no billing changes occurred in Billing → Account Management.
 
@@ -82,8 +82,8 @@ gcloud run deploy billing-kill-function \
   --source . \
   --region us-central1 \
   --trigger-topic billing-kill-trigger \
-  --set-env-vars PROJECT_ID=expense-sheet-b2db8,SIMULATE=false \
-  --service-account billing-kill-sa@expense-sheet-b2db8.iam.gserviceaccount.com \
+  --set-env-vars PROJECT_ID=<YOUR_PROJECT_ID>,SIMULATE=false \
+  --service-account billing-kill-sa@<YOUR_PROJECT_ID>.iam.gserviceaccount.com \
   --runtime nodejs20
 ```
 

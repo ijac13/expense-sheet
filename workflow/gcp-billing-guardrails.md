@@ -337,3 +337,16 @@ Created `billing-guardrails/` with three files. The function parses the base64-e
 ### Summary
 
 All functional ACs pass: base64 parse, threshold guard, SIMULATE short-circuit, billing-enabled pre-check, dependency declaration, and all six README documentation sections. PII check FAILED: `README.md` deploy examples contain the hardcoded GCP project ID `expense-sheet-b2db8` in six places. The spec's own reference deploy command uses `PROJECT_ID` as a placeholder; the README should match that pattern. Replace with `<PROJECT_ID>` before this stage can pass.
+
+---
+
+## Stage Report: build (cycle 1 fix)
+
+- DONE: All 6 occurrences of expense-sheet-b2db8 replaced with <YOUR_PROJECT_ID> in README.md
+  `billing-guardrails/README.md` lines 51, 52, 72, 85, 86 — all `expense-sheet-b2db8` strings replaced; no occurrences remain
+- DONE: No other files changed
+  Only `billing-guardrails/README.md` and `workflow/gcp-billing-guardrails.md` (this report) were modified
+
+### Summary
+
+Replaced all hardcoded `expense-sheet-b2db8` project ID occurrences in `billing-guardrails/README.md` with the `<YOUR_PROJECT_ID>` placeholder. The replacements appear in the two deploy commands (lines 51, 52, 85, 86) and the expected SIMULATE log line (line 72). No functional code files (`index.js`, `package.json`) were touched.
