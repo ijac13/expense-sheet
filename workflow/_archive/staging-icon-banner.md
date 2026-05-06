@@ -1,16 +1,17 @@
 ---
 id: "033"
 title: Staging Icon and Environment Banner
-status: verify
+status: done
 source: captain
 started: 2026-05-03T09:41:34Z
-completed:
-verdict:
+completed: 2026-05-06T05:04:01Z
+verdict: PASSED
 score: 0.9
-worktree: .worktrees/spacedock-ensign-staging-icon-banner
+worktree: 
 issue:
 pr: #5
 mod-block: 
+archived: 2026-05-06T05:04:19Z
 ---
 
 Add a distinct PWA icon for staging and an in-app "STAGING" banner so it's obvious which environment you're using — especially when both are pinned to the mobile home screen.

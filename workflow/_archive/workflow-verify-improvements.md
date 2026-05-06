@@ -1,16 +1,17 @@
 ---
 id: "032"
 title: Workflow Verify Stage Improvements
-status: verify
+status: done
 source: captain
 started: 2026-05-03T09:38:20Z
-completed:
-verdict:
+completed: 2026-05-06T05:04:01Z
+verdict: PASSED
 score: 1.0
-worktree: .worktrees/spacedock-ensign-workflow-verify-improvements
+worktree: 
 issue:
 pr: #3
 mod-block: 
+archived: 2026-05-06T05:04:18Z
 ---
 
 Improve the verify stage in the workflow so agents self-correct before the captain sees anything, and so every verify explicitly checks for PII/secrets in the public repo.

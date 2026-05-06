@@ -1,9 +1,9 @@
 ---
 id: "027"
 title: GCP Billing Guardrails
-status: ideation
+status: spec
 source: captain
-started:
+started: 2026-05-06T05:04:43Z
 completed:
 verdict:
 score: 0.95
@@ -12,27 +12,27 @@ issue:
 pr:
 ---
 
-Protect against runaway GCP bills — alert at TWD $2,000 so I know costs are climbing, and automatically kill billing at TWD $2,500 before it goes further.
+Protect against runaway GCP bills — alert at TWD $500 so I know costs are climbing, and automatically kill billing at TWD $1,000 before it goes further.
 
 ## Why This Matters
 
-The expense-sheet app (and future GCP projects) run on a single GCP billing account. Unexpected charges can accumulate silently. Two layers of protection:
+The expense-sheet app (and future GCP projects) run on a single GCP billing account. Expected monthly cost is ~$0 (free tier covers all usage). Two layers of protection for runaway bugs or misconfigured services:
 
-1. **Alert at TWD $2,000** — email notification only, no action taken.
-2. **Kill billing at TWD $2,500** — automatically sever the billing account from the project. Nuclear but finite.
+1. **Alert at TWD $500** — email notification only. If expected cost is ~$0, anything near $500 means something is wrong.
+2. **Kill billing at TWD $1,000** — automatically sever the billing account from the project. Nuclear but finite.
 
 ## How GCP Actually Works
 
 **Budgets and alerts** (the alert layer):
-- GCP Budget with a threshold rule at TWD $2,000 → email to Billing Admin/Project Owner.
+- GCP Budget with a threshold rule at TWD $500 → email to Billing Admin/Project Owner.
 - **Budgets do NOT cap spending.** Alerts are informational only.
 
 **Programmatic billing disable** (the kill layer):
-- Pattern: Budget at TWD $2,500 → Pub/Sub topic → Cloud Run Function → Cloud Billing API.
+- Pattern: Budget at TWD $1,000 → Pub/Sub topic → Cloud Run Function → Cloud Billing API.
 - The function calls `billing.updateProjectBillingInfo({ billingAccountName: '' })` to remove the billing account link.
 - The function lives in the **same project** — it runs, kills billing, then dies with the project. That's fine; its job is done.
 - **Critical caveats:**
-  - Notification delay means actual spend may slightly overshoot TWD $2,500.
+  - Notification delay means actual spend may slightly overshoot TWD $1,000.
   - Disabling billing terminates ALL GCP services immediately. Resources may be irretrievably deleted.
   - Manual re-enable required to restore. No automatic recovery.
   - Cannot disable billing on a project locked to a billing account.
@@ -40,10 +40,10 @@ The expense-sheet app (and future GCP projects) run on a single GCP billing acco
 ## Success
 
 - A GCP Budget on the billing account with:
-  - Threshold at TWD $2,000 → email alert
-  - Threshold at TWD $2,500 → Pub/Sub trigger
+  - Threshold at TWD $500 → email alert
+  - Threshold at TWD $1,000 → Pub/Sub trigger
 - A Cloud Run function subscribed to the Pub/Sub topic that:
-  - Compares `costAmount` to the TWD $2,500 kill threshold
+  - Compares `costAmount` to the TWD $1,000 kill threshold
   - Calls the Cloud Billing API to detach the billing account
   - Has a `SIMULATE` flag for dry-run testing before going live
 - Setup documented: how to re-enable billing after it's been cut
