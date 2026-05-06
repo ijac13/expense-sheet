@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import TabBar from "./components/TabBar";
 import AuthGuard from "./components/AuthGuard";
+import StagingBanner from "./components/StagingBanner";
 import { AuthProvider } from "./lib/authContext";
 import FontSizeProvider from "./components/FontSizeProvider";
 import Providers from "./providers";
@@ -27,6 +28,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Expense Tracker" />
       </head>
       <body className="min-h-full flex flex-col antialiased">
+        <StagingBanner />
         <FontSizeProvider>
           <Providers>
             <AuthProvider>
