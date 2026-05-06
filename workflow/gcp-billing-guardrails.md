@@ -287,3 +287,20 @@ Wrote a 7-step setup guide covering budget creation (USD thresholds), Pub/Sub to
 **Cycle 1** (2026-05-06) — Verify REJECTED:
 - `billing-guardrails/README.md` contains `expense-sheet-b2db8` hardcoded in 6 places (lines 52, 53, 72, 82, 85, 86)
 - Fix: replace all occurrences with `<YOUR_PROJECT_ID>` placeholder
+
+---
+
+## Stage Report: build
+
+- DONE: `billing-guardrails/index.js` — Cloud Run Function with SIMULATE flag, threshold check at USD $32, billing detach call
+  `/Users/ijac/Claude-ijac/expense-sheet/.worktrees/spacedock-ensign-gcp-billing-guardrails/billing-guardrails/index.js` — exports `handleBillingAlert`, reads `PROJECT_ID`/`SIMULATE`/`KILL_THRESHOLD_USD` from env, checks existing billing status before detach to avoid double-call
+- DONE: `billing-guardrails/package.json` — correct dependencies
+  Minimal package with `@google-cloud/billing: ^4.1.0` and `engines: node>=20`
+- DONE: `billing-guardrails/README.md` — deploy steps, IAM requirements, SIMULATE test procedure, re-enable instructions
+  Covers API enablement, billing-account-level IAM grant, deploy command, test Pub/Sub message, SIMULATE=false arm step, re-enable steps
+- DONE: AC from spec self-checked in stage report
+  See summary below
+
+### Summary
+
+Created `billing-guardrails/` with three files. The function parses the base64-encoded Pub/Sub budget notification, guards against acting below the USD $32 threshold, checks `billingEnabled` before calling the API to avoid redundant detach calls, and re-throws on API failure so Cloud Run marks the invocation failed. README documents the billing-account-level IAM requirement (the critical 403-prevention detail from the spec) and the full SIMULATE-then-arm workflow.
