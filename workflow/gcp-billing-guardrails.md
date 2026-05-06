@@ -350,3 +350,14 @@ All functional ACs pass: base64 parse, threshold guard, SIMULATE short-circuit, 
 ### Summary
 
 Replaced all hardcoded `expense-sheet-b2db8` project ID occurrences in `billing-guardrails/README.md` with the `<YOUR_PROJECT_ID>` placeholder. The replacements appear in the two deploy commands (lines 51, 52, 85, 86) and the expected SIMULATE log line (line 72). No functional code files (`index.js`, `package.json`) were touched.
+
+## Stage Report: verify (cycle 1)
+
+- DONE: All ACs verified with evidence distinct from prior stage reports
+  `index.js` line 25: base64 decode + JSON parse of Pub/Sub message. Line 6: `KILL_THRESHOLD_USD = process.env.KILL_THRESHOLD_USD || 32`. Lines 41–45: SIMULATE short-circuit before any API call. Lines 49–58: `billingEnabled` pre-check before detach call. `package.json` line 11: `"@google-cloud/billing": "^4.1.0"`. `README.md`: covers API enablement, billing-account-level `roles/billing.costsManager` IAM grant, deploy command with `<YOUR_PROJECT_ID>` placeholder, SIMULATE test procedure, arm step (SIMULATE=false), re-enable steps.
+- DONE: PII check passed — grep confirms zero occurrences of expense-sheet-b2db8 in README.md
+  `grep -r "expense-sheet-b2db8" billing-guardrails/` → no matches. All deploy examples use `<YOUR_PROJECT_ID>` placeholder. No hardcoded credentials or personal data in any committed file.
+
+### Summary
+
+Cycle 1 fix confirmed clean. All 6 hardcoded project ID occurrences replaced with `<YOUR_PROJECT_ID>`. All functional ACs pass on code inspection. PII check passed.
