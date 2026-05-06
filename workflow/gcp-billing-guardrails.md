@@ -1,7 +1,7 @@
 ---
 id: "027"
 title: GCP Billing Guardrails
-status: verify
+status: build
 source: captain
 started: 2026-05-06T05:04:43Z
 completed:
@@ -280,3 +280,9 @@ If the kill function fires:
 ### Summary
 
 Wrote a 7-step setup guide covering budget creation (USD thresholds), Pub/Sub topic, IAM/service account (billing account-level grant required for `updateProjectBillingInfo`), Cloud Run Function deployment in Node.js with SIMULATE flag, smoke-test procedure, and re-enable steps. Key detail surfaced: `roles/billing.costsManager` must be granted at the billing account level, not the project level, or the detach call returns 403.
+
+### Feedback Cycles
+
+**Cycle 1** (2026-05-06) — Verify REJECTED:
+- `billing-guardrails/README.md` contains `expense-sheet-b2db8` hardcoded in 6 places (lines 52, 53, 72, 82, 85, 86)
+- Fix: replace all occurrences with `<YOUR_PROJECT_ID>` placeholder
