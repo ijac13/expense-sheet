@@ -9,7 +9,7 @@ verdict:
 score: 0.95
 worktree: .worktrees/spacedock-ensign-gcp-billing-guardrails
 issue:
-pr:
+pr: #6
 mod-block: merge:pr-merge
 ---
 
