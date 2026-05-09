@@ -1,7 +1,7 @@
 ---
 id: "025"
 title: Launch Test Plan — Staging to Production
-status: build
+status: verify
 source: captain plan
 started: 2026-04-29
 completed:
@@ -75,11 +75,11 @@ Structured rollout from staging validation through production migration, replaci
 
 **Goal:** Validate that the new app captures everything the old app does, in parallel.
 
-- [ ] Every expense entered in old app is also entered in new app same day
-- [ ] At end of week: compare total count — new app row count matches old app row count for the period
-- [ ] Spot-check 5 random entries: amount, category, date, payer all match
-- [ ] No data loss incidents (missing rows, wrong amounts, duplicate submissions)
-- [ ] Both users agree the UX is usable for daily entry
+- [x] Every expense entered in old app is also entered in new app same day
+- [x] At end of week: compare total count — new app row count matches old app row count for the period
+- [x] Spot-check 5 random entries: amount, category, date, payer all match
+- [x] No data loss incidents (missing rows, wrong amounts, duplicate submissions)
+- [x] Both users agree the UX is usable for daily entry
 
 **Pass criteria:** 100% entry count match, zero data integrity issues, both users comfortable with daily use.
 

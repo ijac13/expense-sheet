@@ -1,16 +1,16 @@
 ---
 id: "027"
 title: GCP Billing Guardrails
-status: verify
+status: done
 source: captain
 started: 2026-05-06T05:04:43Z
-completed:
-verdict:
+completed: 2026-05-09T08:35:44Z
+verdict: PASSED
 score: 0.95
-worktree: .worktrees/spacedock-ensign-gcp-billing-guardrails
+worktree: 
 issue:
 pr: #6
-mod-block: merge:pr-merge
+mod-block: 
 ---
 
 Protect against runaway GCP bills — alert at TWD $500 so I know costs are climbing, and automatically kill billing at TWD $1,000 before it goes further.
