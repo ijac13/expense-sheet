@@ -1,0 +1,12 @@
+{
+  "name": "billing-guardrails",
+  "version": "1.0.0",
+  "description": "Cloud Run Function to automatically detach GCP billing when spend exceeds the kill threshold",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google-cloud/billing": "^4.1.0"
+  }
+}

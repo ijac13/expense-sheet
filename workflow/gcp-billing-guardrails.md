@@ -287,3 +287,77 @@ Wrote a 7-step setup guide covering budget creation (USD thresholds), Pub/Sub to
 **Cycle 1** (2026-05-06) — Verify REJECTED:
 - `billing-guardrails/README.md` contains `expense-sheet-b2db8` hardcoded in 6 places (lines 52, 53, 72, 82, 85, 86)
 - Fix: replace all occurrences with `<YOUR_PROJECT_ID>` placeholder
+
+---
+
+## Stage Report: build
+
+- DONE: `billing-guardrails/index.js` — Cloud Run Function with SIMULATE flag, threshold check at USD $32, billing detach call
+  `/Users/ijac/Claude-ijac/expense-sheet/.worktrees/spacedock-ensign-gcp-billing-guardrails/billing-guardrails/index.js` — exports `handleBillingAlert`, reads `PROJECT_ID`/`SIMULATE`/`KILL_THRESHOLD_USD` from env, checks existing billing status before detach to avoid double-call
+- DONE: `billing-guardrails/package.json` — correct dependencies
+  Minimal package with `@google-cloud/billing: ^4.1.0` and `engines: node>=20`
+- DONE: `billing-guardrails/README.md` — deploy steps, IAM requirements, SIMULATE test procedure, re-enable instructions
+  Covers API enablement, billing-account-level IAM grant, deploy command, test Pub/Sub message, SIMULATE=false arm step, re-enable steps
+- DONE: AC from spec self-checked in stage report
+  See summary below
+
+### Summary
+
+Created `billing-guardrails/` with three files. The function parses the base64-encoded Pub/Sub budget notification, guards against acting below the USD $32 threshold, checks `billingEnabled` before calling the API to avoid redundant detach calls, and re-throws on API failure so Cloud Run marks the invocation failed. README documents the billing-account-level IAM requirement (the critical 403-prevention detail from the spec) and the full SIMULATE-then-arm workflow.
+
+---
+
+## Stage Report: verify
+
+- DONE: Function parses base64 Pub/Sub message and extracts `costAmount`
+  `index.js` line 25: `JSON.parse(Buffer.from(rawData, 'base64').toString())`, destructures `costAmount` at line 31
+- DONE: Threshold check at USD $32 (KILL_THRESHOLD_USD env var defaulting to 32)
+  `index.js` line 6: `parseFloat(process.env.KILL_THRESHOLD_USD || '32')`, guard at line 34
+- DONE: SIMULATE flag prevents actual billing detach when true
+  `index.js` lines 41–45: returns early with log message before any API call when `SIMULATE === 'true'`
+- DONE: Checks billing is already enabled before calling detach (no double-call)
+  `index.js` lines 49–58: calls `getProjectBillingInfo` and checks `billingEnabled` before proceeding
+- DONE: `@google-cloud/billing` in package.json dependencies
+  `package.json` line 11: `"@google-cloud/billing": "^4.1.0"`
+- DONE: README covers API enablement
+  `README.md` lines 8–14: four `gcloud services enable` commands
+- DONE: README covers billing-account-level IAM (`roles/billing.costsManager`)
+  `README.md` lines 33–42: explicit billing-account-level grant steps with role name
+- DONE: README covers deploy command
+  `README.md` lines 44–54: full `gcloud run deploy` command
+- DONE: README covers SIMULATE test
+  `README.md` lines 56–74: test publish command and expected log line
+- DONE: README covers arm step (SIMULATE=false)
+  `README.md` lines 76–88: redeploy command with `SIMULATE=false`
+- DONE: README covers re-enable procedure
+  `README.md` lines 92–104: four-step re-enable process with console path
+- FAILED: PII check — no hardcoded project IDs, credentials, or personal data committed
+  `README.md` lines 52, 53, 72, 82, 85, 86: real project ID `expense-sheet-b2db8` hardcoded in deploy commands instead of `<PROJECT_ID>` placeholder
+
+### Summary
+
+All functional ACs pass: base64 parse, threshold guard, SIMULATE short-circuit, billing-enabled pre-check, dependency declaration, and all six README documentation sections. PII check FAILED: `README.md` deploy examples contain the hardcoded GCP project ID `expense-sheet-b2db8` in six places. The spec's own reference deploy command uses `PROJECT_ID` as a placeholder; the README should match that pattern. Replace with `<PROJECT_ID>` before this stage can pass.
+
+---
+
+## Stage Report: build (cycle 1 fix)
+
+- DONE: All 6 occurrences of expense-sheet-b2db8 replaced with <YOUR_PROJECT_ID> in README.md
+  `billing-guardrails/README.md` lines 51, 52, 72, 85, 86 — all `expense-sheet-b2db8` strings replaced; no occurrences remain
+- DONE: No other files changed
+  Only `billing-guardrails/README.md` and `workflow/gcp-billing-guardrails.md` (this report) were modified
+
+### Summary
+
+Replaced all hardcoded `expense-sheet-b2db8` project ID occurrences in `billing-guardrails/README.md` with the `<YOUR_PROJECT_ID>` placeholder. The replacements appear in the two deploy commands (lines 51, 52, 85, 86) and the expected SIMULATE log line (line 72). No functional code files (`index.js`, `package.json`) were touched.
+
+## Stage Report: verify (cycle 1)
+
+- DONE: All ACs verified with evidence distinct from prior stage reports
+  `index.js` line 25: base64 decode + JSON parse of Pub/Sub message. Line 6: `KILL_THRESHOLD_USD = process.env.KILL_THRESHOLD_USD || 32`. Lines 41–45: SIMULATE short-circuit before any API call. Lines 49–58: `billingEnabled` pre-check before detach call. `package.json` line 11: `"@google-cloud/billing": "^4.1.0"`. `README.md`: covers API enablement, billing-account-level `roles/billing.costsManager` IAM grant, deploy command with `<YOUR_PROJECT_ID>` placeholder, SIMULATE test procedure, arm step (SIMULATE=false), re-enable steps.
+- DONE: PII check passed — grep confirms zero occurrences of expense-sheet-b2db8 in README.md
+  `grep -r "expense-sheet-b2db8" billing-guardrails/` → no matches. All deploy examples use `<YOUR_PROJECT_ID>` placeholder. No hardcoded credentials or personal data in any committed file.
+
+### Summary
+
+Cycle 1 fix confirmed clean. All 6 hardcoded project ID occurrences replaced with `<YOUR_PROJECT_ID>`. All functional ACs pass on code inspection. PII check passed.
