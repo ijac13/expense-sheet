@@ -1,7 +1,7 @@
 ---
 id: "035"
 title: New Category Not Persisted After Creation
-status: build
+status: verify
 source: captain feedback
 started: 2026-05-04T05:47:31Z
 completed:
