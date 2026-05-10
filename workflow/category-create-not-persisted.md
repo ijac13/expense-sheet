@@ -132,3 +132,14 @@ All 5 ACs pass on direct code inspection. The backend route correctly appends to
 1. **Category list on home page loses scroll** — after new categories are added, the category grid on the home page (expense entry) no longer scrolls. The scrollbar disappears. Previously with DEFAULT_CATEGORIES the scroll worked. The fix updated `app/app/page.tsx` to fetch categories from the API, but the container scroll behaviour broke.
 
 2. **History shows raw `cat_id` instead of category name** — ALL expense records in History display the raw category ID (e.g. `cat_001`) rather than the resolved display name. This affects both records entered with old categories and new categories. The history page was not updated as part of the fix to resolve category IDs to names using the API-sourced category list.
+
+## Stage Report: build (cycle 1)
+
+- DONE: Home page category grid scrolls correctly with API-sourced categories (same as before with DEFAULT_CATEGORIES)
+  `app/app/page.tsx` line 154: added `min-h-0` to the `flex-1 overflow-y-auto` picker container — required for flex children to respect overflow boundary in a `flex-col` layout with fixed height.
+- DONE: History page resolves cat_id to display name for all records — both old and new categories
+  `app/app/history/page.tsx`: imported `Category` type and `getCategories`; added `categories` state (initialized from `DEFAULT_CATEGORIES`) with `useEffect` fetch on mount; replaced every `DEFAULT_CATEGORIES.find(...)` lookup (expense list row, detail view, filter chips, FilterSheet, CategoryPicker in edit mode) with `categories.find(...)`; updated `applyFilters` signature to accept `categories` param. Commit: d031a49.
+
+### Summary
+
+Two regressions fixed. The scroll issue was a Flexbox constraint: `flex-1` without `min-h-0` allows the flex child to grow beyond its allocated space, pushing `overflow-y-auto` into an unconstrained height where no scroll appears. The history cat_id regression was a missing update — the history page was not touched in cycle 0, so it kept resolving categories against `DEFAULT_CATEGORIES`, which has non-API ids and will never match `cat_NNN` ids from the API. Both fixes verified with `tsc --noEmit` (clean).
