@@ -9,7 +9,8 @@ verdict:
 score: 0.9
 worktree: .worktrees/spacedock-ensign-tab-content-mismatch
 issue:
-pr:
+pr: #7
+mod-block: merge:pr-merge
 ---
 
 Switching tabs sometimes shows the previous tab's content instead of the new one. The bottom nav highlights the correct tab but the content area hasn't updated.

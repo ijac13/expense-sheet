@@ -9,7 +9,8 @@ verdict:
 score: 0.9
 worktree: .worktrees/spacedock-ensign-subscription-modal-bugs
 issue:
-pr:
+pr: #9
+mod-block: merge:pr-merge
 ---
 
 Two bugs in the subscription add/edit flow: the amount field is locked in the edit modal, and occasionally adding a new subscription creates a duplicate entry.
