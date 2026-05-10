@@ -9,7 +9,8 @@ verdict:
 score: 0.85
 worktree: .worktrees/spacedock-ensign-report-category-colors
 issue:
-pr:
+pr: #8
+mod-block: merge:pr-merge
 ---
 
 The "BY CATEGORY" breakdown bars in the Reports page are all the same green instead of matching the colors used in the pie chart above them.
