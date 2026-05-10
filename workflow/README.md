@@ -91,6 +91,14 @@ A fresh agent (no context from build) deploys the feature to the staging environ
 - **Good:** Every acceptance criterion has a concrete result — screenshot, test output, or observed behavior. Staging is live and accessible for Captain's manual test. Backend explanation is in plain language, not code.
 - **Bad:** Criteria marked as passed without evidence. Staging not deployed or inaccessible. A report that just restates what was built rather than verifying it works.
 
+#### First Officer Gate Flow
+
+When verify passes, the FO does **not** wait for the captain to ask about deployment. Instead:
+1. Deploy the branch to staging immediately after the gate review
+2. Present the gate summary with the staging URL
+3. Tell the captain exactly what to test (one line per AC)
+4. Wait for captain approval before merging
+
 #### Rejection Protocol
 
 If any acceptance criterion fails, the verify agent MUST set the stage report verdict to REJECTED. Each failure must be listed with concrete evidence (file path, line number, observed vs. expected behaviour). Do not pass a failing AC silently to the captain. The FO will automatically route the findings back to build via the `feedback-to: build` mechanism. The build agent fixes the issues and re-commits; the verify agent then runs again from scratch. The captain only sees the feature once all ACs pass.
