@@ -91,13 +91,23 @@ A fresh agent (no context from build) deploys the feature to the staging environ
 - **Good:** Every acceptance criterion has a concrete result — screenshot, test output, or observed behavior. Staging is live and accessible for Captain's manual test. Backend explanation is in plain language, not code.
 - **Bad:** Criteria marked as passed without evidence. Staging not deployed or inaccessible. A report that just restates what was built rather than verifying it works.
 
+#### Live Evidence Requirement
+
+A verify report is invalid — and the FO must reject it and re-dispatch — if it contains no live evidence. Every verify report must include at least one of:
+- An actual HTTP response from the staging API (curl output, status code, response body)
+- An observed UI behaviour on the live staging URL (not inferred from code)
+
+"I read the code and it looks correct" is not evidence. Code inspection belongs in build, not verify.
+
+If the verify ensign cannot run shell commands (Bash permission denied), it must fail the stage immediately with `verdict: REJECTED` and note the missing permission — not substitute code inspection.
+
 #### First Officer Gate Flow
 
-When verify passes, the FO does **not** wait for the captain to ask about deployment. Instead:
-1. Deploy the branch to staging immediately after the gate review
-2. Present the gate summary with the staging URL
-3. Tell the captain exactly what to test (one line per AC)
-4. Wait for captain approval before merging
+When verify passes, the FO:
+1. Confirms the verify report contains live evidence (HTTP calls or observed staging behaviour) — rejects immediately if not
+2. Checks that the deployed chunk hashes on staging match the built output — if they differ, the deploy didn't go through
+3. Presents the gate summary with the staging URL and a one-line test checklist per AC
+4. Waits for captain approval before merging
 
 #### Rejection Protocol
 
