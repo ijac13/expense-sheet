@@ -106,7 +106,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="flex flex-col bg-base-100 max-w-md mx-auto overflow-hidden" style={{ height: "100dvh" }}>
+    <main className="flex flex-col bg-base-100 max-w-md mx-auto" style={{ minHeight: "calc(100dvh - 4rem)" }}>
 
       {/* Header */}
       <div className="bg-primary text-primary-content px-4 pt-5 pb-3 shrink-0">
