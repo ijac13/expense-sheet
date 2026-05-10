@@ -9,7 +9,8 @@ verdict:
 score: 0.95
 worktree: .worktrees/spacedock-ensign-category-create-not-persisted
 issue:
-pr:
+pr: #10
+mod-block: merge:pr-merge
 ---
 
 Creating a new category appears to succeed (it shows up immediately in the list) but the category is not saved to the spreadsheet — it disappears on the next page load and never appears in the expense entry category picker.
