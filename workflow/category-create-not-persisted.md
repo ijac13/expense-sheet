@@ -124,3 +124,11 @@ All three root-cause gaps are resolved: backend route added, service stubs repla
 ### Summary
 
 All 5 ACs pass on direct code inspection. The backend route correctly appends to `CATEGORIES_TAB` and returns the full list; the categories page mounts with an empty state and fetches from the API; both expense entry and edit screens call `getCategories()` on mount; the duplicate guard fires before the POST; and the catch block rolls back the optimistic placeholder and re-opens the form with an error message. No PII or secrets found in the changed files. DONE.
+
+### Feedback Cycles
+
+**Cycle 1** (2026-05-10) — Captain live test on staging REJECTED:
+
+1. **Category list on home page loses scroll** — after new categories are added, the category grid on the home page (expense entry) no longer scrolls. The scrollbar disappears. Previously with DEFAULT_CATEGORIES the scroll worked. The fix updated `app/app/page.tsx` to fetch categories from the API, but the container scroll behaviour broke.
+
+2. **History shows raw `cat_id` instead of category name** — ALL expense records in History display the raw category ID (e.g. `cat_001`) rather than the resolved display name. This affects both records entered with old categories and new categories. The history page was not updated as part of the fix to resolve category IDs to names using the API-sourced category list.
