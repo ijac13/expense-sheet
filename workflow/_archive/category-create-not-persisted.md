@@ -1,16 +1,17 @@
 ---
 id: "035"
 title: New Category Not Persisted After Creation
-status: verify
+status: done
 source: captain feedback
 started: 2026-05-04T05:47:31Z
-completed:
-verdict:
+completed: 2026-05-11T04:11:34Z
+verdict: PASSED
 score: 0.95
-worktree: .worktrees/spacedock-ensign-category-create-not-persisted
+worktree: 
 issue:
 pr: #10
-mod-block: merge:pr-merge
+mod-block: 
+archived: 2026-05-11T04:11:46Z
 ---
 
 Creating a new category appears to succeed (it shows up immediately in the list) but the category is not saved to the spreadsheet — it disappears on the next page load and never appears in the expense entry category picker.

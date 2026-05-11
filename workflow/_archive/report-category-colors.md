@@ -1,16 +1,17 @@
 ---
 id: "030"
 title: Report Category Bars Use Wrong Color
-status: verify
+status: done
 source: captain feedback
 started: 2026-05-03T09:03:27Z
-completed:
-verdict:
+completed: 2026-05-11T04:11:34Z
+verdict: PASSED
 score: 0.85
-worktree: .worktrees/spacedock-ensign-report-category-colors
+worktree: 
 issue:
 pr: #8
-mod-block: merge:pr-merge
+mod-block: 
+archived: 2026-05-11T04:11:46Z
 ---
 
 The "BY CATEGORY" breakdown bars in the Reports page are all the same green instead of matching the colors used in the pie chart above them.

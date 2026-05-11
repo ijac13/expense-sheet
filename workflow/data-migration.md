@@ -77,8 +77,8 @@ All 75 unique `主分類,子分類` combinations found in the CSV, mapped to `ca
 | 健康 | alisa復健 | medical | explicit |
 | 健康 | 物理治療 | medical | explicit |
 | 健康 | 雷射疣 | medical | explicit |
-| 健康 | AWO | medical | explicit |
-| 健康 | massage | medical | explicit |
+| 健康 | AWO | entertainment| explicit |
+| 健康 | massage | entertainment | explicit |
 | 健康 | 臍帶血 | medical | explicit |
 | 娛樂 | 旅遊 | travel | explicit |
 | 娛樂 | ESTA | travel | explicit |
@@ -118,9 +118,10 @@ All 75 unique `主分類,子分類` combinations found in the CSV, mapped to `ca
 | 購物 | 給公公婆婆 | gifts | explicit (給公公婆婆 match) |
 | 購物 | 日用品 | shopping | fallback |
 | 購物 | 購物 | shopping | fallback |
-| 其他 | 聖堂 | donate | explicit |
+| 其他 | 聖堂 | entertainment | explicit |
 | 其他 | 其他 | other | fallback |
-| 其他 | ijac保險 | other | fallback |
+| 其他 | ijac保險 | other
+ | fallback |
 | 其他 | 保費 | other | fallback |
 | 其他 | 房客 | other | fallback |
 | 其他 | 房屋險 | other | fallback |

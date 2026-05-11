@@ -1,16 +1,17 @@
 ---
 id: "029"
 title: Tab Navigation Shows Wrong Content
-status: verify
+status: done
 source: captain feedback
 started: 2026-05-03T09:03:27Z
-completed:
-verdict:
+completed: 2026-05-11T04:11:34Z
+verdict: PASSED
 score: 0.9
-worktree: .worktrees/spacedock-ensign-tab-content-mismatch
+worktree: 
 issue:
 pr: #7
-mod-block: merge:pr-merge
+mod-block: 
+archived: 2026-05-11T04:11:46Z
 ---
 
 Switching tabs sometimes shows the previous tab's content instead of the new one. The bottom nav highlights the correct tab but the content area hasn't updated.

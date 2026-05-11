@@ -1,16 +1,17 @@
 ---
 id: "031"
 title: Subscription Modal — Amount Not Editable and Duplicate on Add
-status: verify
+status: done
 source: captain feedback
 started: 2026-05-03T09:03:27Z
-completed:
-verdict:
+completed: 2026-05-11T04:11:34Z
+verdict: PASSED
 score: 0.9
-worktree: .worktrees/spacedock-ensign-subscription-modal-bugs
+worktree: 
 issue:
 pr: #9
-mod-block: merge:pr-merge
+mod-block: 
+archived: 2026-05-11T04:11:46Z
 ---
 
 Two bugs in the subscription add/edit flow: the amount field is locked in the edit modal, and occasionally adding a new subscription creates a duplicate entry.
