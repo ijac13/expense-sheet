@@ -11,6 +11,9 @@ const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
 const EXPENSES_TAB = "Expenses";
 const USERS_TAB = "Users";
 const SUBSCRIPTIONS_TAB = "Subscriptions";
+const CATEGORIES_TAB = "Categories";
+
+const CATEGORIES_HEADER = ["id", "name_en", "name_zh", "icon", "sort_order", "is_active"];
 
 const EXPENSES_HEADER = ["id", "date", "amount", "category_id", "paid_by", "created_by", "notes", "created_at"];
 const SUBSCRIPTIONS_HEADER = ["id", "name", "amount", "category_id", "frequency", "due_day", "due_month", "paid_by", "is_active"];
@@ -63,6 +66,17 @@ function rowToSubscription(row: (string | null | undefined)[]): Record<string, u
     due_month: row[6] ? Number(row[6]) : undefined,
     paid_by: row[7] ?? "",
     is_active: row[8] !== "false",
+  };
+}
+
+function rowToCategory(row: (string | null | undefined)[]): Record<string, unknown> {
+  return {
+    id: row[0] ?? "",
+    name_en: row[1] ?? "",
+    name_zh: row[2] ?? "",
+    icon: row[3] ?? "",
+    sort_order: Number(row[4] ?? 0),
+    is_active: row[5] !== "false",
   };
 }
 
@@ -179,6 +193,124 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       });
       const rows = response.data.values ?? [];
       res.status(200).json(rows.slice(1).map(rowToUser));
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // /api/categories — GET / POST / PATCH
+    // -----------------------------------------------------------------------
+    if (path.includes("categories")) {
+      // GET — return all categories
+      if (req.method === "GET") {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${CATEGORIES_TAB}!A:F`,
+        });
+        const rows = response.data.values ?? [];
+        res.status(200).json(rows.slice(1).map(rowToCategory));
+        return;
+      }
+
+      // POST — add a new category
+      if (req.method === "POST") {
+        const body = req.body as Record<string, unknown>;
+
+        // Read existing rows to determine next id and sort_order
+        const existing = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${CATEGORIES_TAB}!A:F`,
+        });
+        const existingRows = (existing.data.values ?? []).slice(1).map(rowToCategory);
+
+        // Generate id: cat_NNN using max numeric suffix + 1
+        const maxNum = existingRows.reduce((max, r) => {
+          const match = String(r.id).match(/^cat_(\d+)$/);
+          if (match) return Math.max(max, parseInt(match[1], 10));
+          return max;
+        }, 0);
+        const newId = `cat_${String(maxNum + 1).padStart(3, "0")}`;
+
+        // sort_order = max existing + 1
+        const maxOrder = existingRows.reduce((max, r) => Math.max(max, Number(r.sort_order) || 0), 0);
+        const sortOrder = maxOrder + 1;
+
+        const row = [
+          newId,
+          String(body.name_en ?? ""),
+          String(body.name_zh ?? ""),
+          String(body.icon ?? ""),
+          String(sortOrder),
+          "true",
+        ];
+
+        // Append row at the end (categories are ordered by sort_order, not insertion order)
+        const colLetter = "F";
+        const existingCheck = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${CATEGORIES_TAB}!A1:F1`,
+        });
+        if (!existingCheck.data.values?.[0]?.[0] || existingCheck.data.values[0][0] !== "id") {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `${CATEGORIES_TAB}!A1:${colLetter}1`,
+            valueInputOption: "RAW",
+            requestBody: { values: [CATEGORIES_HEADER] },
+          });
+        }
+        await sheets.spreadsheets.values.append({
+          spreadsheetId,
+          range: `${CATEGORIES_TAB}!A:F`,
+          valueInputOption: "RAW",
+          requestBody: { values: [row] },
+        });
+
+        res.status(201).json(rowToCategory(row));
+        return;
+      }
+
+      // PATCH /:id — update fields of a category by id
+      if (req.method === "PATCH") {
+        const pathParts = path.split("/").filter(Boolean);
+        const targetId = pathParts[pathParts.length - 1];
+        if (!targetId || targetId === "categories") {
+          res.status(400).json({ error: "id is required in path: PATCH /api/categories/:id" });
+          return;
+        }
+
+        const allRows = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${CATEGORIES_TAB}!A:F`,
+        });
+        const rows = allRows.data.values ?? [];
+        const rowIndex = rows.findIndex((r, i) => i > 0 && r[0] === targetId);
+        if (rowIndex === -1) {
+          res.status(404).json({ error: "Category not found" });
+          return;
+        }
+
+        const body = req.body as Record<string, unknown>;
+        const existing = rows[rowIndex];
+        const updated = [
+          existing[0],
+          body.name_en !== undefined ? String(body.name_en) : existing[1],
+          body.name_zh !== undefined ? String(body.name_zh) : existing[2],
+          body.icon !== undefined ? String(body.icon) : existing[3],
+          body.sort_order !== undefined ? String(body.sort_order) : existing[4],
+          body.is_active !== undefined ? String(body.is_active) : existing[5],
+        ];
+
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `${CATEGORIES_TAB}!A${rowIndex + 1}:F${rowIndex + 1}`,
+          valueInputOption: "RAW",
+          requestBody: { values: [updated] },
+        });
+
+        res.status(200).json(rowToCategory(updated));
+        return;
+      }
+
+      res.status(405).json({ error: "Method not allowed" });
       return;
     }
 

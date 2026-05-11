@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, PenLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
-import { DEFAULT_CATEGORIES, getDefaultCategory, saveLastCategory } from "./lib/categories";
+import { Category, DEFAULT_CATEGORIES, getDefaultCategory, saveLastCategory } from "./lib/categories";
+import { getCategories } from "./lib/categoryService";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
 import { DEFAULT_USER, USERS, type UserId } from "./lib/users";
 import { useAuth } from "./lib/authContext";
@@ -27,6 +28,7 @@ export default function HomePage() {
   const lang = i18n.language;
   const { resolvedUserId } = useAuth();
   const [categoryId, setCategoryId] = useState<string>(() => getDefaultCategory());
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [noteOpen, setNoteOpen] = useState(false);
@@ -37,7 +39,7 @@ export default function HomePage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const selectedCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId);
+  const selectedCat = categories.find(c => c.id === categoryId) ?? DEFAULT_CATEGORIES.find(c => c.id === categoryId);
 
   // Default paidBy to the signed-in user
   useEffect(() => {
@@ -48,6 +50,17 @@ export default function HomePage() {
     getTodayExpenses()
       .then(setExpenses)
       .catch(() => setExpenses([]));
+  }, []);
+
+  useEffect(() => {
+    getCategories()
+      .then((cats) => {
+        const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
+        if (active.length > 0) setCategories(active);
+      })
+      .catch(() => {
+        // Keep DEFAULT_CATEGORIES as fallback
+      });
   }, []);
 
   function handleSelectCategory(id: string) {
@@ -106,7 +119,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="flex flex-col bg-base-100 max-w-md mx-auto" style={{ minHeight: "calc(100dvh - 4rem)" }}>
+    <main className="flex flex-col bg-base-100 max-w-md mx-auto overflow-hidden fixed inset-0">
 
       {/* Header */}
       <div className="bg-primary text-primary-content px-4 pt-5 pb-3 shrink-0">
@@ -138,9 +151,9 @@ export default function HomePage() {
       </div>
 
       {/* Category picker — scrollable */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <CategoryPicker
-          categories={DEFAULT_CATEGORIES}
+          categories={categories}
           selectedId={categoryId}
           onSelect={handleSelectCategory}
         />
