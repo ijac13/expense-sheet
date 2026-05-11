@@ -1,13 +1,13 @@
 ---
 id: "037"
 title: Expense Save — Optimistic UI Update
-status: ideation
+status: build
 source: captain observation
 started: 2026-05-11T04:11:34Z
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/spacedock-ensign-expense-save-latency
 issue:
 pr:
 ---
