@@ -20,7 +20,7 @@ export async function addSubscription(data: Omit<Subscription, "id" | "is_active
 
 export async function updateSubscription(
   id: string,
-  data: Partial<Pick<Subscription, "name" | "category_id" | "due_day" | "due_month">>
+  data: Partial<Pick<Subscription, "name" | "amount" | "category_id" | "due_day" | "due_month">>
 ): Promise<void> {
   const res = await fetch(API_BASE, {
     method: "PATCH",
