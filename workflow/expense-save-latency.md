@@ -1,7 +1,7 @@
 ---
 id: "037"
 title: Expense Save — Optimistic UI Update
-status: build
+status: verify
 source: captain observation
 started: 2026-05-11T04:11:34Z
 completed:
