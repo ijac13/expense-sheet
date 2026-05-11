@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { X, SlidersHorizontal, Search, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getAllExpenses } from "../lib/historyService";
-import { DEFAULT_CATEGORIES } from "../lib/categories";
+import { DEFAULT_CATEGORIES, Category } from "../lib/categories";
+import { getCategories } from "../lib/categoryService";
 import { Expense } from "../lib/expenses";
 import { USERS } from "../lib/users";
 import { updateExpense, deleteExpense } from "../lib/expenseService";
@@ -69,7 +70,7 @@ function getPresetRange(preset: DatePreset): { from: string; to: string } | null
   return null;
 }
 
-function applyFilters(expenses: Expense[], filters: Filters, search: string): Expense[] {
+function applyFilters(expenses: Expense[], filters: Filters, search: string, categories: Category[]): Expense[] {
   let result = expenses;
 
   if (filters.categories.length > 0)
@@ -89,7 +90,7 @@ function applyFilters(expenses: Expense[], filters: Filters, search: string): Ex
   if (search.trim()) {
     const q = search.trim().toLowerCase();
     result = result.filter(e => {
-      const cat = DEFAULT_CATEGORIES.find(c => c.id === e.category_id);
+      const cat = categories.find(c => c.id === e.category_id);
       return (e.notes ?? "").toLowerCase().includes(q)
         || (cat?.name_en ?? "").toLowerCase().includes(q)
         || (cat?.name_zh ?? "").toLowerCase().includes(q);
@@ -168,16 +169,18 @@ function resolveUserId(paid_by: string): string {
 
 function FilterSheet({
   filters,
+  categories,
   onApply,
   onClose,
 }: {
   filters: Filters;
+  categories: Category[];
   onApply: (f: Filters) => void;
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const [draft, setDraft] = useState<Filters>(filters);
-  const activeCategories = DEFAULT_CATEGORIES.filter(c => c.is_active);
+  const activeCategories = categories.filter(c => c.is_active);
 
   function toggleCategory(id: string) {
     setDraft(f => ({
@@ -329,6 +332,7 @@ export default function HistoryPage() {
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [selected, setSelected] = useState<Expense | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit" | "delete-confirm">("view");
   const [editForm, setEditForm] = useState<EditForm | null>(null);
@@ -346,7 +350,18 @@ export default function HistoryPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = useMemo(() => applyFilters(expenses, filters, search), [expenses, filters, search]);
+  useEffect(() => {
+    getCategories()
+      .then((cats) => {
+        const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
+        if (active.length > 0) setCategories(active);
+      })
+      .catch(() => {
+        // Keep DEFAULT_CATEGORIES as fallback
+      });
+  }, []);
+
+  const filtered = useMemo(() => applyFilters(expenses, filters, search, categories), [expenses, filters, search, categories]);
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
 
   const monthGroups = useMemo(() => {
@@ -366,7 +381,7 @@ export default function HistoryPage() {
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = localDateStr(yesterday);
 
-  const selectedCat = selected ? DEFAULT_CATEGORIES.find(c => c.id === selected.category_id) : null;
+  const selectedCat = selected ? categories.find(c => c.id === selected.category_id) : null;
   const selectedPaidBy = selected ? (
     USERS.find(u => u.id === selected.paid_by || u.name === selected.paid_by)
   ) : null;
@@ -391,7 +406,7 @@ export default function HistoryPage() {
     chips.push({ label, onRemove: () => setFilters(f => ({ ...f, datePreset: "all", dateFrom: "", dateTo: "" })) });
   }
   filters.categories.forEach(id => {
-    const c = DEFAULT_CATEGORIES.find(c => c.id === id);
+    const c = categories.find(c => c.id === id);
     if (c) chips.push({
       label: `${c.icon} ${lang === "zh" ? c.name_zh : c.name_en}`,
       onRemove: () => setFilters(f => ({ ...f, categories: f.categories.filter(x => x !== id) }))
@@ -582,7 +597,7 @@ export default function HistoryPage() {
 
                     <div className="divide-y divide-base-300">
                       {group.expenses.map((expense) => {
-                        const cat = DEFAULT_CATEGORIES.find(c => c.id === expense.category_id);
+                        const cat = categories.find(c => c.id === expense.category_id);
                         const paidByUser = USERS.find(u => u.id === expense.paid_by || u.name === expense.paid_by);
                         const catName = lang === "zh" ? (cat?.name_zh ?? cat?.name_en ?? expense.category_id) : (cat?.name_en ?? expense.category_id);
                         return (
@@ -622,6 +637,7 @@ export default function HistoryPage() {
       {filterOpen && (
         <FilterSheet
           filters={filters}
+          categories={categories}
           onApply={setFilters}
           onClose={() => setFilterOpen(false)}
         />
@@ -764,7 +780,7 @@ export default function HistoryPage() {
                   <div>
                     <div className="text-xs uppercase tracking-wider text-base-content/40 mb-2">{t("common.category")}</div>
                     <CategoryPicker
-                      categories={DEFAULT_CATEGORIES}
+                      categories={categories}
                       selectedId={editForm.categoryId}
                       onSelect={id => setEditForm(f => f ? { ...f, categoryId: id } : f)}
                     />

@@ -1,12 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { Expense } from "../../lib/expenses";
 import { applyKey, evaluateExpression, KeypadKey } from "../../lib/calculator";
 import CalculatorKeypad from "../../components/CalculatorKeypad";
 import CategoryPicker from "../../components/CategoryPicker";
-import { DEFAULT_CATEGORIES } from "../../lib/categories";
+import { Category, DEFAULT_CATEGORIES } from "../../lib/categories";
+import { getCategories } from "../../lib/categoryService";
 import { USERS } from "../../lib/users";
 import { updateExpense, deleteExpense } from "../../lib/expenseService";
 
@@ -20,6 +21,18 @@ export default function EditExpenseClient({ expense }: EditExpenseClientProps) {
 
   const [expression, setExpression] = useState(String(expense.amount));
   const [categoryId, setCategoryId] = useState(expense.category_id);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+
+  useEffect(() => {
+    getCategories()
+      .then((cats) => {
+        const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
+        if (active.length > 0) setCategories(active);
+      })
+      .catch(() => {
+        // Keep DEFAULT_CATEGORIES as fallback
+      });
+  }, []);
   const [date, setDate] = useState(expense.date);
   // Resolve paid_by: handle both user ID and display name stored in sheet
   const initialPayer = USERS.find(u => u.id === expense.paid_by || u.name === expense.paid_by)?.id ?? USERS[0].id;
@@ -103,7 +116,7 @@ export default function EditExpenseClient({ expense }: EditExpenseClientProps) {
         <input type="text" placeholder={t("home.notes_placeholder")} className="input input-bordered w-full" value={notes} onChange={e => setNotes(e.target.value)} />
         <div>
           <div className="text-xs text-base-content/50 mb-2 uppercase tracking-wide">{t("common.category")}</div>
-          <CategoryPicker categories={DEFAULT_CATEGORIES} selectedId={categoryId} onSelect={setCategoryId} />
+          <CategoryPicker categories={categories} selectedId={categoryId} onSelect={setCategoryId} />
         </div>
       </div>
 
