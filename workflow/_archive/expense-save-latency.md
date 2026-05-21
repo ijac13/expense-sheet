@@ -10,6 +10,7 @@ score: 0.85
 worktree: 
 issue:
 pr:
+archived: 2026-05-21T03:05:47Z
 ---
 
 When saving an expense, the record should appear in the webapp immediately — before the Google Sheet write completes. A few seconds of latency before the Sheet reflects it is fine. The UI must not make the user wait for the round trip.
