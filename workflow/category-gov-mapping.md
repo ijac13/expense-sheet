@@ -1,9 +1,9 @@
 ---
 id: "036"
 title: Category → Government Category Mapping
-status: ideation
+status: spec
 source: captain
-started:
+started: 2026-05-21T03:07:30Z
 completed:
 verdict:
 score:
