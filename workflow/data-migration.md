@@ -129,6 +129,11 @@ All 75 unique `主分類,子分類` combinations found in the CSV, mapped to `ca
 
 Note on 娛樂 travel subcategories: the spec rule covers 旅遊/ESTA/合歡山住宿 explicitly. The remaining travel-themed subcategories (泰國機票, 清邁住宿, 清邁訂車訂金, 馬來西亞, 馬來西亞換200美金) should also map to `travel` based on clear semantic intent. The script will include these as explicit mappings.
 
+<!--captain: can you put the historical category? If that is not exactly the same name as the new category, can you make it a note in that? For example, when the expense is for bicycle use (自行车用), then you can put that expense into daily necessary, but put 自行车用 into the note of that expense. I want to keep the context of history expense. I want to keep the context of history expense. And remember, the new category will map to the GOV category, so as the old category-->
+
+
+<!--captain: I'm not sure about the script spec, but before you put this data in, I thought we will have a new tab inside this combined CSV and see how it will map to the new category and the GOV category. We can first verify in Excel before we combine, moving the old data into expense sheets. My assumption is that once we have the combined expense to a mapping, then we only need to copy this data into the expenses tab in the expense sheet production, and then all the data will be there. Am I correct?-->
+
 ## Script Spec: `scripts/migrate-2025.js`
 
 ### Environment variables
