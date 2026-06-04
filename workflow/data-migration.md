@@ -1,7 +1,7 @@
 ---
 id: "008"
 title: Data Migration
-status: build
+status: verify
 source: commission seed
 started: 2026-05-06T05:13:40Z
 completed:
