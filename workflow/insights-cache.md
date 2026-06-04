@@ -36,3 +36,16 @@ Generating insights takes several seconds and costs an API call. There's no reas
 - Cross-device sync of cached insights
 - Per-user cache (single cache for the device)
 - Auto-expiry of the cache
+
+## Stage Report: build
+
+- DONE: Cached insight + ISO timestamp saved to localStorage on successful generation
+  AC-1: `writeInsightsCache({ text, generatedAt: new Date().toISOString() })` called in `generate()` on success — commit 93db692
+- DONE: Mount loads cache immediately (no API call); shows timestamp and Regenerate button
+  AC-2: `useEffect([], ...)` reads `readInsightsCache()` and sets state to "done" without calling the API — commit 93db692
+- DONE: Regeneration failure keeps existing cache visible with an error message shown alongside
+  AC-6: `isRegen` flag distinguishes first-time vs regen; on regen failure state is set to `"regen_error"` which renders the cached insight + error paragraph — commit 93db692
+
+### Summary
+
+Implemented localStorage caching for the InsightsCard component. On generation, `{ text, generatedAt }` is saved under `insights_cache`. On mount, the cache is loaded immediately and displayed without an API call. The "Regenerate" button label is shown when cache is present; a `regen_error` state keeps cached content visible while showing an error inline. Translation keys `insights_generated_at` added to both en and zh locale files.
