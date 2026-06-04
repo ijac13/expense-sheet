@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-category-gov-mapping
 issue:
-pr:
+pr: #11
 mod-block: merge:pr-merge
 ---
 
