@@ -13,7 +13,7 @@ const USERS_TAB = "Users";
 const SUBSCRIPTIONS_TAB = "Subscriptions";
 const CATEGORIES_TAB = "Categories";
 
-const CATEGORIES_HEADER = ["id", "name_en", "name_zh", "icon", "sort_order", "is_active"];
+const CATEGORIES_HEADER = ["id", "name_en", "name_zh", "icon", "sort_order", "is_active", "gov_category"];
 
 const EXPENSES_HEADER = ["id", "date", "amount", "category_id", "paid_by", "created_by", "notes", "created_at"];
 const SUBSCRIPTIONS_HEADER = ["id", "name", "amount", "category_id", "frequency", "due_day", "due_month", "paid_by", "is_active"];
@@ -77,6 +77,7 @@ function rowToCategory(row: (string | null | undefined)[]): Record<string, unkno
     icon: row[3] ?? "",
     sort_order: Number(row[4] ?? 0),
     is_active: row[5] !== "false",
+    gov_category: row[6] ?? null,
   };
 }
 
@@ -241,13 +242,14 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           String(body.icon ?? ""),
           String(sortOrder),
           "true",
+          String(body.gov_category ?? ""),
         ];
 
         // Append row at the end (categories are ordered by sort_order, not insertion order)
-        const colLetter = "F";
+        const colLetter = "G";
         const existingCheck = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A1:F1`,
+          range: `${CATEGORIES_TAB}!A1:G1`,
         });
         if (!existingCheck.data.values?.[0]?.[0] || existingCheck.data.values[0][0] !== "id") {
           await sheets.spreadsheets.values.update({
@@ -259,7 +261,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         }
         await sheets.spreadsheets.values.append({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A:F`,
+          range: `${CATEGORIES_TAB}!A:G`,
           valueInputOption: "RAW",
           requestBody: { values: [row] },
         });
@@ -297,11 +299,12 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           body.icon !== undefined ? String(body.icon) : existing[3],
           body.sort_order !== undefined ? String(body.sort_order) : existing[4],
           body.is_active !== undefined ? String(body.is_active) : existing[5],
+          body.gov_category !== undefined ? String(body.gov_category) : (existing[6] ?? ""),
         ];
 
         await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A${rowIndex + 1}:F${rowIndex + 1}`,
+          range: `${CATEGORIES_TAB}!A${rowIndex + 1}:G${rowIndex + 1}`,
           valueInputOption: "RAW",
           requestBody: { values: [updated] },
         });
