@@ -453,9 +453,9 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         return;
       }
 
-      // Tier: "week" (<30 days), "month" (1–2 months), "full" (2+ months)
+      // Tier: "week" (<30 days), "month" (1–3 months), "full" (3+ months with real prior data)
       const monthsWithData = new Set(allExpenses.map((e) => String(e.date).slice(0, 7)));
-      const tier = daysSinceFirst < 30 ? "week" : monthsWithData.size < 2 ? "month" : "full";
+      const tier = daysSinceFirst < 30 ? "week" : monthsWithData.size < 3 ? "month" : "full";
 
       function monthOffset(n: number): string {
         const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
@@ -518,6 +518,11 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         : "Full history available. Include month-over-month and year-over-year comparisons where relevant.";
 
       const prompt = `You are a warm, knowledgeable financial advisor for a household of two in Taiwan. Analyse their spending and give concise, practical, kind advice — like a trusted friend who knows about money. Not clinical. Not cheerleader-y.
+
+Household context (do NOT flag these as concerns — they are intentional):
+- 4 mobile phone plans (one per family member across the extended family)
+- A gym subscription for the captain's parents (intentional support expense)
+- Multiple digital subscriptions are normal for this household size
 
 ${tierNote}
 
