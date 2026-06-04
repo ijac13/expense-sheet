@@ -146,15 +146,50 @@ function CategoryRow({
 // Insights card
 // ---------------------------------------------------------------------------
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
+const INSIGHTS_CACHE_KEY = "insights_cache";
+
+interface InsightsCache {
+  text: string;
+  generatedAt: string; // ISO 8601
+}
+
+function readInsightsCache(): InsightsCache | null {
+  try {
+    const raw = localStorage.getItem(INSIGHTS_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as InsightsCache;
+  } catch {
+    return null;
+  }
+}
+
+function writeInsightsCache(cache: InsightsCache) {
+  try {
+    localStorage.setItem(INSIGHTS_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // localStorage unavailable — silently ignore
+  }
+}
 
 function InsightsCard() {
   const { t } = useTranslation();
-  const [state, setState] = useState<"idle" | "loading" | "done" | "insufficient" | "error">("idle");
+  const [state, setState] = useState<"idle" | "loading" | "done" | "insufficient" | "error" | "regen_error">("idle");
   const [insights, setInsights] = useState("");
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState("reports.insights_error");
   const [insufficientDays, setInsufficientDays] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // AC-2: Load cache on mount; show cached result without API call
+  useEffect(() => {
+    const cached = readInsightsCache();
+    if (cached) {
+      setInsights(cached.text);
+      setGeneratedAt(cached.generatedAt);
+      setState("done");
+    }
+  }, []);
 
   function startTimer() {
     setElapsed(0);
@@ -166,8 +201,9 @@ function InsightsCard() {
   useEffect(() => () => stopTimer(), []);
 
   async function generate() {
+    const isRegen = state === "done" || state === "regen_error";
     setState("loading");
-    setErrorKey("reports.insights_error");
+    if (!isRegen) setErrorKey("reports.insights_error");
     startTimer();
     try {
       const res = await fetch(`${API_BASE}/api/insights`, { method: "POST" });
@@ -180,18 +216,33 @@ function InsightsCard() {
       }
       if (!res.ok) {
         const code = String(data.error_code ?? "");
-        if (code === "ai_error") setErrorKey("reports.insights_error_ai");
-        else if (code === "data_error") setErrorKey("reports.insights_error_data");
-        else setErrorKey("reports.insights_error");
-        setState("error");
+        const key = code === "ai_error"
+          ? "reports.insights_error_ai"
+          : code === "data_error"
+          ? "reports.insights_error_data"
+          : "reports.insights_error";
+        setErrorKey(key);
+        // AC-6: If regen fails, keep cached insight visible with error shown
+        setState(isRegen ? "regen_error" : "error");
         return;
       }
-      if (data.insights) { setInsights(String(data.insights)); setState("done"); }
-      else { setErrorKey("reports.insights_error"); setState("error"); }
+      if (data.insights) {
+        const text = String(data.insights);
+        const ts = new Date().toISOString();
+        // AC-1: Save to localStorage
+        writeInsightsCache({ text, generatedAt: ts });
+        setInsights(text);
+        setGeneratedAt(ts);
+        setState("done");
+      } else {
+        setErrorKey("reports.insights_error");
+        setState(isRegen ? "regen_error" : "error");
+      }
     } catch {
       stopTimer();
       setErrorKey("reports.insights_error_data");
-      setState("error");
+      // AC-6: On network failure during regen, keep cache visible
+      setState(isRegen ? "regen_error" : "error");
     }
   }
 
@@ -207,6 +258,7 @@ function InsightsCard() {
     });
   }
 
+  // AC-4: When no cache exists, show "Generate Insights"; otherwise "Regenerate"
   if (state === "idle") return (
     <div className="bg-base-200 rounded-2xl p-5 space-y-3">
       <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">{t("reports.insights_title")}</div>
@@ -252,18 +304,27 @@ function InsightsCard() {
     </div>
   );
 
-  // done
+  // done or regen_error — show cached insight
+  // AC-3: Show timestamp; AC-4: button reads "Regenerate"; AC-6: show error inline on regen_error
   return (
     <div className="bg-base-200 rounded-2xl p-5 space-y-3">
       <div className="flex items-center justify-between">
         <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">{t("reports.insights_title")}</div>
-        <button onClick={() => setState("idle")} className="text-xs text-base-content/40 hover:text-base-content/70">
+        <button onClick={generate} className="btn btn-ghost btn-xs">
           {t("reports.regenerate")}
         </button>
       </div>
       <div className="text-sm text-base-content/80 space-y-1">
         {renderInsights(insights)}
       </div>
+      {generatedAt && (
+        <p className="text-xs text-base-content/40">
+          {t("reports.insights_generated_at")} {new Date(generatedAt).toLocaleString()}
+        </p>
+      )}
+      {state === "regen_error" && (
+        <p className="text-xs text-error/80">{t(errorKey)}</p>
+      )}
     </div>
   );
 }
