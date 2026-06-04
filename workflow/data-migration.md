@@ -1,13 +1,13 @@
 ---
 id: "008"
 title: Data Migration
-status: spec
+status: build
 source: commission seed
 started: 2026-05-06T05:13:40Z
 completed:
 verdict:
 score: 0.7
-worktree:
+worktree: .worktrees/spacedock-ensign-data-migration
 issue:
 pr:
 ---
