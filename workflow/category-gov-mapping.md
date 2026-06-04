@@ -10,7 +10,7 @@ score:
 worktree: .worktrees/spacedock-ensign-category-gov-mapping
 issue:
 pr: #11
-mod-block: merge:pr-merge
+mod-block: 
 ---
 
 Every expense category maps to a `gov_category` — a government-defined classification. The mapping is set when a category is created, existing categories get mapped on launch, and the mapping is visible in the UI as reference information.
