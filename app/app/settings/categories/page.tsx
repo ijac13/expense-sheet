@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Category } from "../../lib/categories";
+import { Category, GovCategory, GOV_CATEGORY_LABELS, GOV_CATEGORY_OPTIONS } from "../../lib/categories";
 import {
   getCategories,
   addCategory,
@@ -20,10 +20,11 @@ interface FormState {
   icon: string;
   name_en: string;
   name_zh: string;
+  gov_category: GovCategory | "";
   error: string;
 }
 
-const emptyForm: FormState = { icon: "", name_en: "", name_zh: "", error: "" };
+const emptyForm: FormState = { icon: "", name_en: "", name_zh: "", gov_category: "", error: "" };
 
 export default function CategoryManagementPage() {
   const { t } = useTranslation();
@@ -53,7 +54,7 @@ export default function CategoryManagementPage() {
   }
 
   function openEdit(cat: Category) {
-    setForm({ icon: cat.icon, name_en: cat.name_en, name_zh: cat.name_zh, error: "" });
+    setForm({ icon: cat.icon, name_en: cat.name_en, name_zh: cat.name_zh, gov_category: cat.gov_category ?? "", error: "" });
     setFormMode({ type: "edit", id: cat.id });
   }
 
@@ -71,6 +72,10 @@ export default function CategoryManagementPage() {
       setForm((f) => ({ ...f, error: t("cat_mgmt.error_zh_required") }));
       return;
     }
+    if (!form.gov_category) {
+      setForm((f) => ({ ...f, error: t("cat_mgmt.gov_category_required") }));
+      return;
+    }
 
     if (formMode?.type === "add") {
       // Client-side duplicate guard
@@ -86,6 +91,7 @@ export default function CategoryManagementPage() {
         icon: form.icon.trim() || "📦",
         name_en: form.name_en.trim(),
         name_zh: form.name_zh.trim(),
+        gov_category: form.gov_category as GovCategory,
       };
 
       // Optimistic update with a placeholder
@@ -124,6 +130,7 @@ export default function CategoryManagementPage() {
         icon: form.icon.trim() || "📦",
         name_en: form.name_en.trim(),
         name_zh: form.name_zh.trim(),
+        gov_category: form.gov_category as GovCategory,
       };
 
       // Optimistic update
@@ -266,6 +273,21 @@ export default function CategoryManagementPage() {
                   onChange={(e) => setForm((f) => ({ ...f, name_zh: e.target.value, error: "" }))}
                 />
               </div>
+              <div>
+                <label className="label pb-1">
+                  <span className="label-text">{t("cat_mgmt.gov_category_label")} <span className="text-error">*</span></span>
+                </label>
+                <select
+                  className="select select-bordered w-full"
+                  value={form.gov_category}
+                  onChange={(e) => setForm((f) => ({ ...f, gov_category: e.target.value as GovCategory | "", error: "" }))}
+                >
+                  <option value="">{t("cat_mgmt.gov_category_placeholder")}</option>
+                  {GOV_CATEGORY_OPTIONS.map((key) => (
+                    <option key={key} value={key}>{GOV_CATEGORY_LABELS[key]}</option>
+                  ))}
+                </select>
+              </div>
               {form.error && (
                 <p className="text-error text-sm">{form.error}</p>
               )}
@@ -306,6 +328,12 @@ export default function CategoryManagementPage() {
                 <div className="flex-1 min-w-0">
                   <span className="font-medium">{cat.name_en}</span>
                   <span className="text-base-content/50 text-sm ml-2">{cat.name_zh}</span>
+                  <div className="mt-0.5">
+                    {cat.gov_category
+                      ? <span className="text-xs text-base-content/60">{GOV_CATEGORY_LABELS[cat.gov_category as GovCategory]}</span>
+                      : <span className="badge badge-warning badge-xs text-xs">{t("cat_mgmt.gov_category_unset")}</span>
+                    }
+                  </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
