@@ -1,7 +1,7 @@
 ---
 id: "039"
 title: Insights Cache — Show Last Generated with Timestamp
-status: build
+status: verify
 source: captain
 started: 2026-06-04T21:00:00Z
 completed:
