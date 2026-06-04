@@ -10,6 +10,7 @@ score: 0.7
 worktree: .worktrees/spacedock-ensign-data-migration
 issue:
 pr:
+mod-block: merge:pr-merge
 ---
 
 I have old expense data in Excel or CSV format with a different column structure. This needs to be mapped to the new Expenses tab schema and imported into the production Google Spreadsheet so historical data is available from day one.
