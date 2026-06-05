@@ -26,16 +26,9 @@ Check PR-pending entities using the same logic as the startup hook: scan entity 
 
 ## Hook: merge
 
-**PR APPROVAL GUARDRAIL — Do NOT push or create a PR without explicit captain approval.** Before pushing, present a draft PR summary to the captain:
+Verify gate approval is sufficient authorization to proceed. Rebase the branch onto main, push, and create the PR automatically — no extra confirmation needed. Present the PR URL to the captain after creation.
 
-- **Title:** {entity title}
-- **Branch:** {branch} -> main
-- **Changes:** {N} file(s) changed across {N} commit(s)
-- **Files:** {list of changed files}
-
-Wait for the captain's explicit approval before pushing. Do NOT infer approval from silence, acknowledgment of the summary, or the gate approval that preceded this step — only an explicit "push it", "go ahead", "yes", or equivalent counts.
-
-**On approval:** First, push main to ensure the remote is up to date with local state commits: `git push origin main`. Then rebase the worktree branch onto main: `git rebase main` (from the worktree directory). Then push the worktree branch: `git push origin {branch}`. If any step fails (no remote, auth error, rebase conflict), report to the captain and fall back to local merge.
+Proceed directly — no additional confirmation needed after verify gate approval. First, push main to ensure the remote is up to date with local state commits: `git push origin main`. Then rebase the worktree branch onto main: `git rebase main` (from the worktree directory). Then push the worktree branch: `git push origin {branch}`. If any step fails (no remote, auth error, rebase conflict), report to the captain and fall back to local merge.
 
 Before constructing the PR body, compute the short SHA for the audit link by running `git rev-parse --short HEAD` in the worktree directory. If the command exits non-zero (no commits, detached HEAD), substitute the literal string `main` into the audit-link template instead and report the fallback to the captain. Resolve the owner/repo via `gh repo view --json nameWithOwner --jq '.nameWithOwner'`.
 
@@ -80,6 +73,6 @@ Target total length: **60-120 words**.
 
 Set the entity's `pr` field to the PR number (e.g., `#57`). Report the PR to the captain.
 
-**On decline:** Do NOT automatically fall back to local merge. Ask the captain how to proceed — options include local merge or leaving the branch unmerged. Only act on the captain's explicit choice.
+**On push/PR failure:** Report the error to the captain and fall back to local merge if `gh` is unavailable or push fails.
 
 Do NOT archive yet. The entity stays at its current stage with `pr` set until the PR is merged. The FO handles advancement to the terminal stage and archival when it detects the merge (via the event loop PR check, idle hook, or startup hook).
