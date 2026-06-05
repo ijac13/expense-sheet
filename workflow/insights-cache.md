@@ -9,8 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-insights-cache
 issue:
-pr:
-mod-block: merge:pr-merge
+pr: #12
+mod-block: 
 ---
 
 Fix for spending-insights (014): the Generate Insights button calls the API every time it's tapped. Cache the last result in localStorage with the timestamp it was generated. Show the cached version by default. Only regenerate when the captain explicitly taps "Regenerate".
