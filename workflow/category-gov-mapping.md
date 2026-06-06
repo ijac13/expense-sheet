@@ -1,15 +1,15 @@
 ---
 id: "036"
 title: Category → Government Category Mapping
-status: verify
+status: done
 source: captain
 started: 2026-05-21T03:07:30Z
-completed:
-verdict:
+completed: 2026-06-06T02:14:29Z
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-category-gov-mapping
+worktree: 
 issue:
-pr: #11
+pr: "#11"
 mod-block: 
 ---
 
