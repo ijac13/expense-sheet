@@ -1,3 +1,4 @@
+
 ---
 id: "014"
 title: Spending Insights
@@ -10,6 +11,7 @@ score: 0.8
 worktree:
 issue:
 pr:
+archived: 2026-06-07T16:56:26Z
 ---
 
 Raw numbers don't change behavior — advice does. This feature analyzes spending patterns across months and gives plain-language recommendations: what looks like waste, what's worth keeping, and how this month compares to the same period last year. The goal is actionable insight, not just more charts.
