@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReportExpense, PayerFilter } from "../lib/reportTypes";
 import { getExpensesByCategory } from "../lib/reportService";
+import { DEFAULT_CATEGORIES, Category } from "../lib/categories";
+import { getCategories } from "../lib/categoryService";
 import { USERS } from "../lib/users";
+import ExpenseEditSheet from "../components/ExpenseEditSheet";
 
 interface Props {
   year: number;
@@ -15,6 +18,7 @@ interface Props {
   periodLabel: string;
   payer: PayerFilter;
   onBack: () => void;
+  onDataChanged: () => void;
 }
 
 export default function DrillDown({
@@ -26,13 +30,27 @@ export default function DrillDown({
   periodLabel,
   payer,
   onBack,
+  onDataChanged,
 }: Props) {
   const { t } = useTranslation();
   const [expenses, setExpenses] = useState<ReportExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [selected, setSelected] = useState<ReportExpense | null>(null);
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
+
+  useEffect(() => {
+    getCategories()
+      .then((cats) => {
+        const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
+        if (active.length > 0) setCategories(active);
+      })
+      .catch(() => {
+        // Keep DEFAULT_CATEGORIES as fallback
+      });
+  }, []);
 
   function load() {
     setLoading(true);
@@ -43,6 +61,15 @@ export default function DrillDown({
   }
 
   useEffect(load, [year, month, categoryId, payer]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refetch after a write so rows, the header total, and the transaction count come from
+  // server truth — an edit can move an expense out of this category, period, or payer filter.
+  function refreshAfterWrite() {
+    onDataChanged();
+    getExpensesByCategory(year, month, categoryId, payer)
+      .then(setExpenses)
+      .catch(() => setError("load_failed"));
+  }
 
   const total = expenses.reduce((s, e) => s + e.amount, 0);
 
@@ -102,7 +129,12 @@ export default function DrillDown({
         {!loading && !error && expenses.length > 0 && (
           <div className="space-y-2">
             {expenses.map((expense) => (
-              <div key={expense.id} className="card bg-base-200 shadow-sm">
+              <button
+                type="button"
+                key={expense.id}
+                onClick={() => setSelected(expense)}
+                className="card bg-base-200 shadow-sm w-full text-left hover:bg-base-300 transition-colors"
+              >
                 <div className="card-body p-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1 min-w-0">
@@ -121,11 +153,21 @@ export default function DrillDown({
                     </div>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
       </div>
+
+      {selected && (
+        <ExpenseEditSheet
+          expense={selected}
+          categories={categories}
+          onClose={() => setSelected(null)}
+          onSaved={refreshAfterWrite}
+          onDeleted={refreshAfterWrite}
+        />
+      )}
     </div>
   );
 }
