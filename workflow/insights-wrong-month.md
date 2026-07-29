@@ -1,9 +1,9 @@
 ---
 id: 041
 title: Generate Insights Uses Latest Month, Not Viewed Month
-status: ideation
+status: spec
 source: captain (previously discussed, not yet tracked)
-started:
+started: 2026-07-29T12:50:21Z
 completed:
 verdict:
 score:
