@@ -1,13 +1,13 @@
 ---
 id: 040
 title: Tap to Edit Expense in Reports Drill-Down
-status: spec
+status: build
 source: captain feedback screenshot (feedback-screenshots/click to edit expense in history.png)
 started: 2026-07-29T12:50:19Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-report-expense-edit
 issue:
 pr:
 ---
