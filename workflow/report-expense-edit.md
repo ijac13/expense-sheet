@@ -135,3 +135,66 @@ The ideation's premise that Home and History share one edit screen is false, and
 The spec therefore targets the History sheet, extracted into a component both entry points import. This is also forced independently by navigation: the drill-down is component state at `app/app/reports/page.tsx:335`, so any route round-trip would reset `drillDownCategory` to `null` and strand the user on the top-level report — exactly the failure the ideation's fourth success criterion forbids. One consequence is that `ReportExpense` currently drops `subscription_id` and rewrites `paid_by` into a display name, so it needs both real values plumbed through to drive the form faithfully.
 
 One decision is left open for the gate: whether the shared surface gains entity 010's subscription warning, which History lacks today. Adding it satisfies entity 010's approved spec but changes History — a surface this feature otherwise declares out of scope. Recommended Option A with the reasoning stated; captain's call.
+
+## Stage Report: build
+
+- DONE: Working implementation on the dedicated branch with every spec acceptance criterion met and documented in the stage report, per the Reuse Target section (extract History's bottom sheet into a shared component, wire it as the drill-down's edit surface)
+  Commit 5c51b13 on `spacedock-ensign/report-expense-edit`; all 17 criteria exercised below, 47/47 assertions green.
+- DONE: Subscription warning (Option A, captain-approved) present in the shared component per the scope notes
+  `ExpenseEditSheet.tsx` renders `history.subscription_edit_warning` in edit mode and `history.delete_subscription_note` in delete-confirm, both gated on `subscription_id`; deleting the banner turns AC15/AC15c/HIST5 red.
+- DONE: Every acceptance criterion explicitly checked off with evidence; no regressions to History's existing edit/delete flow
+  History regression covered by HIST1-HIST5 (list, view sheet, save writes + updates in place, delete removes row).
+
+### Acceptance criteria — evidence
+
+Verified by driving the real page components under jsdom against a mock server that mirrors the
+Firebase Function contract (`functions/src/index.ts`). Every assertion below fails if the named
+change is made:
+
+- AC1 rows are interactive controls — `DrillDown.tsx:132` is `<button type="button">`; reverting it to `<div>` fails AC1/AC16a.
+- AC2/AC7 tap opens the surface, URL unchanged — sheet appears and `location.href` is byte-identical; a route push would fail AC7.
+- AC3 one shared component — esbuild metafile shows `app/components/ExpenseEditSheet.tsx` imported by both `app/history/page.tsx` and `app/reports/DrillDown.tsx`, present once; dropping either import fails AC3.
+- AC4 pre-filled — amount/date/notes/payer read back from the form equal the tapped row's own text; category tile carries the selected ring.
+- AC5/AC6 existing service functions — server call log shows PATCH `/api` and DELETE `/api`; no `fetch(`, `"PATCH"` or `"DELETE"` literal exists in the sheet, drill-down or History.
+- AC8 returns to the same list — after save the sheet closes onto the drill-down; period and payer selections survive the round trip (AC8c).
+- AC9/AC10/AC11/AC12 refresh — edited row shows NT$999 with no reload, header goes 1,830/3 → 2,579/3, top-level goes 2,560 → 3,309 with payer ijac 720 → 1,469. Removing `onDataChanged()` fails AC11; removing the refetch fails AC9/AC10/AC12/AC13.
+- AC13 filtered-out row — re-categorising an expense drops it from the drill-down (3 rows → 1).
+- AC14 plumbing — `getExpensesByCategory` returns `subscription_id: "sub-1"` and an unmapped `paid_by`.
+- AC15 subscription warning — banner in edit mode, note in the delete dialog, both translated.
+- AC16 monthly/annual parity — annual drill-down tap, save (total 2,357) and delete (2 rows, 1,580) behave identically.
+- AC17 i18n — zh renders 付款人/記錄者/編輯支出/儲存更改 with no English leaking; no new hardcoded labels.
+
+Edge cases: invalid amount blocked with nothing written; save failure keeps the sheet open, shows
+the error and leaves totals untouched; delete of an already-deleted expense surfaces "not found";
+deleting the last row shows `reports.no_data_period` at NT$0; no rows exist to tap while loading or
+errored; rapid double-tap opens exactly one sheet.
+
+### Summary
+
+History's bottom sheet moved verbatim into `app/app/components/ExpenseEditSheet.tsx`, now imported
+by both History and `DrillDown.tsx` — one implementation, two entry points, as the spec's Reuse
+Target requires. The drill-down remains component state, so no route navigation happens and closing
+the editor lands back on the same category, period and payer. After a write the drill-down refetches
+rather than patching in place, which is what makes AC13 (row leaves the filter after an edit) and the
+deleted-by-peer case work without duplicating the service's filter logic; a `dataVersion` counter on
+`ReportsPage` makes the top-level summaries recompute. The sheet opens in view mode at both call
+sites — identical to History today — because giving the drill-down a different initial mode would
+contradict AC3 and the spec's "behave exactly as they do in History".
+
+Two things the gate should weigh. First, **the subscription warning is dormant on real data**: the
+Function's `rowToExpense` maps only columns A:H and never emits `subscription_id`, so no API response
+populates it. Option A is wired exactly as entity 010's route screen wires it and fires correctly
+when the field is present (proved with a seeded `subscription_id`), but it will not appear in
+production until the Function carries that column. That is an entity 010 data-layer gap, outside this
+spec's scope, and worth its own entity. Second, three error strings — "Enter a valid amount.",
+"Failed to save.", "Failed to delete." — moved verbatim from History and remain English-only. AC17
+says "using existing i18n keys" and no key exists for them, so adding keys would have changed
+History beyond the captain-approved Option A; flagging rather than silently expanding scope.
+
+Also observed while testing, unrelated to this change and pre-existing: the reports payer filter
+compares `paid_by` against `"user1"`/`"user2"` while the sheet stores display names, so selecting a
+payer yields no rows. `filterByPayer` is untouched by this work.
+
+Verification note: a real-browser pass was not possible — Chromium segfaults in this sandbox even
+launched standalone — so the components were driven under jsdom with real DOM events and real HTTP.
+Behaviour is covered; visual layout in a browser is not.
