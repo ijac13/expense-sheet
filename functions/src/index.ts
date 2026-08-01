@@ -206,7 +206,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       if (req.method === "GET") {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A:F`,
+          range: `${CATEGORIES_TAB}!A:G`,
         });
         const rows = response.data.values ?? [];
         res.status(200).json(rows.slice(1).map(rowToCategory));
@@ -282,7 +282,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
 
         const allRows = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A:F`,
+          range: `${CATEGORIES_TAB}!A:G`,
         });
         const rows = allRows.data.values ?? [];
         const rowIndex = rows.findIndex((r, i) => i > 0 && r[0] === targetId);

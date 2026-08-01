@@ -1,0 +1,8 @@
+[
+  { "id": "eating-out", "name_en": "Eating Out", "name_zh": "外食", "icon": "🍜", "sort_order": 1, "is_active": true, "gov_category": "restaurants_accommodation" },
+  { "id": "groceries", "name_en": "Groceries", "name_zh": "食材", "icon": "🥬", "sort_order": 3, "is_active": true, "gov_category": "food_beverage_tobacco" },
+  { "id": "medical", "name_en": "Medical", "name_zh": "醫療", "icon": "🏥", "sort_order": 4, "is_active": true, "gov_category": "health" },
+  { "id": "other", "name_en": "Other", "name_zh": "其他", "icon": "📦", "sort_order": 22, "is_active": true, "gov_category": "miscellaneous" },
+  { "id": "insurance", "name_en": "Insurance", "name_zh": "保險", "icon": "🛡️", "sort_order": 23, "is_active": true, "gov_category": "insurance_financial" },
+  { "id": "tax", "name_en": "Tax", "name_zh": "稅金", "icon": "🧾", "sort_order": 24, "is_active": true, "gov_category": "miscellaneous" }
+]
