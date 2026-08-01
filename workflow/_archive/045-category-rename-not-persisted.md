@@ -4,13 +4,15 @@ title: Category Rename Doesn't Persist to Production Sheet
 status: ideation
 source: captain (found manually testing in production)
 started:
-completed:
-verdict:
+completed: 2026-08-01
+verdict: MERGED into 044
 score:
 worktree:
 issue:
 pr:
 ---
+
+**Merged into entity 044** (Reports/History Show Stale or Wrong Category & Payer Names) — same class of bug, same suspect file (`reportService.ts`). Archived here unbuilt; see 044 for the live scope.
 
 Renaming a category in Settings → Category Management is supposed to update the Categories tab and have every screen that shows that category reflect the new name immediately (entity 003's approved spec, AC: "the change is immediately reflected everywhere the category name is displayed"). It doesn't: the captain renamed a category in the webapp, and the change shows up in none of — the production Categories sheet, History, or Reports.
 
