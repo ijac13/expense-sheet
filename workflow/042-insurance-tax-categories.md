@@ -10,6 +10,7 @@ score:
 worktree: .worktrees/spacedock-ensign-042-insurance-tax-categories
 issue:
 pr:
+mod-block: captain-action:production-sheets-credentials
 ---
 
 "Other" has become a catch-all mixing two unrelated, recurring patterns — insurance premiums and government tax payments — instead of holding genuinely miscellaneous spend. Analysis of the last 3 months of production data shows all 4 "Other" entries (NT$154,249 total) are actually one of these two: NT$123,176 income tax + NT$1,001 house tax, and NT$15,010 + NT$15,062 insurance premiums. A third insurance premium (NT$5,268, "ijac 國壽保費") is separately buried under Medical. Neither pattern is visible in the gov_category breakdown today — no category currently maps to `insurance_financial`, and tax has no home at all.
