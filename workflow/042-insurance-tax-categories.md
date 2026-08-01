@@ -1,13 +1,13 @@
 ---
 id: 042
 title: Split Insurance and Tax Out of "Other" Category
-status: spec
+status: build
 source: captain (category analysis of expense-sheet-prod data, 2026-05 to 2026-07)
 started: 2026-07-29T12:50:24Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-042-insurance-tax-categories
 issue:
 pr:
 ---
