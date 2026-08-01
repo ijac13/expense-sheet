@@ -295,6 +295,10 @@ export default function ReportsPage() {
   // Drill-down state
   const [drillDownCategory, setDrillDownCategory] = useState<CategoryBreakdown | null>(null);
 
+  // Bumped when the drill-down writes an expense, so summaries refetch instead of
+  // showing figures the edit already invalidated.
+  const [dataVersion, setDataVersion] = useState(0);
+
   useEffect(() => setMounted(true), []);
 
   // Load monthly data
@@ -307,7 +311,7 @@ export default function ReportsPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [period, year, month, payer]);
+  }, [period, year, month, payer, dataVersion]);
 
   // Load annual data
   useEffect(() => {
@@ -319,7 +323,7 @@ export default function ReportsPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [period, annualYear, payer]);
+  }, [period, annualYear, payer, dataVersion]);
 
   const prevMonth = useCallback(() => {
     if (month === 1) { setYear((y) => y - 1); setMonth(12); }
@@ -351,6 +355,7 @@ export default function ReportsPage() {
         }
         payer={payer}
         onBack={() => setDrillDownCategory(null)}
+        onDataChanged={() => setDataVersion(v => v + 1)}
       />
     );
   }

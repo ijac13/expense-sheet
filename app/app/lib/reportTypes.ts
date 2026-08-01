@@ -56,8 +56,11 @@ export interface ReportExpense {
   category_name: string;     // English
   category_name_zh: string;  // Traditional Chinese
   icon: string;
-  paid_by: string;
+  paid_by: string;           // raw user id, resolved to a display name at render time
   notes: string;
+  created_by?: string;
+  created_at: string;
+  subscription_id?: string;
 }
 
 export type PayerFilter = "all" | "user1" | "user2";

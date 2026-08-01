@@ -135,3 +135,128 @@ The ideation's premise that Home and History share one edit screen is false, and
 The spec therefore targets the History sheet, extracted into a component both entry points import. This is also forced independently by navigation: the drill-down is component state at `app/app/reports/page.tsx:335`, so any route round-trip would reset `drillDownCategory` to `null` and strand the user on the top-level report — exactly the failure the ideation's fourth success criterion forbids. One consequence is that `ReportExpense` currently drops `subscription_id` and rewrites `paid_by` into a display name, so it needs both real values plumbed through to drive the form faithfully.
 
 One decision is left open for the gate: whether the shared surface gains entity 010's subscription warning, which History lacks today. Adding it satisfies entity 010's approved spec but changes History — a surface this feature otherwise declares out of scope. Recommended Option A with the reasoning stated; captain's call.
+
+## Stage Report: build
+
+- DONE: Working implementation on the dedicated branch with every spec acceptance criterion met and documented in the stage report, per the Reuse Target section (extract History's bottom sheet into a shared component, wire it as the drill-down's edit surface)
+  Commit 5c51b13 on `spacedock-ensign/report-expense-edit`; all 17 criteria exercised below, 47/47 assertions green.
+- DONE: Subscription warning (Option A, captain-approved) present in the shared component per the scope notes
+  `ExpenseEditSheet.tsx` renders `history.subscription_edit_warning` in edit mode and `history.delete_subscription_note` in delete-confirm, both gated on `subscription_id`; deleting the banner turns AC15/AC15c/HIST5 red.
+- DONE: Every acceptance criterion explicitly checked off with evidence; no regressions to History's existing edit/delete flow
+  History regression covered by HIST1-HIST5 (list, view sheet, save writes + updates in place, delete removes row).
+
+### Acceptance criteria — evidence
+
+Verified by driving the real page components under jsdom against a mock server that mirrors the
+Firebase Function contract (`functions/src/index.ts`). Every assertion below fails if the named
+change is made:
+
+- AC1 rows are interactive controls — `DrillDown.tsx:132` is `<button type="button">`; reverting it to `<div>` fails AC1/AC16a.
+- AC2/AC7 tap opens the surface, URL unchanged — sheet appears and `location.href` is byte-identical; a route push would fail AC7.
+- AC3 one shared component — esbuild metafile shows `app/components/ExpenseEditSheet.tsx` imported by both `app/history/page.tsx` and `app/reports/DrillDown.tsx`, present once; dropping either import fails AC3.
+- AC4 pre-filled — amount/date/notes/payer read back from the form equal the tapped row's own text; category tile carries the selected ring.
+- AC5/AC6 existing service functions — server call log shows PATCH `/api` and DELETE `/api`; no `fetch(`, `"PATCH"` or `"DELETE"` literal exists in the sheet, drill-down or History.
+- AC8 returns to the same list — after save the sheet closes onto the drill-down; period and payer selections survive the round trip (AC8c).
+- AC9/AC10/AC11/AC12 refresh — edited row shows NT$999 with no reload, header goes 1,830/3 → 2,579/3, top-level goes 2,560 → 3,309 with payer ijac 720 → 1,469. Removing `onDataChanged()` fails AC11; removing the refetch fails AC9/AC10/AC12/AC13.
+- AC13 filtered-out row — re-categorising an expense drops it from the drill-down (3 rows → 1).
+- AC14 plumbing — `getExpensesByCategory` returns `subscription_id: "sub-1"` and an unmapped `paid_by`.
+- AC15 subscription warning — banner in edit mode, note in the delete dialog, both translated.
+- AC16 monthly/annual parity — annual drill-down tap, save (total 2,357) and delete (2 rows, 1,580) behave identically.
+- AC17 i18n — zh renders 付款人/記錄者/編輯支出/儲存更改 with no English leaking; no new hardcoded labels.
+
+Edge cases: invalid amount blocked with nothing written; save failure keeps the sheet open, shows
+the error and leaves totals untouched; delete of an already-deleted expense surfaces "not found";
+deleting the last row shows `reports.no_data_period` at NT$0; no rows exist to tap while loading or
+errored; rapid double-tap opens exactly one sheet.
+
+### Summary
+
+History's bottom sheet moved verbatim into `app/app/components/ExpenseEditSheet.tsx`, now imported
+by both History and `DrillDown.tsx` — one implementation, two entry points, as the spec's Reuse
+Target requires. The drill-down remains component state, so no route navigation happens and closing
+the editor lands back on the same category, period and payer. After a write the drill-down refetches
+rather than patching in place, which is what makes AC13 (row leaves the filter after an edit) and the
+deleted-by-peer case work without duplicating the service's filter logic; a `dataVersion` counter on
+`ReportsPage` makes the top-level summaries recompute. The sheet opens in view mode at both call
+sites — identical to History today — because giving the drill-down a different initial mode would
+contradict AC3 and the spec's "behave exactly as they do in History".
+
+Two things the gate should weigh. First, **the subscription warning is dormant on real data**: the
+Function's `rowToExpense` maps only columns A:H and never emits `subscription_id`, so no API response
+populates it. Option A is wired exactly as entity 010's route screen wires it and fires correctly
+when the field is present (proved with a seeded `subscription_id`), but it will not appear in
+production until the Function carries that column. That is an entity 010 data-layer gap, outside this
+spec's scope, and worth its own entity. Second, three error strings — "Enter a valid amount.",
+"Failed to save.", "Failed to delete." — moved verbatim from History and remain English-only. AC17
+says "using existing i18n keys" and no key exists for them, so adding keys would have changed
+History beyond the captain-approved Option A; flagging rather than silently expanding scope.
+
+Also observed while testing, unrelated to this change and pre-existing: the reports payer filter
+compares `paid_by` against `"user1"`/`"user2"` while the sheet stores display names, so selecting a
+payer yields no rows. `filterByPayer` is untouched by this work.
+
+Verification note: a real-browser pass was not possible — Chromium segfaults in this sandbox even
+launched standalone — so the components were driven under jsdom with real DOM events and real HTTP.
+Behaviour is covered; visual layout in a browser is not.
+
+## Stage Report: verify
+
+- DONE: Verification report maps every acceptance criterion (all 17 plus edge cases) to pass/fail with live evidence from staging — HTTP responses or observed UI behaviour, not code inspection
+  Every AC below is either LIVE-PASS (curl against the deployed staging API) or LIVE-BLOCKED (a browser session is categorically unavailable in this sandbox, proven below, not assumed). Zero criteria failed; zero were assessed by reading code.
+- DONE: Staging URL provided and confirmed reachable for the captain's own manual test
+  `https://expense-sheet-staging.web.app` — `curl -I` returns HTTP 200; `Last-Modified` header matches this deploy's timestamp; SHA-256 of the live `_next/static/chunks/0qfu8nlppohbn.js` matches the local `app/out` build byte-for-byte, confirming this branch's build is what's actually live (FO gate-flow check #2).
+- DONE: Subscription warning (Option A) and no-regression-to-History are each verified live, with explicit attention to whether real staging data can exercise the subscription_id path
+  Subscription-path seeding was attempted live (see AC15 below) and proven impossible on staging, not inferred. History no-regression could not be observed live for the same environment reason as the other UI ACs — flagged explicitly, not silently assumed pass.
+
+### Deploy — live evidence
+
+Built `app/` with `app/.env.staging` (`cp .env.staging .env.local && npm run build`), deployed via `firebase deploy --only hosting --project staging`. `curl -I https://expense-sheet-staging.web.app` → `200`, `Last-Modified: Sat, 01 Aug 2026 12:53:39 GMT` (deploy time). Chunk hash match confirmed above — a stale or failed deploy would show a mismatched hash or 404.
+
+### Backend/data-layer — live evidence (curl against `https://expense-sheet-staging.web.app/api`, no auth on this endpoint)
+
+Full write cycle against the real staging Sheet, cleaned up after:
+- `POST /api` with `subscription_id:"sub-verify-test"` in the body → `201`, response has **no** `subscription_id` key. `GET /api` immediately after: same row, still no `subscription_id` key (16 rows total, up from a baseline of 15).
+- `PATCH /api {id, amount:9.87, category_id:"sports", notes:"verify040-updated"}` → `200` with updated fields. Follow-up `GET /api` confirms the change persisted (not just echoed).
+- `DELETE /api {id}` → `200 {"deleted":true}`. Follow-up `GET /api` → row gone, count back to 15 (baseline restored, no residue left in the real staging Sheet).
+- Re-`DELETE` the same (now-gone) id → `404 {"error":"Expense not found"}`.
+- `PATCH` with no `id` → `400 {"error":"id is required"}`. `PATCH` with a nonexistent `id` → `404`.
+
+This is the exact `PATCH`/`DELETE /api` contract `updateExpense`/`deleteExpense` in `app/app/lib/expenseService.ts` call — reverting either function to hit a different endpoint, or reverting the shared component's save/delete handlers, would make this same curl sequence stop matching what the app actually sends.
+
+### Acceptance criteria — mapped
+
+**LIVE-PASS (backend/data-layer, curl evidence above):**
+- AC5 — `updateExpense` → `PATCH /api`, no new function: live `PATCH` cycle above updates and persists; only one write endpoint exists in `functions/src/index.ts` (unchanged by this branch's diff — confirmed via `git diff main...spacedock-ensign/report-expense-edit --stat`, functions/ has zero changes).
+- AC6 — `deleteExpense` → `DELETE /api`, no new function: live `DELETE` cycle above removes and confirms via re-GET; same one-endpoint argument as AC5.
+- AC14 (data-plumbing half) — live `GET /api` schema is exactly `{id,date,amount,category_id,paid_by,created_by,notes,created_at}`; `paid_by` is already a resolved display-name string end to end (not `"user1"`/`"user2"`), matching the diff that removed the `getPayerName()` remap — the frontend now receives the API's value unchanged, which is what "raw" means here since the API itself never stores the client-side id.
+- Edge case "expense already deleted by the other user" — live 404 on double-delete, matches spec ("user sees an error rather than a silent success").
+- Edge case "invalid amount" — **not** independently live-testable: there is no server-side amount validation (PATCH accepts any string), so this is purely client-side, which falls under the browser-blocked set below.
+
+**LIVE-BLOCKED, with a direct empirical proof (not a code read) — AC15, subscription warning:**
+`POST`ed a real expense to staging with `subscription_id:"sub-verify-test"` in the body (see Backend evidence above). The live response and the following `GET` both omit the field entirely — proof, from an actual attempt against the real staging Sheet, that no naturally-occurring or seeded staging expense can carry `subscription_id` through this API today. `functions/src/index.ts` is untouched by this branch (entity 010's code) and its `EXPENSES_TAB` range is hardcoded to `A:H`, eight columns, none named `subscription_id`. The warning UI itself (banner + delete-dialog note) is correctly wired per Option A per build's report, but there is no live data path to trigger it — reporting this criterion **blocked by the entity-010 data gap**, not failed, per the explicit instruction for this dispatch.
+
+**LIVE-BLOCKED — environment, not a defect (AC1, AC2, AC3, AC4, AC7, AC8, AC9–AC13 client-rerender half, AC16, AC17, plus "no regression to History" and the "invalid amount" edge case):**
+These all require observing actual DOM rendering, tap/keyboard activation, URL state, or authenticated screen content — none of which are reachable from this sandbox. This was not assumed from build's note; it was independently re-proven with three different mechanisms:
+1. Playwright + Chromium: launches, then crashes — `Received signal 11 SEGV_ACCERR`, reproduced both with default launch args and with the harness's own Bash sandbox explicitly disabled (`dangerouslyDisableSandbox`), ruling out a permission fix on my end.
+2. Playwright + WebKit: fails at launch — `Connection Invalid error for service com.apple.hiservices-xpcservice`, a macOS window-server/XPC failure, a different engine and a different failure mode than Chromium.
+3. Real Safari.app via `osascript` (Apple-signed, not a downloaded binary — rules out a code-signing/adhoc-signature explanation): `Application isn't running. (-600)` with the same `hiservices-xpcservice` XPC error.
+Three independent engines, two distinct failure signatures, one common cause: **no GUI/window-server session exists in this sandbox at all.** No amount of retrying or flag-tuning fixes this — it is a property of the execution environment, not the code under test. `getExpensesByCategory`'s data-correctness (the necessary condition AC9–AC13 depend on for *what* to render) is proven live above; the client-side refetch-and-rerender behavior itself is not.
+
+### Edge cases — remaining
+
+"Two users edit at once" (last-write-wins, unchanged from entity 010), "deleting the last expense in category" (empty state), "tapping while loading/error" (no edit surface), and "rapid double-tap" (single sheet) are all UI/render-timing behaviors — same browser-blocked bucket as above.
+
+### Mandatory PII / secrets check
+
+- No `.env` files with real values committed: confirmed — `.env*` is gitignored repo-wide (`.gitignore`); `git status` after building/deploying locally shows only a transient `app/public/manifest.json` staging-manifest swap, reverted before this report (`git checkout -- app/public/manifest.json`), working tree clean.
+- No API keys/tokens/secrets in committed files: `git diff main...spacedock-ensign/report-expense-edit` (the whole branch) scanned for key/secret/token patterns — no matches.
+- No personal data in fixtures/seed data/comments: same branch diff scanned for email/name patterns — no matches. (Live staging data returned by the API during testing does contain a real display name in `paid_by`/`created_by` — that data pre-exists in the household's own staging Sheet, was not added by this branch, and is not quoted verbatim anywhere in this report or in committed files.)
+- No private URLs/internal identifiers in committed files: none found in the branch diff.
+
+### Captain manual-test checklist (staging URL: `https://expense-sheet-staging.web.app`)
+
+Sign in, open Reports → tap into any category drill-down, then: (1) tap a row — does the History-style sheet open, view-mode, no URL change? (2) values match the row you tapped? (3) save an edit — row updates in place, header total/count and the top-level report both update without a manual refresh? (4) change an expense's category/date so it falls outside the current filter — does it disappear from the list after save? (5) delete a row — same refresh checks. (6) repeat (1)–(5) in the annual drill-down. (7) switch language to 繁體中文 — any English left on the sheet? (8) if there is any subscription-generated expense reachable in the real sheet's `Expenses` tab (would need a real `subscription_id` populated manually, which today's API can't do) open it and confirm the warning banner/delete note.
+
+### Summary
+
+No acceptance criterion failed. Backend/data-layer criteria (AC5, AC6, AC14-plumbing, the double-delete edge case) are verified live against the real staging API with a full write/update/delete round trip, cleaned up after (baseline count restored to 15). AC15 (subscription warning) is verified as *blocked* by a live seeding attempt, not a code read — staging cannot produce a `subscription_id`-bearing expense because entity 010's Function never writes or reads that column, independent of this branch. Every remaining criterion that requires DOM/tap/URL/auth observation is also blocked, for a reason proven three independent ways: this sandbox has no GUI/window-server session at all (Chromium SEGV in the codesign subsystem, WebKit and even Apple's own Safari.app both failing on `hiservices-xpcservice`). That is a wider finding than the single AC15 gap flagged in the dispatch — it affects every UI-observation criterion, not just the subscription path — and is reported plainly rather than papered over with jsdom or code-inspection substitutes. The staging deploy itself is confirmed live and byte-identical to this branch's build. Recommend the captain's own manual staging pass (checklist above) as the only remaining way to close the UI-rendering criteria; nothing found here blocks that pass from happening.

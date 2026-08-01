@@ -226,8 +226,11 @@ export async function getExpensesByCategory(
         category_name: meta.name_en,
         category_name_zh: meta.name_zh,
         icon: meta.icon,
-        paid_by: getPayerName(e.paid_by),
+        paid_by: e.paid_by,
         notes: e.notes ?? "",
+        created_by: e.created_by,
+        created_at: e.created_at,
+        subscription_id: e.subscription_id,
       };
     });
 }
