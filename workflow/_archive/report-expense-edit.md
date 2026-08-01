@@ -1,16 +1,17 @@
 ---
 id: 040
 title: Tap to Edit Expense in Reports Drill-Down
-status: verify
+status: done
 source: captain feedback screenshot (feedback-screenshots/click to edit expense in history.png)
 started: 2026-07-29T12:50:19Z
-completed:
-verdict:
+completed: 2026-08-01T14:17:35Z
+verdict: passed
 score:
 worktree: .worktrees/spacedock-ensign-report-expense-edit
 issue:
 pr: pr-merge:13
-mod-block: merge:pr-merge
+mod-block:
+archived: 2026-08-01T14:17:35Z
 ---
 
 Tapping an expense row inside a Reports category drill-down does nothing today — Home and History already open the edit screen (entity 010) when you tap a row, but the same tap in a Reports drill-down (entity 005) is dead, so a user who spots a mistake while reviewing a report has to go hunt down the same expense in History to fix it.
