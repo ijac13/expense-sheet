@@ -10,6 +10,7 @@ score:
 worktree: .worktrees/spacedock-ensign-report-expense-edit
 issue:
 pr:
+mod-block: merge:pr-merge
 ---
 
 Tapping an expense row inside a Reports category drill-down does nothing today — Home and History already open the edit screen (entity 010) when you tap a row, but the same tap in a Reports drill-down (entity 005) is dead, so a user who spots a mistake while reviewing a report has to go hunt down the same expense in History to fix it.

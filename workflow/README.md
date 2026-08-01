@@ -31,7 +31,9 @@ Build a personal expense tracking app for daily spending capture — quick manua
 
 ## File Naming
 
-Each feature is a markdown file named `{slug}.md` — lowercase, hyphens, no spaces. Example: `expense-entry.md`.
+Each feature is a markdown file named `{id}-{slug}.md` — zero-padded id prefix, lowercase slug, hyphens, no spaces. Example: `010-edit-delete-expense.md`. This makes the id visible without opening the file or running `status`.
+
+`spacedock new <slug>` writes a flat `{slug}.md` — it does not know the id-prefix convention. Immediately after filing, rename the file to add the `{id}-` prefix (`mv`/`git mv` + `git add`) before committing. Once renamed, the full filename stem — id prefix included — is the slug used everywhere else (`--set`, `--entity-path`, worktree paths, branch names). Do not rename a file while its `worktree:` field is set — the worktree, branch, and dispatch names are already keyed to the pre-rename slug; rename only after the entity reaches a terminal or worktree-free state.
 
 ## Schema
 
