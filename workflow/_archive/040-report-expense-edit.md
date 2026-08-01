@@ -14,6 +14,8 @@ mod-block:
 archived: 2026-08-01T14:17:35Z
 ---
 
+**Production deploy:** merging to `main` did not auto-deploy (no CI/CD in this repo) — production hosting (`expense-sheet-b2db8`) was still running the pre-040 build until a manual `firebase deploy --only hosting --project production` on 2026-08-01, confirmed live via HTTP (`Last-Modified: Sat, 01 Aug 2026 15:00:10 GMT`).
+
 Tapping an expense row inside a Reports category drill-down does nothing today — Home and History already open the edit screen (entity 010) when you tap a row, but the same tap in a Reports drill-down (entity 005) is dead, so a user who spots a mistake while reviewing a report has to go hunt down the same expense in History to fix it.
 
 ## User Stories
