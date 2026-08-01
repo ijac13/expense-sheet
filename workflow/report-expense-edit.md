@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-report-expense-edit
 issue:
-pr: "#13"
+pr: pr-merge:13
 mod-block: merge:pr-merge
 ---
 
