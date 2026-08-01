@@ -1,13 +1,13 @@
 ---
 id: 044
 title: Reports/History Show Stale or Wrong Category & Payer Names (Hardcoded/Cached Lookup)
-status: spec
+status: build
 source: captain (found while manually verifying entity 040 on staging)
 started: 2026-08-01T14:52:44Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-044-report-hardcoded-lookups
 issue:
 pr:
 ---
