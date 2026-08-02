@@ -1,3 +1,5 @@
+import type { UserId } from "./users";
+
 export interface CategoryBreakdown {
   category_id: string;
   category_name: string;     // English
@@ -63,6 +65,9 @@ export interface ReportExpense {
   subscription_id?: string;
 }
 
-export type PayerFilter = "all" | "user1" | "user2";
+// Was a hardcoded "all" | "user1" | "user2" union — now derived from UserId so it
+// can't silently drift from the actual USERS list (see reportService.ts's
+// resolvePayerName, which needs this to be a real user id to look up a name).
+export type PayerFilter = "all" | UserId;
 export type ChartType = "pie" | "bar";
 export type ReportPeriod = "monthly" | "annual";

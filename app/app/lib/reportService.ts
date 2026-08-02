@@ -13,15 +13,36 @@ import {
   PayerFilter,
 } from "./reportTypes";
 import { Expense } from "./expenses";
-import { DEFAULT_CATEGORIES } from "./categories";
+import { DEFAULT_CATEGORIES, Category } from "./categories";
+import { getCategories } from "./categoryService";
+import { USERS } from "./users";
 
 const API_BASE = "/api";
 
 // ---------------------------------------------------------------------------
-// Category metadata — resolved from DEFAULT_CATEGORIES (has both en + zh names)
+// Category metadata — resolved live-list-first, DEFAULT_CATEGORIES as fallback
 // ---------------------------------------------------------------------------
-function getCatMeta(catId: string): { name_en: string; name_zh: string; icon: string } {
-  const cat = DEFAULT_CATEGORIES.find((c) => c.id === catId);
+// Live category data (same source the category picker already uses) always wins,
+// so a rename or a staging-only id (e.g. `cat_003`) resolves correctly. Falls back
+// to DEFAULT_CATEGORIES only if the live fetch fails (offline/API down), and to the
+// raw id only if the category genuinely isn't in either list (AC-1..AC-4).
+async function fetchCategoryList(): Promise<Category[]> {
+  try {
+    const live = await getCategories();
+    if (live && live.length > 0) return live;
+  } catch {
+    // GET /api/categories failed — fall through to the DEFAULT_CATEGORIES fallback.
+  }
+  return DEFAULT_CATEGORIES;
+}
+
+function getCatMeta(
+  catId: string,
+  categories: Category[]
+): { name_en: string; name_zh: string; icon: string } {
+  const cat =
+    categories.find((c) => c.id === catId) ??
+    DEFAULT_CATEGORIES.find((c) => c.id === catId);
   return {
     name_en: cat?.name_en ?? catId,
     name_zh: cat?.name_zh ?? catId,
@@ -29,10 +50,18 @@ function getCatMeta(catId: string): { name_en: string; name_zh: string; icon: st
   };
 }
 
-import { USERS } from "./users";
-
 function getPayerName(userId: string): string {
   return USERS.find(u => u.id === userId)?.name ?? userId;
+}
+
+// ---------------------------------------------------------------------------
+// Payer filter — PayerFilter carries a user *id* (the <select>'s option value);
+// stored `paid_by` is the display *name* written at expense-creation time
+// (app/app/page.tsx). Resolve id -> name before comparing so the filter actually
+// matches instead of comparing an id against a name that can never equal it.
+// ---------------------------------------------------------------------------
+function resolvePayerName(payer: Exclude<PayerFilter, "all">): string {
+  return USERS.find((u) => u.id === payer)?.name ?? payer;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,10 +84,11 @@ function makeDate(year: number, month: number, day: number): string {
 
 function filterByPayer(expenses: Expense[], payer: PayerFilter): Expense[] {
   if (payer === "all") return expenses;
-  return expenses.filter((e) => e.paid_by === payer);
+  const target = resolvePayerName(payer);
+  return expenses.filter((e) => e.paid_by === target);
 }
 
-function buildCategoryBreakdown(expenses: Expense[]): CategoryBreakdown[] {
+function buildCategoryBreakdown(expenses: Expense[], categories: Category[]): CategoryBreakdown[] {
   const map: Record<string, { total: number; count: number }> = {};
   for (const e of expenses) {
     if (!map[e.category_id]) map[e.category_id] = { total: 0, count: 0 };
@@ -68,7 +98,7 @@ function buildCategoryBreakdown(expenses: Expense[]): CategoryBreakdown[] {
   const grandTotal = expenses.reduce((s, e) => s + e.amount, 0);
   return Object.entries(map)
     .map(([cat_id, { total, count }]) => {
-      const meta = getCatMeta(cat_id);
+      const meta = getCatMeta(cat_id, categories);
       return {
         category_id: cat_id,
         category_name: meta.name_en,
@@ -104,7 +134,10 @@ export async function getMonthlySummary(
   month: number,
   payer: PayerFilter = "all"
 ): Promise<MonthlySummary> {
-  const allExpenses = await fetchAllExpenses();
+  const [allExpenses, categories] = await Promise.all([
+    fetchAllExpenses(),
+    fetchCategoryList(),
+  ]);
 
   const ym = makeDate(year, month, 1).slice(0, 7);
   const monthExpenses = filterByPayer(
@@ -140,7 +173,7 @@ export async function getMonthlySummary(
     month,
     label: `${MONTH_NAMES[month - 1]} ${year}`,
     total: monthExpenses.reduce((s, e) => s + e.amount, 0),
-    categories: buildCategoryBreakdown(monthExpenses),
+    categories: buildCategoryBreakdown(monthExpenses, categories),
     payers: buildPayerBreakdown(monthExpenses),
     comparison: {
       prev_month_total: prevExpenses.reduce((s, e) => s + e.amount, 0),
@@ -159,7 +192,10 @@ export async function getAnnualSummary(
   year: number,
   payer: PayerFilter = "all"
 ): Promise<AnnualSummary> {
-  const allExpenses = await fetchAllExpenses();
+  const [allExpenses, categories] = await Promise.all([
+    fetchAllExpenses(),
+    fetchCategoryList(),
+  ]);
 
   const yearPrefix = String(year);
   const yearExpenses = filterByPayer(
@@ -185,7 +221,7 @@ export async function getAnnualSummary(
   return {
     year,
     total: yearExpenses.reduce((s, e) => s + e.amount, 0),
-    categories: buildCategoryBreakdown(yearExpenses),
+    categories: buildCategoryBreakdown(yearExpenses, categories),
     payers: buildPayerBreakdown(yearExpenses),
     monthly_trend,
     expense_count: yearExpenses.length,
@@ -201,7 +237,10 @@ export async function getExpensesByCategory(
   categoryId: string,
   payer: PayerFilter = "all"
 ): Promise<ReportExpense[]> {
-  const allExpenses = await fetchAllExpenses();
+  const [allExpenses, categories] = await Promise.all([
+    fetchAllExpenses(),
+    fetchCategoryList(),
+  ]);
 
   let expenses = allExpenses.filter((e) => e.category_id === categoryId);
 
@@ -217,7 +256,7 @@ export async function getExpensesByCategory(
   return expenses
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((e) => {
-      const meta = getCatMeta(e.category_id);
+      const meta = getCatMeta(e.category_id, categories);
       return {
         id: e.id,
         date: e.date,
