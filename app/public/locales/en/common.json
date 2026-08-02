@@ -62,6 +62,7 @@
     "insights_error_data": "Couldn't load your expense data. Check your connection and try again.",
     "insights_error": "Something went wrong. Please try again.",
     "regenerate": "Regenerate",
+    "insights_generated_at": "Generated:",
     "amount": "Amount"
   },
   "subscriptions": {

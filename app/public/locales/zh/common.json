@@ -62,6 +62,7 @@
     "insights_error_data": "無法載入支出資料，請檢查網路連線後再試。",
     "insights_error": "發生錯誤，請再試一次。",
     "regenerate": "重新產生",
+    "insights_generated_at": "產生時間：",
     "amount": "金額"
   },
   "subscriptions": {
