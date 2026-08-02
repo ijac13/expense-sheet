@@ -1,16 +1,16 @@
 ---
 id: "039"
 title: Insights Cache — Show Last Generated with Timestamp
-status: verify
+status: done
 source: captain
 started: 2026-06-04T21:00:00Z
-completed:
-verdict:
+completed: 2026-08-02T23:45:44Z
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-insights-cache
+worktree:
 issue:
 pr: #12
-mod-block: 
+mod-block:
 ---
 
 Fix for spending-insights (014): the Generate Insights button calls the API every time it's tapped. Cache the last result in localStorage with the timestamp it was generated. Show the cached version by default. Only regenerate when the captain explicitly taps "Regenerate".
