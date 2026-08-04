@@ -13,6 +13,8 @@ pr: #12
 mod-block:
 ---
 
+**Production deploy:** `firebase deploy --only hosting --project production` run 2026-08-03, confirmed live via HTTP (`https://expense-sheet-b2db8.web.app` — 200, `Last-Modified: Tue, 04 Aug 2026 03:52:54 GMT`).
+
 Fix for spending-insights (014): the Generate Insights button calls the API every time it's tapped. Cache the last result in localStorage with the timestamp it was generated. Show the cached version by default. Only regenerate when the captain explicitly taps "Regenerate".
 
 ## Why This Matters
