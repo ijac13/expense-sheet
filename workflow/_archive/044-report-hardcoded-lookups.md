@@ -1,16 +1,16 @@
 ---
 id: 044
 title: Reports/History Show Stale or Wrong Category & Payer Names (Hardcoded/Cached Lookup)
-status: verify
+status: done
 source: captain (found while manually verifying entity 040 on staging)
 started: 2026-08-01T14:52:44Z
-completed:
-verdict:
+completed: 2026-08-07T09:23:30Z
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-044-report-hardcoded-lookups
+worktree:
 issue:
 pr: "#14"
-mod-block: merge:pr-merge
+mod-block:
 ---
 
 Reports silently shows raw ids instead of names whenever the underlying data doesn't match a hardcoded list in `app/app/lib/reportService.ts`. Two confirmed cases, both pre-existing and unrelated to entity 040 (verified against 040's actual diff — it only touches unrelated `paid_by`/`subscription_id` plumbing, not either lookup function below):
