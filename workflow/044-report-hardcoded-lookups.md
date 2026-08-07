@@ -9,7 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-044-report-hardcoded-lookups
 issue:
-pr:
+pr: "#14"
+mod-block: merge:pr-merge
 ---
 
 Reports silently shows raw ids instead of names whenever the underlying data doesn't match a hardcoded list in `app/app/lib/reportService.ts`. Two confirmed cases, both pre-existing and unrelated to entity 040 (verified against 040's actual diff — it only touches unrelated `paid_by`/`subscription_id` plumbing, not either lookup function below):
