@@ -13,6 +13,8 @@ pr: "#14"
 mod-block:
 ---
 
+**Production deploy:** `firebase deploy --only hosting --project production` run 2026-08-07, confirmed live via HTTP (`https://expense-sheet-b2db8.web.app` — 200, `Last-Modified: Fri, 07 Aug 2026 09:25:02 GMT`).
+
 Reports silently shows raw ids instead of names whenever the underlying data doesn't match a hardcoded list in `app/app/lib/reportService.ts`. Two confirmed cases, both pre-existing and unrelated to entity 040 (verified against 040's actual diff — it only touches unrelated `paid_by`/`subscription_id` plumbing, not either lookup function below):
 
 1. **Category names.** `getCatMeta()` resolves a category's name only against the hardcoded `DEFAULT_CATEGORIES` list (production slugs like `groceries`, `medical`). Staging's real Categories tab uses the older `cat_NNN` scheme. Any expense whose `category_id` isn't in `DEFAULT_CATEGORIES` — including every staging category today — displays as the raw id (e.g. "cat_003") instead of a name. Entity 040 made this easy to trigger: its category picker correctly fetches the *live* category list, so picking a category from it can write a valid `category_id` that this hardcoded resolver still can't read back.
