@@ -362,6 +362,22 @@ export default function ReportsPage() {
 
   useEffect(() => setMounted(true), []);
 
+  // Force a refetch (via the same dataVersion lever the drill-down write-path
+  // already uses) when the user returns here via browser/gesture back-forward
+  // navigation. Next's App Router client cache can reuse an already-rendered
+  // page on that path without re-running mount effects (see the identical note
+  // in history/page.tsx and node_modules/next/dist/docs/01-app/04-glossary.md#client-cache),
+  // so a category renamed while Reports was already visited earlier in the
+  // session would otherwise keep showing the old name. `popstate` never fires
+  // for normal <Link>-tab navigation.
+  useEffect(() => {
+    function handlePopState() {
+      setDataVersion((v) => v + 1);
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   // Load monthly data
   useEffect(() => {
     if (period !== "monthly") return;
