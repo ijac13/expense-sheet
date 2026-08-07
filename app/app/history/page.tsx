@@ -322,14 +322,29 @@ export default function HistoryPage() {
   }, []);
 
   useEffect(() => {
-    getCategories()
-      .then((cats) => {
-        const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
-        if (active.length > 0) setCategories(active);
-      })
-      .catch(() => {
-        // Keep DEFAULT_CATEGORIES as fallback
-      });
+    function loadCategories() {
+      getCategories()
+        .then((cats) => {
+          const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
+          if (active.length > 0) setCategories(active);
+        })
+        .catch(() => {
+          // Keep the current categories (DEFAULT_CATEGORIES on first load) as fallback
+        });
+    }
+    loadCategories();
+    // Next.js's App Router client cache reuses an already-rendered page (this
+    // effect does not re-run) when the user returns via browser/gesture
+    // back-forward navigation rather than an in-app <Link> tap — see
+    // node_modules/next/dist/docs/01-app/04-glossary.md#client-cache: "Pages are
+    // not cached by default but are reused during browser back/forward
+    // navigation." A category renamed in Settings while History was already
+    // visited earlier in the session would otherwise keep showing the old name.
+    // `popstate` fires only for that back/forward case, never for <Link> taps
+    // (which use pushState), so this adds no redundant fetching on normal tab
+    // navigation.
+    window.addEventListener("popstate", loadCategories);
+    return () => window.removeEventListener("popstate", loadCategories);
   }, []);
 
   const filtered = useMemo(() => applyFilters(expenses, filters, search, categories), [expenses, filters, search, categories]);

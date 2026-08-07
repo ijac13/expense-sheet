@@ -26,6 +26,8 @@ interface FormState {
 
 const emptyForm: FormState = { icon: "", name_en: "", name_zh: "", gov_category: "", error: "" };
 
+type SaveStatus = { type: "success" | "error"; message: string } | null;
+
 export default function CategoryManagementPage() {
   const { t } = useTranslation();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -33,6 +35,7 @@ export default function CategoryManagementPage() {
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [archivedOpen, setArchivedOpen] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>(null);
 
   useEffect(() => {
     getCategories()
@@ -42,6 +45,13 @@ export default function CategoryManagementPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Auto-dismiss the save confirmation/error toast (AC-11, AC-12).
+  useEffect(() => {
+    if (!saveStatus) return;
+    const timer = setTimeout(() => setSaveStatus(null), saveStatus.type === "success" ? 2500 : 5000);
+    return () => clearTimeout(timer);
+  }, [saveStatus]);
 
   const active = [...categories.filter((c) => c.is_active)].sort(
     (a, b) => a.sort_order - b.sort_order
@@ -133,6 +143,12 @@ export default function CategoryManagementPage() {
         gov_category: form.gov_category as GovCategory,
       };
 
+      // Snapshot the pre-edit category so a failed save can revert deterministically
+      // (AC-12) — do not depend on a second network call (the old rollback-via-refetch)
+      // succeeding, since a failed PATCH can coincide with a failed GET, which would
+      // silently leave the failed edit displayed as if it had saved.
+      const preEditCat = categories.find((c) => c.id === editId);
+
       // Optimistic update
       setCategories((prev) =>
         prev.map((c) => (c.id === editId ? { ...c, ...data } : c))
@@ -141,11 +157,16 @@ export default function CategoryManagementPage() {
 
       try {
         await updateCategory(editId, data);
+        setSaveStatus({ type: "success", message: t("cat_mgmt.save_success") });
       } catch (err) {
-        // Roll back by refetching
-        getCategories().then(setCategories).catch(() => {});
+        if (preEditCat) {
+          setCategories((prev) => prev.map((c) => (c.id === editId ? preEditCat : c)));
+        } else {
+          // No snapshot available (shouldn't happen) — best-effort refetch fallback.
+          getCategories().then(setCategories).catch(() => {});
+        }
         const msg = err instanceof Error ? err.message : "Failed to update category";
-        alert(msg);
+        setSaveStatus({ type: "error", message: msg });
       }
     }
   }
@@ -210,6 +231,13 @@ export default function CategoryManagementPage() {
 
   return (
     <div className="max-w-lg mx-auto p-4">
+      {saveStatus && (
+        <div className="toast toast-top toast-center z-50">
+          <div className={`alert ${saveStatus.type === "success" ? "alert-success" : "alert-error"}`}>
+            <span>{saveStatus.message}</span>
+          </div>
+        </div>
+      )}
       <Link href="/settings" className="flex items-center gap-1 text-sm text-base-content/60 mb-4">
         <ChevronLeft size={16} /> {t("settings.title")}
       </Link>
