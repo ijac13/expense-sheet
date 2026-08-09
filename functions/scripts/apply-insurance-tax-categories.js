@@ -205,16 +205,14 @@ async function loadLiveSource() {
         requestBody: { values: rows },
       });
     },
-    async patchExpenseCategory(id) {
+    async patchExpenseCategory(id, newCategoryId) {
       // Find row index, then update only column D (category_id) to preserve
       // every other column byte-identical.
       const resp = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${EXPENSES_TAB}!A:H` });
       const rows = resp.data.values ?? [];
       const idx = rows.findIndex((r, i) => i > 0 && r[0] === id);
       if (idx === -1) throw new Error(`patchExpenseCategory: id ${id} not found`);
-      const target = RETAG_TARGETS.find((t) => rows[idx][2] === String(t.amount) || Number(rows[idx][2]) === t.amount);
-      const newCategoryId = target ? target.to_category : undefined;
-      if (!newCategoryId) throw new Error(`patchExpenseCategory: no target mapping for row ${id}`);
+      if (!newCategoryId) throw new Error(`patchExpenseCategory: no target category for row ${id}`);
       await sheets.spreadsheets.values.update({
         spreadsheetId,
         range: `${EXPENSES_TAB}!D${idx + 1}:D${idx + 1}`,
@@ -250,11 +248,17 @@ function inWindow(date) {
 async function planCategoryInserts(source) {
   const categories = await source.getCategories();
 
-  const slugLike = /^cat_\d+$/;
-  const badId = categories.find((c) => slugLike.test(c.id));
-  if (badId) {
-    throw new Error(
-      `Halting: category id "${badId.id}" matches the cat_NNN pattern — production categories are not slugs as assumed. See entity 042 Assumptions.`
+  // The Categories tab uses cat_NNN ids while every expense/subscription row
+  // references slugs (`other`, `medical`, …). This guard used to halt here,
+  // because a category id that missed the hard-coded DEFAULT_CATEGORIES list
+  // rendered as a raw id. Entity 044 removed that coupling — getCatMeta now
+  // resolves against the live category list and falls back to DEFAULT_CATEGORIES
+  // per id — so a mixed scheme is cosmetic rather than a rendering failure, and
+  // slug ids are what the expense data already points at.
+  const catNnn = categories.filter((c) => /^cat_\d+$/.test(c.id));
+  if (catNnn.length > 0) {
+    console.log(
+      `[warn] ${catNnn.length}/${categories.length} existing category ids use the cat_NNN scheme; adding insurance/tax as slugs alongside them (entity 042, post-044 decision).`
     );
   }
 
