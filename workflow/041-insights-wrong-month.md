@@ -135,3 +135,30 @@ Every file:line in the spec was traced in the working tree and re-verified by re
 ### Summary
 
 Wrote the spec grounded in a live trace rather than the entity's conjecture — the Plan's guess was correct but incomplete. Beyond the `now()` defaulting, tracing surfaced three problems the original framing missed: the whole-history fallback at `index.ts:475` that would mislabel an empty period's analysis, tier computation from total span rather than data-up-to-the-viewed-period, and the in-flight period-switch race. 19 ACs across five groups (request/response contract, monthly window, annual window, empty/insufficient periods, cache scoping). Note for build: entity 039 is still in `verify` on PR #12 and unmerged, so AC-14 through AC-19 land on top of code that is not yet on `main` — sequencing needs the FO's call.
+
+## Build Plan
+
+Written before coding, per the build stage definition.
+
+Backend — `functions/src/index.ts` + new `functions/src/insights.ts`
+
+1. Extract the period maths and prompt assembly out of the inline `/api/insights` block into `functions/src/insights.ts`, exporting `parseInsightsPeriod(body)` and `buildInsightsPrompt({ expenses, subscriptions, period, nowMs })`. The extraction is what makes AC-4 through AC-13 checkable without Google Sheets or an Anthropic key — the endpoint itself needs both.
+2. `parseInsightsPeriod` returns the validated period or `null`; the endpoint answers `null` with HTTP 400 `{ error_code: "bad_period" }` before the Sheets read and before any Anthropic call (AC-4).
+3. All windows derive from the requested period, never `now`: month keys by integer arithmetic (`year * 12 + month - 1 - n`) so no `Date` year quirks; label from a `MONTH_NAMES` constant (AC-5..AC-10).
+4. Drop the `recentExp.length > 0 ? recentExp : allExpenses` fallback. Zero expenses in the requested period returns `{ insufficient_data: true, days: 0, period }` (AC-11).
+5. Tier counts only months with data strictly before the requested period, and the day span ends at the requested period's end (capped at today for a partial period), so later months cannot promote a tier (AC-12).
+6. A comparison block whose window holds no data is omitted from the prompt entirely rather than printed as `(no data)` (AC-13). Annual mode replaces both monthly blocks with a single prior-year block (AC-9).
+7. Success responds `{ insights, period: { type, year, month? } }` (AC-3).
+
+Frontend — `app/app/reports/page.tsx`
+
+8. `InsightsCard` takes a `period` prop; the two call sites pass the on-screen month / year (AC-1, AC-2).
+9. Cache key becomes `insights_cache:monthly:YYYY-MM` / `insights_cache:annual:YYYY`; the legacy flat `insights_cache` key is never read, so it can never be displayed (AC-14, AC-18).
+10. An effect keyed on the cache key re-reads the cache on every period change — cached text for that period, otherwise idle (AC-15, AC-16, AC-17).
+11. A generation captures its own key, resolves against the AC-3 echoed period, and writes its own cache entry; it updates the display only when its key is still the on-screen one (AC-19).
+
+Proof
+
+- `functions/test/insights.test.js` (`node --test`, no new dependencies) exercises the compiled module against fixture expenses for AC-4..AC-13.
+- `tsc` over `functions`, `next build` over `app` for the whole-repo compile.
+- AC-15..AC-19 are UI behaviours with no browser harness available in this environment; they are implemented and typechecked here and belong to verify's live pass.
