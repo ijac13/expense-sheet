@@ -1,7 +1,7 @@
 ---
 id: 041
 title: Generate Insights Uses Latest Month, Not Viewed Month
-status: build
+status: verify
 source: captain (previously discussed, not yet tracked)
 started: 2026-07-29T12:50:21Z
 completed:
