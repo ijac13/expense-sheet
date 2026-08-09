@@ -162,3 +162,31 @@ Proof
 - `functions/test/insights.test.js` (`node --test`, no new dependencies) exercises the compiled module against fixture expenses for AC-4..AC-13.
 - `tsc` over `functions`, `next build` over `app` for the whole-repo compile.
 - AC-15..AC-19 are UI behaviours with no browser harness available in this environment; they are implemented and typechecked here and belong to verify's live pass.
+
+## Stage Report: build
+
+- DONE: Request/response contract: /api/insights reads period from the request body instead of defaulting to now() (AC-1 through AC-4)
+  Live: `POST /api/insights` for `{monthly,2025,5}` and `{annual,2025}` against staging each echo the exact requested period back in `period`. Three malformed bodies (`{}`, `month:13`, `year:"2026"` as string) each returned `400 {"error_code":"bad_period"}` in ~0.5s vs 6.5s for a real generation — confirms the reject path skips the Sheets read and the Anthropic call (AC-4).
+- DONE: Monthly and annual analysis windows are computed from the requested period, not from now(), including comparison windows (AC-5 through AC-10)
+  `node --test` against `functions/lib/insights.js` (the exact compiled module now deployed): 12/12 pass, AC-5..AC-10 each with a falsifying assertion (e.g. AC-5 asserts July's row does not leak into May's total). Live corroboration: the real May-2025 generation's AI output independently flagged "Transportation ... more than 10× your previous three-month average," consistent with a real Feb–Apr window being computed and fed into the prompt.
+- DONE: Whole-history fallback removed; empty periods return insufficient_data instead of another period's data; tier reflects data up to the viewed period (AC-11 through AC-13)
+  Live: a future period (`2099-03`) and a pre-history period (`2024-12`) each returned `{insufficient_data:true,days:0,period:{...echoed...}}` — never another period's numbers. Unit tests for AC-11/12/13 pass against the deployed code, including the spec's named edge case (Feb 2025, preceded by 1 month of data, stays `tier:"month"` despite 18 later months existing in the sheet).
+- DONE: Insights cache key is scoped per period, building on entity 039's now-merged cache (AC-14 through AC-19)
+  AC-14 live: the deployed hosting chunk (`_next/static/chunks/0kts4pk97xe-_.js`, sha256 `429ac029…`, byte-identical to this build's local `app/out` output) contains the `insights_cache:monthly:` / `insights_cache:annual:` key templates, not the old flat key. AC-15..AC-19 (cache re-read on switch, regen isolation, legacy-key discard, in-flight race) are reviewed in the commit `1910527` diff (`app/app/reports/page.tsx`, `currentKeyRef`/`inflightKeysRef` guards) and match spec, but are LIVE-BLOCKED here — no browser is launchable (below).
+
+### Backend live evidence — staging (`https://expense-sheet-staging.web.app`)
+
+Redeployed this run: `npm run build` (tsc) + `firebase deploy --only functions --project expense-sheet-staging` (`api(us-central1)`: "Successful update operation"), and `app` rebuilt against `.env.staging` + `firebase deploy --only hosting --project expense-sheet-staging`.
+
+- `POST {period:"monthly",year:2025,month:5}` → `200`, real `insights` text, `period` echoes `{monthly,2025,5}` exactly.
+- `POST {period:"annual",year:2025}` → `200`, `period` echoes `{annual,2025}` exactly.
+- `POST {}` / `{...,month:13}` / `{...,year:"2026"}` → all `400 {"error_code":"bad_period"}`.
+- `POST {monthly,2099,3}` and `{monthly,2024,12}` → both `200 {"insufficient_data":true,"days":0,"period":{...}}`.
+
+### Environment limitation — no browser launchable (AC-15..AC-19)
+
+Re-confirmed independently of entity 044's verify report, same signature: `npx playwright install chromium` → `EPERM: operation not permitted, lstat '/Users/ijac/Library/Caches'`; cached browser builds are version-skewed regardless (chromium wants build 1234, cache has 1228). No real or headless browser is launchable in this sandbox. Code is implemented and reviewed; behaviour is unobserved in a running page. Flagged for the verify stage's captain-assisted manual pass.
+
+### Summary
+
+Inherited a complete implementation at commit `1910527` (prior ensign crashed post-commit, not from a logic failure) and verified rather than re-built it: 12/12 unit tests pass against the exact compiled module now redeployed, live HTTP round trips against staging confirm the request/response contract and the empty-period/no-fallback behaviour end-to-end, and the deployed hosting bundle is byte-identical (sha256) to this build's output and carries the period-scoped cache key format. No AC failed and no gap was found requiring a fix. AC-15..AC-19 remain implemented-but-unobserved due to a sandbox environment limitation (no launchable browser), the same blocker independently hit by entity 044's verify stage.
