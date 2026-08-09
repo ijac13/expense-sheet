@@ -1,13 +1,13 @@
 ---
 id: 041
 title: Generate Insights Uses Latest Month, Not Viewed Month
-status: spec
+status: build
 source: captain (previously discussed, not yet tracked)
 started: 2026-07-29T12:50:21Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-041-insights-wrong-month
 issue:
 pr:
 ---
