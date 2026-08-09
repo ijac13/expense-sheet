@@ -14,7 +14,8 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "migrate:insurance-tax": "node scripts/apply-insurance-tax-categories.js"
+    "migrate:insurance-tax": "node -r ./scripts/load-local-env.js scripts/apply-insurance-tax-categories.js",
+    "migrate:insurance-tax:dry-run": "node -r ./scripts/load-local-env.js scripts/apply-insurance-tax-categories.js --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
