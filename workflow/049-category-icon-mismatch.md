@@ -1,13 +1,13 @@
 ---
 id: 049
 title: Category Icons/Emoji Don't Match Category Management Settings
-status: spec
+status: build
 source: captain (found manually testing entity 044 on staging)
 started: 2026-08-10T10:26:52Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-049-category-icon-mismatch
 issue:
 pr:
 ---
