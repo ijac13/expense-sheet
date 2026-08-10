@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { X, SlidersHorizontal, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getAllExpenses } from "../lib/historyService";
-import { DEFAULT_CATEGORIES, Category } from "../lib/categories";
+import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory } from "../lib/categories";
 import { getCategories } from "../lib/categoryService";
 import { Expense } from "../lib/expenses";
 import { USERS } from "../lib/users";
@@ -271,7 +271,7 @@ function FilterSheet({
                       ? "bg-primary text-primary-content border-primary"
                       : "bg-base-200 text-base-content/70 border-base-300"}`}
                 >
-                  {c.icon} {lang === "zh" ? c.name_zh : c.name_en}
+                  {categoryIcon(c)} {lang === "zh" ? c.name_zh : c.name_en}
                 </button>
               ))}
             </div>
@@ -307,7 +307,10 @@ export default function HistoryPage() {
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  // The full live list, archived categories included — an expense on an archived
+  // category still has to resolve its icon (AC-6). The `is_active` filter belongs
+  // on the picker/filter UI below, not on the resolution source.
+  const [allCategories, setAllCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [selected, setSelected] = useState<Expense | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -325,8 +328,7 @@ export default function HistoryPage() {
     function loadCategories() {
       getCategories()
         .then((cats) => {
-          const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
-          if (active.length > 0) setCategories(active);
+          if (cats.length > 0) setAllCategories(cats);
         })
         .catch(() => {
           // Keep the current categories (DEFAULT_CATEGORIES on first load) as fallback
@@ -346,6 +348,11 @@ export default function HistoryPage() {
     window.addEventListener("popstate", loadCategories);
     return () => window.removeEventListener("popstate", loadCategories);
   }, []);
+
+  const categories = useMemo(
+    () => allCategories.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order),
+    [allCategories]
+  );
 
   const filtered = useMemo(() => applyFilters(expenses, filters, search, categories), [expenses, filters, search, categories]);
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
@@ -387,7 +394,7 @@ export default function HistoryPage() {
   filters.categories.forEach(id => {
     const c = categories.find(c => c.id === id);
     if (c) chips.push({
-      label: `${c.icon} ${lang === "zh" ? c.name_zh : c.name_en}`,
+      label: `${categoryIcon(c)} ${lang === "zh" ? c.name_zh : c.name_en}`,
       onRemove: () => setFilters(f => ({ ...f, categories: f.categories.filter(x => x !== id) }))
     });
   });
@@ -506,7 +513,7 @@ export default function HistoryPage() {
 
                     <div className="divide-y divide-base-300">
                       {group.expenses.map((expense) => {
-                        const cat = categories.find(c => c.id === expense.category_id);
+                        const cat = resolveCategory(expense.category_id, allCategories);
                         const paidByUser = USERS.find(u => u.id === expense.paid_by || u.name === expense.paid_by);
                         const catName = lang === "zh" ? (cat?.name_zh ?? cat?.name_en ?? expense.category_id) : (cat?.name_en ?? expense.category_id);
                         return (
@@ -516,7 +523,7 @@ export default function HistoryPage() {
                             className="w-full grid grid-cols-[44px_1fr_auto] gap-3 items-center px-4 py-3 hover:bg-base-200 transition-colors text-left"
                           >
                             <span className="grid place-items-center w-10 h-10 rounded-xl bg-white border border-base-300">
-                              <span className="text-xl">{cat?.icon ?? "💰"}</span>
+                              <span className="text-xl">{categoryIcon(cat)}</span>
                             </span>
                             <div className="min-w-0">
                               <div className="text-[15px] font-medium">{catName}</div>
@@ -557,6 +564,7 @@ export default function HistoryPage() {
         <ExpenseEditSheet
           expense={selected}
           categories={categories}
+          allCategories={allCategories}
           onClose={() => setSelected(null)}
           onSaved={updated => setExpenses(prev => prev.map(e => e.id === updated.id ? { ...e, ...updated } : e))}
           onDeleted={id => setExpenses(prev => prev.filter(e => e.id !== id))}

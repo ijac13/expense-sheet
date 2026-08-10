@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, PenLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
-import { Category, DEFAULT_CATEGORIES, getDefaultCategory, saveLastCategory } from "./lib/categories";
+import { Category, DEFAULT_CATEGORIES, categoryIcon, getDefaultCategory, saveLastCategory } from "./lib/categories";
 import { getCategories } from "./lib/categoryService";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
 import { DEFAULT_USER, USERS, type UserId } from "./lib/users";
@@ -125,7 +125,7 @@ export default function HomePage() {
       <div className="bg-primary text-primary-content px-4 pt-5 pb-3 shrink-0">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-sm opacity-80">
-            <span>{selectedCat?.icon}</span>
+            <span>{categoryIcon(selectedCat)}</span>
             <span>{lang === "zh" && selectedCat?.name_zh ? selectedCat.name_zh : selectedCat?.name_en}</span>
           </div>
           <div className="flex items-center gap-3">

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Category, GovCategory, GOV_CATEGORY_LABELS, GOV_CATEGORY_OPTIONS } from "../../lib/categories";
+import { Category, GovCategory, GOV_CATEGORY_LABELS, GOV_CATEGORY_OPTIONS, categoryIcon } from "../../lib/categories";
 import {
   getCategories,
   addCategory,
@@ -352,7 +352,7 @@ export default function CategoryManagementPage() {
                 key={cat.id}
                 className="flex items-center gap-3 p-2 rounded-lg bg-base-100 border border-base-300"
               >
-                <span className="text-2xl w-8 text-center">{cat.icon}</span>
+                <span className="text-2xl w-8 text-center">{categoryIcon(cat)}</span>
                 <div className="flex-1 min-w-0">
                   <span className="font-medium">{cat.name_en}</span>
                   <span className="text-base-content/50 text-sm ml-2">{cat.name_zh}</span>
@@ -410,7 +410,7 @@ export default function CategoryManagementPage() {
                   key={cat.id}
                   className="flex items-center gap-3 p-2 rounded-lg bg-base-200 border border-base-300 opacity-60"
                 >
-                  <span className="text-2xl w-8 text-center">{cat.icon}</span>
+                  <span className="text-2xl w-8 text-center">{categoryIcon(cat)}</span>
                   <div className="flex-1 min-w-0">
                     <span className="font-medium">{cat.name_en}</span>
                     <span className="text-base-content/50 text-sm ml-2">{cat.name_zh}</span>

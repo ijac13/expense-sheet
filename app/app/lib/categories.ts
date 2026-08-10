@@ -108,6 +108,52 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: "tax", name_en: "Tax", name_zh: "稅金", icon: "🧾", sort_order: 24, is_active: true, gov_category: "miscellaneous" },
 ];
 
+export const FALLBACK_ICON = "💰";
+
+/**
+ * Resolve a stored `category_id` to the live category it belongs to.
+ *
+ * 99% of stored expenses and every subscription carry a legacy slug id
+ * (`eating-out`) that exists in no live category — the live list uses `cat_NNN`.
+ * A direct `find` therefore misses and the caller renders a placeholder. Bridge
+ * the slug through DEFAULT_CATEGORIES' `name_en` to the live category of the same
+ * name, so the icon comes from the sheet Category Management writes rather than
+ * from the baked-in map. Nothing is written back; the stored id stays a slug.
+ *
+ * Pass the UNFILTERED live list — resolving against an `is_active`-filtered list
+ * misses an archived category.
+ */
+export function resolveCategory(
+  categoryId: string,
+  categories: Category[]
+): Category | undefined {
+  const live = categories.find((c) => c.id === categoryId);
+  if (live) return live;
+
+  const legacy = DEFAULT_CATEGORIES.find((c) => c.id === categoryId);
+  if (!legacy) return undefined;
+
+  // No live twin means the live fetch failed (offline) — the baked-in entry is
+  // the fallback, never the preference.
+  return categories.find((c) => c.name_en === legacy.name_en) ?? legacy;
+}
+
+/**
+ * The icon to render for a category. The API returns `icon: ""` for a blank cell
+ * in the sheet, and `""` survives `??`, so guard with `||` — an empty string must
+ * never reach the DOM as nothing at all.
+ */
+export function categoryIcon(category: { icon?: string } | undefined): string {
+  return category?.icon?.trim() || FALLBACK_ICON;
+}
+
+export function resolveCategoryIcon(
+  categoryId: string,
+  categories: Category[]
+): string {
+  return categoryIcon(resolveCategory(categoryId, categories));
+}
+
 export const LAST_CATEGORY_KEY = "expense_last_category_id";
 
 export function getDefaultCategory(): string {
