@@ -136,3 +136,31 @@ Every per-expense and per-subscription category icon resolves from the live cate
 ### Summary
 
 The ideation's diagnosis was inverted and the spec says so: icons break because History and the expense detail sheet resolve against the live category list *only*, and 99.3% of real production expenses carry legacy slug ids that exist in no live category — so the lookup misses and every row renders the same `💰`. Verified live (1931/1945 production, 1400/1404 staging), and confirmed Home and Reports are unaffected, which narrows the fix to two surfaces plus Subscriptions. One open decision is escalated rather than chosen: a `DEFAULT_CATEGORIES` fallback would make icons look right today (all 22 slug icons currently equal their `cat_NNN` counterparts) but would silently fail this entity's own "changes reflect without a deploy" criterion, so the spec offers a resolution-layer bridge (recommended) versus a production data migration — the same category-scheme question the captain already deferred in entity 042.
+
+## Stage Report: build
+
+- DONE: Implement Option A (resolution-layer bridge) — captain's explicit choice over Option B: no writes to any sheet, translate a legacy slug id to its live category's icon via the name_en correspondence, live icon wins
+  `resolveCategory`/`categoryIcon` in `app/app/lib/categories.ts` (commit `c3f26c5`): direct live-id match wins, else the slug goes through `DEFAULT_CATEGORIES`' `name_en` to the live category of that name. No write path added anywhere. Re-checked the correspondence against both live APIs today: 22/22 slugs bridge to a live category on production (25 categories, `cat_001`–`cat_023` plus 042's now-shipped `insurance`/`tax`) and on staging, with zero duplicate `name_en` — the bridge is unambiguous on real data.
+- DONE: Fix History and ExpenseEditSheet (AC-1 through AC-6) and Subscriptions (AC-7 through AC-9), matching the spec's exact call sites
+  All five spec-named call sites changed: `history/page.tsx:509,519`, `ExpenseEditSheet.tsx:54,146`, `subscriptions/page.tsx:14,208,262,320,416`. History and `reports/DrillDown.tsx` now hold the **unfiltered** live list for resolution and derive the active list for their pickers, so an archived category resolves (AC-6) without widening the Edit Expense picker. Subscriptions calls `getCategories()` for the first time (AC-7) and both `<select>`s list live actives (AC-9).
+- DONE: Confirm no regressions on Home, Reports, or any surface already resolving correctly (AC-10), and the offline/blank-icon edge cases (AC-11, AC-12)
+  Home, `CategoryPicker`, and Category Management changed only `X.icon` → `categoryIcon(X)`, which is the identity for any non-blank icon — asserted over all 25 live plus 22 baked-in categories. `npx tsc --noEmit` and `npm run build` both clean.
+
+### Evidence
+
+`npm test` in `app/` — 13 tests, all passing, covering three claims:
+
+- **The bridge makes the live icon win.** Fixtures give each live category an icon that differs from its baked-in twin, so the rendered glyph identifies which source was read. Replacing the bridge line with the old `DEFAULT_CATEGORIES` fallback fails 3 unit tests and 5 of 6 render tests — confirmed by mutating the compiled output and re-running.
+- **The blank-icon guard is `||`, not `??`.** Reverting `categoryIcon` to `?? FALLBACK_ICON` fails the AC-12 unit test and the History render test.
+- **The rendered DOM, not just the helper.** `test/icons.render.test.js` mounts the real `history/page.tsx` and `subscriptions/page.tsx` in jsdom against production-shaped fixtures (legacy-slug, live-id, archived, orphan and blank-icon rows) and asserts on the icon that reaches the DOM: AC-1/AC-3 (`🍕` not `💰`, not the baked-in `🍜`), AC-2 (detail sheet through the portal), AC-4 (edit an icon mid-run, dispatch `popstate`, the slug row shows the new glyph with no rebuild), AC-5, AC-6, AC-11 (API 503 → every row keeps a defined glyph), AC-12.
+
+### Notes for verify
+
+- **No full-app browser run.** Every page sits behind `AuthGuard`'s Google sign-in popup, which cannot run headlessly, and the app is a static export with no local `/api`. The page components were mounted directly instead. Confirming on deployed staging with real data is verify's to do.
+- **Deliberate behaviour change outside the ACs:** `reportService.getCatMeta`'s fallback glyph for a genuinely orphaned id moves from `📦` to the shared `💰`. Categories in the live list are unaffected (AC-10).
+- **Two known limits, both left alone.** If the captain ever creates a second live category with an existing `name_en`, the bridge takes the first match. And History's category *filter* still compares raw ids, so filtering by a live category matches no slug expense — the same class as the picker-selection bug the spec deferred, and equally not an icon bug.
+- **New in the repo:** an `npm test` script, a `jsdom` devDependency, and `app/test/`. The repo had no app-level test runner before; `functions/test/` set the `node --test` precedent.
+
+### Summary
+
+The captain's Option A is in: a legacy slug id is translated to its live category through the `name_en` correspondence, so the icon always comes from the sheet Category Management writes and nothing is written back. The visible fix today is that the 1931 production expenses that all rendered the same `💰` now render their own category's icon; the durable fix is that an icon edit in Category Management reaches them at all, which no baked-in fallback could deliver. Two regressions the change could have introduced were headed off rather than discovered later: resolution runs against the unfiltered live list so archived categories still resolve, and Subscriptions' edit modal keeps the stored slug as its option value so an amount-only save cannot silently rewrite `category_id`.
