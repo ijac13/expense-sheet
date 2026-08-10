@@ -13,6 +13,8 @@ pr: "#15"
 mod-block:
 ---
 
+**Production deploy:** `firebase deploy --only functions,hosting --project production` run 2026-08-10. First attempt aborted on an orphaned `helloWorld` function left on the server from an earlier, unrelated cleanup entity — captain deleted it (`firebase functions:delete helloWorld --region us-central1`), then functions and hosting were deployed separately. Confirmed live: functions via the new `/api/insights` contract responding `{"error_code":"bad_period"}` to a malformed request; hosting via `https://expense-sheet-b2db8.web.app` (`Last-Modified: Mon, 10 Aug 2026 10:23:11 GMT`).
+
 Spending Insights (entity 014) was specced to analyze whichever period the user is currently looking at — "monthly or annual depends on user is looking at monthly report or annual report" — but it actually always generates analysis for the latest month, regardless of which month is open in Reports. Example: viewing May in Reports and tapping Generate Insights returns July's analysis.
 
 ## User Stories
