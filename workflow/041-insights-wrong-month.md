@@ -9,7 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-041-insights-wrong-month
 issue:
-pr:
+pr: "#15"
+mod-block: merge:pr-merge
 ---
 
 Spending Insights (entity 014) was specced to analyze whichever period the user is currently looking at — "monthly or annual depends on user is looking at monthly report or annual report" — but it actually always generates analysis for the latest month, regardless of which month is open in Reports. Example: viewing May in Reports and tapping Generate Insights returns July's analysis.
