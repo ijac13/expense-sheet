@@ -1,16 +1,16 @@
 ---
 id: 041
 title: Generate Insights Uses Latest Month, Not Viewed Month
-status: verify
+status: done
 source: captain (previously discussed, not yet tracked)
 started: 2026-07-29T12:50:21Z
-completed:
-verdict:
+completed: 2026-08-10T09:56:35Z
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-041-insights-wrong-month
+worktree:
 issue:
 pr: "#15"
-mod-block: merge:pr-merge
+mod-block:
 ---
 
 Spending Insights (entity 014) was specced to analyze whichever period the user is currently looking at — "monthly or annual depends on user is looking at monthly report or annual report" — but it actually always generates analysis for the latest month, regardless of which month is open in Reports. Example: viewing May in Reports and tapping Generate Insights returns July's analysis.
