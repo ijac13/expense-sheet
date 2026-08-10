@@ -146,16 +146,40 @@ function CategoryRow({
 // Insights card
 // ---------------------------------------------------------------------------
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
-const INSIGHTS_CACHE_KEY = "insights_cache";
+
+type InsightsPeriod =
+  | { type: "monthly"; year: number; month: number }
+  | { type: "annual"; year: number };
 
 interface InsightsCache {
   text: string;
   generatedAt: string; // ISO 8601
 }
 
-function readInsightsCache(): InsightsCache | null {
+// Per-period key. The flat `insights_cache` key this replaces is never read, so
+// an entry written before this change can never surface under a period.
+function insightsCacheKey(period: InsightsPeriod): string {
+  return period.type === "monthly"
+    ? `insights_cache:monthly:${period.year}-${String(period.month).padStart(2, "0")}`
+    : `insights_cache:annual:${period.year}`;
+}
+
+// The period a response says it analysed, as a cache key — the only way to tell
+// whether an arriving result belongs to the period now on screen.
+function echoedCacheKey(echo: unknown): string | null {
+  if (typeof echo !== "object" || echo === null) return null;
+  const e = echo as Record<string, unknown>;
+  if (typeof e.year !== "number") return null;
+  if (e.type === "annual") return insightsCacheKey({ type: "annual", year: e.year });
+  if (e.type === "monthly" && typeof e.month === "number") {
+    return insightsCacheKey({ type: "monthly", year: e.year, month: e.month });
+  }
+  return null;
+}
+
+function readInsightsCache(key: string): InsightsCache | null {
   try {
-    const raw = localStorage.getItem(INSIGHTS_CACHE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     return JSON.parse(raw) as InsightsCache;
   } catch {
@@ -163,15 +187,16 @@ function readInsightsCache(): InsightsCache | null {
   }
 }
 
-function writeInsightsCache(cache: InsightsCache) {
+function writeInsightsCache(key: string, cache: InsightsCache) {
   try {
-    localStorage.setItem(INSIGHTS_CACHE_KEY, JSON.stringify(cache));
+    localStorage.setItem(key, JSON.stringify(cache));
   } catch {
-    // localStorage unavailable — silently ignore
+    // localStorage unavailable or full — the insight stays on screen regardless
   }
 }
 
-function InsightsCard() {
+function InsightsCard({ period }: { period: InsightsPeriod }) {
+  const cacheKey = insightsCacheKey(period);
   const { t } = useTranslation();
   const [state, setState] = useState<"idle" | "loading" | "done" | "insufficient" | "error" | "regen_error">("idle");
   const [insights, setInsights] = useState("");
@@ -180,18 +205,27 @@ function InsightsCard() {
   const [insufficientDays, setInsufficientDays] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentKeyRef = useRef(cacheKey);
+  const inflightKeysRef = useRef<Set<string>>(new Set());
 
-  // AC-2: Load cache on mount; show cached result without API call
+  // Re-reads the cache whenever the viewed period changes, so the card shows
+  // this period's insight, this period's generation in flight, or nothing.
   useEffect(() => {
-    const cached = readInsightsCache();
+    currentKeyRef.current = cacheKey;
+    const cached = readInsightsCache(cacheKey);
     if (cached) {
       setInsights(cached.text);
       setGeneratedAt(cached.generatedAt);
       setState("done");
+      return;
     }
-  }, []);
+    setInsights("");
+    setGeneratedAt(null);
+    setState(inflightKeysRef.current.has(cacheKey) ? "loading" : "idle");
+  }, [cacheKey]);
 
   function startTimer() {
+    stopTimer();
     setElapsed(0);
     timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
   }
@@ -201,20 +235,36 @@ function InsightsCard() {
   useEffect(() => () => stopTimer(), []);
 
   async function generate() {
+    const requestKey = cacheKey;
+    const requestBody = period.type === "monthly"
+      ? { period: "monthly", year: period.year, month: period.month }
+      : { period: "annual", year: period.year };
     const isRegen = state === "done" || state === "regen_error";
     setState("loading");
     if (!isRegen) setErrorKey("reports.insights_error");
+    inflightKeysRef.current.add(requestKey);
     startTimer();
     try {
-      const res = await fetch(`${API_BASE}/api/insights`, { method: "POST" });
+      const res = await fetch(`${API_BASE}/api/insights`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
       const data = await res.json() as Record<string, unknown>;
       stopTimer();
+      // A result belongs to the period it says it analysed, not to whatever is
+      // on screen when it lands. Errors carry no echo, so they fall back to the
+      // period that was requested.
+      const resultKey = echoedCacheKey(data.period) ?? requestKey;
+      const isCurrent = resultKey === currentKeyRef.current;
       if (data.insufficient_data) {
+        if (!isCurrent) return;
         setInsufficientDays(typeof data.days === "number" ? data.days : 0);
         setState("insufficient");
         return;
       }
       if (!res.ok) {
+        if (!isCurrent) return;
         const code = String(data.error_code ?? "");
         const key = code === "ai_error"
           ? "reports.insights_error_ai"
@@ -222,27 +272,31 @@ function InsightsCard() {
           ? "reports.insights_error_data"
           : "reports.insights_error";
         setErrorKey(key);
-        // AC-6: If regen fails, keep cached insight visible with error shown
+        // If regen fails, keep the cached insight visible with the error shown
         setState(isRegen ? "regen_error" : "error");
         return;
       }
       if (data.insights) {
         const text = String(data.insights);
         const ts = new Date().toISOString();
-        // AC-1: Save to localStorage
-        writeInsightsCache({ text, generatedAt: ts });
+        writeInsightsCache(resultKey, { text, generatedAt: ts });
+        if (!isCurrent) return;
         setInsights(text);
         setGeneratedAt(ts);
         setState("done");
       } else {
+        if (!isCurrent) return;
         setErrorKey("reports.insights_error");
         setState(isRegen ? "regen_error" : "error");
       }
     } catch {
       stopTimer();
+      if (requestKey !== currentKeyRef.current) return;
       setErrorKey("reports.insights_error_data");
-      // AC-6: On network failure during regen, keep cache visible
+      // On network failure during regen, keep cache visible
       setState(isRegen ? "regen_error" : "error");
+    } finally {
+      inflightKeysRef.current.delete(requestKey);
     }
   }
 
@@ -650,7 +704,7 @@ export default function ReportsPage() {
                 </div>
 
                 {/* AI Insights */}
-                <InsightsCard />
+                <InsightsCard period={{ type: "monthly", year, month }} />
               </>
             ) : null}
           </>
@@ -795,7 +849,7 @@ export default function ReportsPage() {
                 </div>
 
                 {/* AI Insights */}
-                <InsightsCard />
+                <InsightsCard period={{ type: "annual", year: annualYear }} />
               </>
             )}
           </>

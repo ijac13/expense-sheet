@@ -136,3 +136,96 @@ Every file:line in the spec was traced in the working tree and re-verified by re
 ### Summary
 
 Wrote the spec grounded in a live trace rather than the entity's conjecture — the Plan's guess was correct but incomplete. Beyond the `now()` defaulting, tracing surfaced three problems the original framing missed: the whole-history fallback at `index.ts:475` that would mislabel an empty period's analysis, tier computation from total span rather than data-up-to-the-viewed-period, and the in-flight period-switch race. 19 ACs across five groups (request/response contract, monthly window, annual window, empty/insufficient periods, cache scoping). Note for build: entity 039 is still in `verify` on PR #12 and unmerged, so AC-14 through AC-19 land on top of code that is not yet on `main` — sequencing needs the FO's call.
+
+## Build Plan
+
+Written before coding, per the build stage definition.
+
+Backend — `functions/src/index.ts` + new `functions/src/insights.ts`
+
+1. Extract the period maths and prompt assembly out of the inline `/api/insights` block into `functions/src/insights.ts`, exporting `parseInsightsPeriod(body)` and `buildInsightsPrompt({ expenses, subscriptions, period, nowMs })`. The extraction is what makes AC-4 through AC-13 checkable without Google Sheets or an Anthropic key — the endpoint itself needs both.
+2. `parseInsightsPeriod` returns the validated period or `null`; the endpoint answers `null` with HTTP 400 `{ error_code: "bad_period" }` before the Sheets read and before any Anthropic call (AC-4).
+3. All windows derive from the requested period, never `now`: month keys by integer arithmetic (`year * 12 + month - 1 - n`) so no `Date` year quirks; label from a `MONTH_NAMES` constant (AC-5..AC-10).
+4. Drop the `recentExp.length > 0 ? recentExp : allExpenses` fallback. Zero expenses in the requested period returns `{ insufficient_data: true, days: 0, period }` (AC-11).
+5. Tier counts only months with data strictly before the requested period, and the day span ends at the requested period's end (capped at today for a partial period), so later months cannot promote a tier (AC-12).
+6. A comparison block whose window holds no data is omitted from the prompt entirely rather than printed as `(no data)` (AC-13). Annual mode replaces both monthly blocks with a single prior-year block (AC-9).
+7. Success responds `{ insights, period: { type, year, month? } }` (AC-3).
+
+Frontend — `app/app/reports/page.tsx`
+
+8. `InsightsCard` takes a `period` prop; the two call sites pass the on-screen month / year (AC-1, AC-2).
+9. Cache key becomes `insights_cache:monthly:YYYY-MM` / `insights_cache:annual:YYYY`; the legacy flat `insights_cache` key is never read, so it can never be displayed (AC-14, AC-18).
+10. An effect keyed on the cache key re-reads the cache on every period change — cached text for that period, otherwise idle (AC-15, AC-16, AC-17).
+11. A generation captures its own key, resolves against the AC-3 echoed period, and writes its own cache entry; it updates the display only when its key is still the on-screen one (AC-19).
+
+Proof
+
+- `functions/test/insights.test.js` (`node --test`, no new dependencies) exercises the compiled module against fixture expenses for AC-4..AC-13.
+- `tsc` over `functions`, `next build` over `app` for the whole-repo compile.
+- AC-15..AC-19 are UI behaviours with no browser harness available in this environment; they are implemented and typechecked here and belong to verify's live pass.
+
+## Stage Report: build
+
+- DONE: Request/response contract: /api/insights reads period from the request body instead of defaulting to now() (AC-1 through AC-4)
+  Live: `POST /api/insights` for `{monthly,2025,5}` and `{annual,2025}` against staging each echo the exact requested period back in `period`. Three malformed bodies (`{}`, `month:13`, `year:"2026"` as string) each returned `400 {"error_code":"bad_period"}` in ~0.5s vs 6.5s for a real generation — confirms the reject path skips the Sheets read and the Anthropic call (AC-4).
+- DONE: Monthly and annual analysis windows are computed from the requested period, not from now(), including comparison windows (AC-5 through AC-10)
+  `node --test` against `functions/lib/insights.js` (the exact compiled module now deployed): 12/12 pass, AC-5..AC-10 each with a falsifying assertion (e.g. AC-5 asserts July's row does not leak into May's total). Live corroboration: the real May-2025 generation's AI output independently flagged "Transportation ... more than 10× your previous three-month average," consistent with a real Feb–Apr window being computed and fed into the prompt.
+- DONE: Whole-history fallback removed; empty periods return insufficient_data instead of another period's data; tier reflects data up to the viewed period (AC-11 through AC-13)
+  Live: a future period (`2099-03`) and a pre-history period (`2024-12`) each returned `{insufficient_data:true,days:0,period:{...echoed...}}` — never another period's numbers. Unit tests for AC-11/12/13 pass against the deployed code, including the spec's named edge case (Feb 2025, preceded by 1 month of data, stays `tier:"month"` despite 18 later months existing in the sheet).
+- DONE: Insights cache key is scoped per period, building on entity 039's now-merged cache (AC-14 through AC-19)
+  AC-14 live: the deployed hosting chunk (`_next/static/chunks/0kts4pk97xe-_.js`, sha256 `429ac029…`, byte-identical to this build's local `app/out` output) contains the `insights_cache:monthly:` / `insights_cache:annual:` key templates, not the old flat key. AC-15..AC-19 (cache re-read on switch, regen isolation, legacy-key discard, in-flight race) are reviewed in the commit `1910527` diff (`app/app/reports/page.tsx`, `currentKeyRef`/`inflightKeysRef` guards) and match spec, but are LIVE-BLOCKED here — no browser is launchable (below).
+
+### Backend live evidence — staging (`https://expense-sheet-staging.web.app`)
+
+Redeployed this run: `npm run build` (tsc) + `firebase deploy --only functions --project expense-sheet-staging` (`api(us-central1)`: "Successful update operation"), and `app` rebuilt against `.env.staging` + `firebase deploy --only hosting --project expense-sheet-staging`.
+
+- `POST {period:"monthly",year:2025,month:5}` → `200`, real `insights` text, `period` echoes `{monthly,2025,5}` exactly.
+- `POST {period:"annual",year:2025}` → `200`, `period` echoes `{annual,2025}` exactly.
+- `POST {}` / `{...,month:13}` / `{...,year:"2026"}` → all `400 {"error_code":"bad_period"}`.
+- `POST {monthly,2099,3}` and `{monthly,2024,12}` → both `200 {"insufficient_data":true,"days":0,"period":{...}}`.
+
+### Environment limitation — no browser launchable (AC-15..AC-19)
+
+Re-confirmed independently of entity 044's verify report, same signature: `npx playwright install chromium` → `EPERM: operation not permitted, lstat '/Users/ijac/Library/Caches'`; cached browser builds are version-skewed regardless (chromium wants build 1234, cache has 1228). No real or headless browser is launchable in this sandbox. Code is implemented and reviewed; behaviour is unobserved in a running page. Flagged for the verify stage's captain-assisted manual pass.
+
+### Summary
+
+Inherited a complete implementation at commit `1910527` (prior ensign crashed post-commit, not from a logic failure) and verified rather than re-built it: 12/12 unit tests pass against the exact compiled module now redeployed, live HTTP round trips against staging confirm the request/response contract and the empty-period/no-fallback behaviour end-to-end, and the deployed hosting bundle is byte-identical (sha256) to this build's output and carries the period-scoped cache key format. No AC failed and no gap was found requiring a fix. AC-15..AC-19 remain implemented-but-unobserved due to a sandbox environment limitation (no launchable browser), the same blocker independently hit by entity 044's verify stage.
+
+## Stage Report: verify
+
+Verdict: PASS. No acceptance criterion failed. Cycle 1's verify agent died before writing a report, so this is a full pass, not a patch on a prior one.
+
+- DONE: Live evidence for AC-1 through AC-14 already gathered in build — re-confirm briefly, don't redo from scratch, per this workflow's fresh-verify-agent convention
+  Re-confirmed live against `https://expense-sheet-staging.web.app`, not re-derived from the build report. AC-3 echo: `{monthly,2025,5}`, `{monthly,2025,6}`, `{annual,2025}` each returned HTTP 200 with `period` echoing the request exactly. AC-6 live: the May call opens "# May 2025 Spending Insights", the June call "# June 2025 Spending Insights" — today is 2026-08-10, so a regression to `now()` would have labelled both August 2026. AC-4: seven malformed bodies (`{}`, missing `month`, `month:0`, `month:13`, `month:5.5`, `year:"2025"`, `period:"weekly"`) each returned `400 {"error_code":"bad_period"}` in ~0.45s against ~6.1s for a real generation — the reject path skips the Sheets read and the Anthropic call. AC-11: `{monthly,2099,3}` and `{monthly,2024,12}` both returned `{"insufficient_data":true,"days":0,...}` with the period echoed, never another period's numbers.
+- DONE: AC-5/AC-7/AC-8/AC-9/AC-10/AC-12/AC-13 re-run against the compiled module now deployed
+  `node --test functions/test/` → 12/12 pass. `npx tsc` reproduced `lib/insights.js` at the identical sha256 (`c1d3275a…`), so the tested module is the one built from committed source. Each test carries a falsifying negative: AC-5 fails if July's row leaks into May's total; AC-7 fails if the 3-month window walks back from `now` instead of the requested month; AC-9 fails if a month-over-month block survives in annual mode; AC-12 fails if 18 later months promote Feb-2025 above `tier:"month"`; AC-13 fails if an empty window prints `(no data)` instead of being omitted.
+- DONE: AC-15 through AC-19 (cache switch/regen/legacy-key/race UI behavior) need a real browser — if this sandbox still can't launch one, document that plainly and hand the manual checklist to the captain, same as entities 040/044
+  Still browser-blocked, and I pinned the actual mechanism rather than repeating build's symptom: system Chrome 151 fails `dlopen` of its own framework ("blocked by sandbox"); Playwright's cached Chrome-for-Testing 1228 exits 133 (SIGTRAP); Puppeteer's cached Chrome/headless-shell 131 and 148 exit 139 (SIGSEGV, crashpad denied under `~/Library/Application Support`). No browser is launchable here. To avoid leaving these five ACs on code-reading alone, I lifted the cache-key function and the echoed-period resolver **verbatim out of the deployed chunk** and exercised them: `node --test` → 9/9 pass (harness at `/private/tmp/claude-501/-Users-ijac-Claude-ijac-expense-sheet/d2c68372-5fcb-4c24-862d-e3cba17be309/scratchpad/deployed-cache-harness.js`). This proves what the shipped code computes; it does not observe React rendering, so the captain checklist below still stands.
+- DONE: Staging URL live and confirmed running this exact build (chunk hash match)
+  Three-way match, stronger than a two-way: rebuilding `app` from current source (`app/.env.local` confirmed identical to `.env.staging`) reproduced `_next/static/chunks/0kts4pk97xe-_.js` at sha256 `429ac029fe001bc21b2492766d26ef148d5ffdf00a29a5dbeb3422d1274e5d07`, byte-identical to the chunk served by staging right now. Hosting root and `/reports/` both HTTP 200; `GET /api/insights` returns 405, `POST` serves the new contract. The deployed chunk contains only `insights_cache:monthly:` / `insights_cache:annual:` — the flat `insights_cache` literal does not appear (AC-14, AC-18).
+- DONE: Mandatory PII / secrets check
+  Branch touches five files (`app/app/reports/page.tsx`, `functions/src/index.ts`, `functions/src/insights.ts`, `functions/test/insights.test.js`, this entity). No `.env` with real values is tracked (only `.example` files; `.gitignore` covers `.env*`). No key/token/password/private-key/service-account pattern, no email address or phone number, no spreadsheet ID or opaque long identifier in the diff. Fixtures use synthetic `food`/`transport` rows only. The single added URL is the already-public staging host.
+
+### Observation — not an AC failure, captain's call
+
+The live annual response opens "**This month** shows significant investment in family care…" while analysing the year 2025. The period data is correct — the prompt label reads `2025` and only the prior-year comparison block is present (AC-9, AC-10 both pass). The cause is the tier note at `functions/src/insights.ts:169`, which is chosen by tier alone and so tells the AI to "include month-over-month and year-over-year comparisons" even in annual mode. Prompt wording is explicitly out of scope here (entity 014), so I did not change it. Worth a follow-up entity if the captain finds the annual phrasing confusing.
+
+### Captain manual checklist — AC-15..AC-19, staging
+
+Open `https://expense-sheet-staging.web.app/reports/`, then:
+
+1. **AC-15** — Generate insights for one month, navigate to a neighbouring month. Expect the idle "Generate Insights" button, never the previous month's text.
+2. **AC-16** — Navigate back to the month you generated. Expect its own text and its own "Generated:" timestamp.
+3. **AC-17** — With two months generated, tap "Regenerate" on one. Expect only that month to change; the other stays readable.
+4. **AC-18** — In DevTools console run `localStorage.setItem("insights_cache", JSON.stringify({text:"OLD",generatedAt:"2026-01-01T00:00:00Z"}))`, reload, and visit any month. Expect no "OLD" text, no blank card, no crash.
+5. **AC-19** — Tap Generate, then immediately switch months before it finishes. Expect the arriving result never to appear under the new month; switching back shows it.
+6. **AC-1/AC-2** — With the Network tab open, tap Generate in monthly and in annual view. Expect the request body to carry the month/year shown on screen.
+
+### Plain-language summary
+
+The bug was that the insights button asked the server "analyse my spending" without saying *which* period, so the server used today's date. Now the button sends the exact month or year on screen, and the server replies with the analysis **plus a note saying which period it analysed** — so the app can tell whether an answer that arrives late still belongs to the period you are looking at. Saved insights used to share one slot, so one month's advice could show up under another; each period now has its own slot, and the old shared slot is ignored rather than misattributed.
+
+### Summary
+
+Verified independently rather than trusting the build report: rebuilt the frontend from source and matched it byte-for-byte to what staging serves, re-ran the live HTTP contract, and re-ran the unit suite against a recompiled module with a matching hash. The strongest single piece of evidence is that May and June 2025 each returned their own labelled analysis on 2026-08-10 — impossible under the old `now()` behaviour. AC-15..AC-19 remain unobservable in a browser here (sandbox blocks every Chrome build on the machine), but I narrowed the gap by exercising the deployed bundle's own cache-key and echo-matching logic, leaving only React rendering for the captain's manual pass.
