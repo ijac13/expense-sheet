@@ -1,7 +1,7 @@
 ---
 id: 049
 title: Category Icons/Emoji Don't Match Category Management Settings
-status: build
+status: verify
 source: captain (found manually testing entity 044 on staging)
 started: 2026-08-10T10:26:52Z
 completed:
