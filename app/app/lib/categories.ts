@@ -79,7 +79,10 @@ export interface Category {
   sort_order: number;
   is_active: boolean;
   gov_category?: GovCategory;
+  note?: string;
 }
+
+export const NOTE_MAX_LENGTH = 120;
 
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: "eating-out", name_en: "Eating Out", name_zh: "外食", icon: "🍜", sort_order: 1, is_active: true, gov_category: "restaurants_accommodation" },
