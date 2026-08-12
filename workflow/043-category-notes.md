@@ -1,9 +1,9 @@
 ---
 id: 043
 title: Category Notes — Tooltip on Home
-status: ideation
+status: spec
 source: captain
-started:
+started: 2026-08-12T04:41:49Z
 completed:
 verdict:
 score:

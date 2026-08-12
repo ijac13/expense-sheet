@@ -1,9 +1,9 @@
 ---
 id: 048
 title: Category Edit Form Doesn't Open in Category Management
-status: ideation
+status: spec
 source: captain (found manually testing entity 044 on staging)
-started:
+started: 2026-08-12T04:41:49Z
 completed:
 verdict:
 score:
