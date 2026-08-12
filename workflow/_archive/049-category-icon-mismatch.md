@@ -13,6 +13,8 @@ pr: "#17"
 mod-block:
 ---
 
+**Production deploy:** `firebase deploy --only hosting --project production` run 2026-08-12 (hosting-only — this entity touched no `functions/` code). Confirmed live: `https://expense-sheet-b2db8.web.app` (`Last-Modified: Wed, 12 Aug 2026 04:38:55 GMT`). Note: this deploy was initially missed after merge — caught when the captain reported still seeing the old behavior on production expenses. Workflow README's `done` stage now makes the deploy-and-confirm step explicit for future entities.
+
 Category icons shown around the app (Home, History, Reports) don't match what's actually configured in Category Management — many categories show the same, wrong emoji. Very likely the same root-cause pattern entity 044 just fixed for category *names* (hardcoded `DEFAULT_CATEGORIES`/`CATEGORY_ICONS` lookups in `app/app/lib/categories.ts` instead of the live category data from the API) — but 044's fix was scoped to name resolution only and never touched icon resolution, so this is a distinct entity, not a regression or a duplicate.
 
 ## User Stories
