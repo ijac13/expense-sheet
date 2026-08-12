@@ -22,6 +22,8 @@ Thumbs.db
 node_modules/
 .next/
 out/
+.test-build/
+.test-build-ui/
 
 # Worktrees
 .worktrees/

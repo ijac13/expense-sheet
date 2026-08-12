@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Subscription, getNextDueDate } from "../lib/subscriptions";
 import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription } from "../lib/subscriptionService";
-import { DEFAULT_CATEGORIES } from "../lib/categories";
+import { Category, DEFAULT_CATEGORIES, categoryIcon, resolveCategory } from "../lib/categories";
+import { getCategories } from "../lib/categoryService";
 import { USERS, DEFAULT_USER } from "../lib/users";
 import { useAuth } from "../lib/authContext";
 import { useTranslation } from "react-i18next";
 
 type ModalMode = "add" | "edit" | null;
 
-function getCategoryDisplay(category_id: string) {
-  const cat = DEFAULT_CATEGORIES.find((c) => c.id === category_id);
-  return cat ? { icon: cat.icon, name: cat.name_en } : { icon: "📦", name: category_id };
+function getCategoryDisplay(category_id: string, categories: Category[]) {
+  const cat = resolveCategory(category_id, categories);
+  return { icon: categoryIcon(cat), name: cat?.name_en ?? category_id };
 }
 
 function formatDueDate(date: Date): string {
@@ -51,6 +52,9 @@ export default function SubscriptionsPage() {
   const currentUserId = resolvedUserId ?? DEFAULT_USER;
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
+  // Full live list, archived included — a subscription on an archived category
+  // still resolves its icon. DEFAULT_CATEGORIES is the offline fallback only.
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
 
   useEffect(() => {
     getSubscriptions()
@@ -58,6 +62,21 @@ export default function SubscriptionsPage() {
       .catch(() => setSubscriptions([]))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    getCategories()
+      .then((cats) => {
+        if (cats.length > 0) setCategories(cats);
+      })
+      .catch(() => {
+        // Keep DEFAULT_CATEGORIES as fallback
+      });
+  }, []);
+
+  const activeCategories = useMemo(
+    () => categories.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order),
+    [categories]
+  );
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addForm, setAddForm] = useState<AddFormState>(defaultAddForm);
@@ -76,7 +95,9 @@ export default function SubscriptionsPage() {
   const cancelled = subscriptions.filter((s) => !s.is_active).sort((a, b) => b.id.localeCompare(a.id));
 
   function openAdd() {
-    setAddForm(defaultAddForm);
+    // The options are live categories now, so the initial value has to be a live
+    // id — a legacy slug default would show one category and submit another.
+    setAddForm({ ...defaultAddForm, category_id: activeCategories[0]?.id ?? defaultAddForm.category_id });
     setModalMode("add");
   }
 
@@ -173,6 +194,22 @@ export default function SubscriptionsPage() {
     ? subscriptions.find((s) => s.id === editingId)?.frequency
     : undefined;
 
+  // Every stored subscription carries a legacy slug id, which is absent from the
+  // live list. Keep that stored id as the option's value so saving an unrelated
+  // field cannot silently rewrite the category, and label it with the live
+  // category's icon and name so the modal shows what Category Management shows.
+  const editCategoryOptions = useMemo(() => {
+    const options = activeCategories.map((c) => ({ value: c.id, label: `${categoryIcon(c)} ${c.name_en}` }));
+    if (editForm.category_id && !options.some((o) => o.value === editForm.category_id)) {
+      const stored = resolveCategory(editForm.category_id, categories);
+      options.unshift({
+        value: editForm.category_id,
+        label: `${categoryIcon(stored)} ${stored?.name_en ?? editForm.category_id}`,
+      });
+    }
+    return options;
+  }, [activeCategories, categories, editForm.category_id]);
+
   if (loading) return (
     <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-6">
       <h1 className="text-2xl font-bold mb-4">{t("subscriptions.title")}</h1>
@@ -197,7 +234,7 @@ export default function SubscriptionsPage() {
           <div className="text-xs text-base-content/50 uppercase tracking-wide mb-2">{t("subscriptions.active")}</div>
           <div className="space-y-2">
             {active.map((sub) => {
-              const cat = getCategoryDisplay(sub.category_id);
+              const cat = getCategoryDisplay(sub.category_id, categories);
               const nextDue = getNextDueDate(sub);
               return (
                 <div key={sub.id} className="card bg-base-200 shadow-sm">
@@ -253,7 +290,7 @@ export default function SubscriptionsPage() {
           <div className="text-xs text-base-content/50 uppercase tracking-wide mb-2">{t("subscriptions.cancelled")}</div>
           <div className="space-y-2">
             {cancelled.map((sub) => {
-              const cat = getCategoryDisplay(sub.category_id);
+              const cat = getCategoryDisplay(sub.category_id, categories);
               return (
                 <div key={sub.id} className="card bg-base-200/50 shadow-sm opacity-60">
                   <div className="card-body p-4">
@@ -317,9 +354,9 @@ export default function SubscriptionsPage() {
                   value={addForm.category_id}
                   onChange={(e) => setAddForm((f) => ({ ...f, category_id: e.target.value }))}
                 >
-                  {DEFAULT_CATEGORIES.filter((c) => c.is_active).map((c) => (
+                  {activeCategories.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.icon} {c.name_en}
+                      {categoryIcon(c)} {c.name_en}
                     </option>
                   ))}
                 </select>
@@ -413,9 +450,9 @@ export default function SubscriptionsPage() {
                   value={editForm.category_id}
                   onChange={(e) => setEditForm((f) => ({ ...f, category_id: e.target.value }))}
                 >
-                  {DEFAULT_CATEGORIES.filter((c) => c.is_active).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.icon} {c.name_en}
+                  {editCategoryOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
                     </option>
                   ))}
                 </select>
