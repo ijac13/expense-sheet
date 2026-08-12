@@ -13,7 +13,7 @@ import {
   PayerFilter,
 } from "./reportTypes";
 import { Expense } from "./expenses";
-import { DEFAULT_CATEGORIES, Category } from "./categories";
+import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory } from "./categories";
 import { getCategories } from "./categoryService";
 import { USERS } from "./users";
 
@@ -40,13 +40,11 @@ function getCatMeta(
   catId: string,
   categories: Category[]
 ): { name_en: string; name_zh: string; icon: string } {
-  const cat =
-    categories.find((c) => c.id === catId) ??
-    DEFAULT_CATEGORIES.find((c) => c.id === catId);
+  const cat = resolveCategory(catId, categories);
   return {
     name_en: cat?.name_en ?? catId,
     name_zh: cat?.name_zh ?? catId,
-    icon: cat?.icon ?? "📦",
+    icon: categoryIcon(cat),
   };
 }
 

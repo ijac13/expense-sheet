@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Category } from "../lib/categories";
+import { Category, categoryIcon, resolveCategory } from "../lib/categories";
 import { Expense } from "../lib/expenses";
 import { USERS } from "../lib/users";
 import { updateExpense, deleteExpense } from "../lib/expenseService";
@@ -20,7 +20,10 @@ interface EditForm {
 
 interface Props {
   expense: Expense;
+  /** Active categories — the edit-mode picker's options. */
   categories: Category[];
+  /** Full live list, archived included — the resolution source for this expense. */
+  allCategories: Category[];
   onClose: () => void;
   onSaved: (updated: Expense) => void;
   onDeleted: (id: string) => void;
@@ -42,7 +45,7 @@ function resolveUserId(paid_by: string): string {
   return USERS[0].id; // default
 }
 
-export default function ExpenseEditSheet({ expense, categories, onClose, onSaved, onDeleted }: Props) {
+export default function ExpenseEditSheet({ expense, categories, allCategories, onClose, onSaved, onDeleted }: Props) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
 
@@ -51,7 +54,7 @@ export default function ExpenseEditSheet({ expense, categories, onClose, onSaved
   const [actionError, setActionError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const cat = categories.find(c => c.id === expense.category_id);
+  const cat = resolveCategory(expense.category_id, allCategories);
   const paidByUser = USERS.find(u => u.id === expense.paid_by || u.name === expense.paid_by);
   const createdByUser = USERS.find(u => u.id === expense.created_by || u.name === expense.created_by);
   const isSubscription = !!expense.subscription_id;
@@ -143,7 +146,7 @@ export default function ExpenseEditSheet({ expense, categories, onClose, onSaved
 
             <div className="flex items-center gap-4 px-5 pt-2 pb-4 border-b border-base-300">
               <span className="grid place-items-center w-14 h-14 rounded-2xl bg-primary/10 text-primary">
-                <span className="text-3xl">{cat?.icon ?? "💰"}</span>
+                <span className="text-3xl">{categoryIcon(cat)}</span>
               </span>
               <div>
                 <div className="text-xl font-semibold">

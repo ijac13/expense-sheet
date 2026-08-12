@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReportExpense, PayerFilter } from "../lib/reportTypes";
 import { getExpensesByCategory } from "../lib/reportService";
@@ -36,16 +36,20 @@ export default function DrillDown({
   const [expenses, setExpenses] = useState<ReportExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [allCategories, setAllCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [selected, setSelected] = useState<ReportExpense | null>(null);
+
+  const categories = useMemo(
+    () => allCategories.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order),
+    [allCategories]
+  );
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
   useEffect(() => {
     getCategories()
       .then((cats) => {
-        const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
-        if (active.length > 0) setCategories(active);
+        if (cats.length > 0) setAllCategories(cats);
       })
       .catch(() => {
         // Keep DEFAULT_CATEGORIES as fallback
@@ -163,6 +167,7 @@ export default function DrillDown({
         <ExpenseEditSheet
           expense={selected}
           categories={categories}
+          allCategories={allCategories}
           onClose={() => setSelected(null)}
           onSaved={refreshAfterWrite}
           onDeleted={refreshAfterWrite}

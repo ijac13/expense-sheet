@@ -137,3 +137,69 @@ Every per-expense and per-subscription category icon resolves from the live cate
 ### Summary
 
 The ideation's diagnosis was inverted and the spec says so: icons break because History and the expense detail sheet resolve against the live category list *only*, and 99.3% of real production expenses carry legacy slug ids that exist in no live category — so the lookup misses and every row renders the same `💰`. Verified live (1931/1945 production, 1400/1404 staging), and confirmed Home and Reports are unaffected, which narrows the fix to two surfaces plus Subscriptions. One open decision is escalated rather than chosen: a `DEFAULT_CATEGORIES` fallback would make icons look right today (all 22 slug icons currently equal their `cat_NNN` counterparts) but would silently fail this entity's own "changes reflect without a deploy" criterion, so the spec offers a resolution-layer bridge (recommended) versus a production data migration — the same category-scheme question the captain already deferred in entity 042.
+
+## Stage Report: build
+
+- DONE: Implement Option A (resolution-layer bridge) — captain's explicit choice over Option B: no writes to any sheet, translate a legacy slug id to its live category's icon via the name_en correspondence, live icon wins
+  `resolveCategory`/`categoryIcon` in `app/app/lib/categories.ts` (commit `c3f26c5`): direct live-id match wins, else the slug goes through `DEFAULT_CATEGORIES`' `name_en` to the live category of that name. No write path added anywhere. Re-checked the correspondence against both live APIs today: 22/22 slugs bridge to a live category on production (25 categories, `cat_001`–`cat_023` plus 042's now-shipped `insurance`/`tax`) and on staging, with zero duplicate `name_en` — the bridge is unambiguous on real data.
+- DONE: Fix History and ExpenseEditSheet (AC-1 through AC-6) and Subscriptions (AC-7 through AC-9), matching the spec's exact call sites
+  All five spec-named call sites changed: `history/page.tsx:509,519`, `ExpenseEditSheet.tsx:54,146`, `subscriptions/page.tsx:14,208,262,320,416`. History and `reports/DrillDown.tsx` now hold the **unfiltered** live list for resolution and derive the active list for their pickers, so an archived category resolves (AC-6) without widening the Edit Expense picker. Subscriptions calls `getCategories()` for the first time (AC-7) and both `<select>`s list live actives (AC-9).
+- DONE: Confirm no regressions on Home, Reports, or any surface already resolving correctly (AC-10), and the offline/blank-icon edge cases (AC-11, AC-12)
+  Home, `CategoryPicker`, and Category Management changed only `X.icon` → `categoryIcon(X)`, which is the identity for any non-blank icon — asserted over all 25 live plus 22 baked-in categories. `npx tsc --noEmit` and `npm run build` both clean.
+
+### Evidence
+
+`npm test` in `app/` — 13 tests, all passing, covering three claims:
+
+- **The bridge makes the live icon win.** Fixtures give each live category an icon that differs from its baked-in twin, so the rendered glyph identifies which source was read. Replacing the bridge line with the old `DEFAULT_CATEGORIES` fallback fails 3 unit tests and 5 of 6 render tests — confirmed by mutating the compiled output and re-running.
+- **The blank-icon guard is `||`, not `??`.** Reverting `categoryIcon` to `?? FALLBACK_ICON` fails the AC-12 unit test and the History render test.
+- **The rendered DOM, not just the helper.** `test/icons.render.test.js` mounts the real `history/page.tsx` and `subscriptions/page.tsx` in jsdom against production-shaped fixtures (legacy-slug, live-id, archived, orphan and blank-icon rows) and asserts on the icon that reaches the DOM: AC-1/AC-3 (`🍕` not `💰`, not the baked-in `🍜`), AC-2 (detail sheet through the portal), AC-4 (edit an icon mid-run, dispatch `popstate`, the slug row shows the new glyph with no rebuild), AC-5, AC-6, AC-11 (API 503 → every row keeps a defined glyph), AC-12.
+
+### Notes for verify
+
+- **No full-app browser run.** Every page sits behind `AuthGuard`'s Google sign-in popup, which cannot run headlessly, and the app is a static export with no local `/api`. The page components were mounted directly instead. Confirming on deployed staging with real data is verify's to do.
+- **Deliberate behaviour change outside the ACs:** `reportService.getCatMeta`'s fallback glyph for a genuinely orphaned id moves from `📦` to the shared `💰`. Categories in the live list are unaffected (AC-10).
+- **Two known limits, both left alone.** If the captain ever creates a second live category with an existing `name_en`, the bridge takes the first match. And History's category *filter* still compares raw ids, so filtering by a live category matches no slug expense — the same class as the picker-selection bug the spec deferred, and equally not an icon bug.
+- **New in the repo:** an `npm test` script, a `jsdom` devDependency, and `app/test/`. The repo had no app-level test runner before; `functions/test/` set the `node --test` precedent.
+
+### Summary
+
+The captain's Option A is in: a legacy slug id is translated to its live category through the `name_en` correspondence, so the icon always comes from the sheet Category Management writes and nothing is written back. The visible fix today is that the 1931 production expenses that all rendered the same `💰` now render their own category's icon; the durable fix is that an icon edit in Category Management reaches them at all, which no baked-in fallback could deliver. Two regressions the change could have introduced were headed off rather than discovered later: resolution runs against the unfiltered live list so archived categories still resolve, and Subscriptions' edit modal keeps the stored slug as its option value so an amount-only save cannot silently rewrite `category_id`.
+
+## Stage Report: verify
+
+**Verdict: PASS** — every AC verified against deployed staging; no AC failed.
+
+- DONE: Deploy to staging and confirm live, on real data — build's evidence was jsdom-mounted components, not a running deployed app (AuthGuard blocks headless sign-in, noted explicitly in the build report as verify's job)
+  `firebase deploy --only hosting --project staging` (functions untouched by this branch, so hosting-only keeps the blast radius minimal). All 14 JS chunks referenced by `/`, `/history` and `/subscriptions` are sha256-identical between `app/out` and what staging serves; `GET /api` returns 1404 real expenses and `GET /api/categories` 25 categories, both HTTP 200.
+- DONE: Live-check the bridge actually wins over any baked-in fallback for real legacy-slug expenses on staging, and that editing an icon in Category Management reflects with no rebuild (AC-4, AC-8)
+  Ran the **deployed** `resolveCategory`/`categoryIcon` — extracted from the chunk fetched over HTTP from staging (`0_9ofk67fg_dc.js`, sha256 `38ad08ca…`, identical to the local build) — against the **live** API payload. 1400/1404 staging expenses carry a legacy slug absent from the live list; 0 fall back to `💰`. Feeding the live payload back with `cat_001.icon` altered to a sentinel `🦄` makes the deployed resolver return `🦄` for slug `eating-out` (509 expenses) while the baked-in map still says `🍜` — the live record wins, and the chunk is untouched. **Then closed the round-trip for real** (captain-approved staging write): `PATCH /api/categories/cat_001 {"icon":"🦄"}` → 200, a fresh `GET` returns `icon: 🦄`, and the deployed resolver resolves `eating-out` → `🦄` — with the bridge chunk's sha256 unchanged at `38ad08ca…` across the whole exchange, so no rebuild or redeploy was involved. Restored to `🍜` and re-fetched: byte-identical to the pre-mutation snapshot.
+- DONE: Confirm the two build-flagged items don't regress anything real: the orphan fallback glyph change (📦→💰), and Subscriptions now calling getCategories() for the first time
+  Orphan glyph: 0 of 1404 staging expenses have a `category_id` in neither the live list nor the legacy map, and the deployed resolver returns `undefined` for none of them — the `📦`→`💰` change is unreachable on real data. Subscriptions: the subscriptions-only chunk `17qp~mp3y.sh~.js` now imports categoryService (module `80386`), which it never did before; `GET /api/categories` is the same endpoint History already used, so it adds no new backend surface.
+- DONE: Mandatory PII / secrets check
+  No `.env` file with real values is tracked (only three `.example` files); `app/.env.local` is ignored via `app/.gitignore:34`. Across every line this branch adds (excluding `package-lock.json`): no key/token/password/private-key match, the only email is the synthetic `test@example.com`, the only URL is `http://localhost/`. The real addresses in `app/app/lib/users.ts` are pre-existing on `main` and untouched here. Reverted one build artifact (`app/public/manifest.json`, rewritten by the staging `prebuild`) so it stayed out of the commit.
+
+### Evidence
+
+Live staging, deployed code + deployed data (HTTP 200 on every call):
+
+- **AC-1 / AC-3** — 1400 legacy-slug expenses resolve; 0 render `💰`, and 0 differ from the `icon` string `GET /api/categories` returns. Falsification control: replaying the pre-fix lookup (live list only, `?? "💰"`) over the *same live payload* gives 1400/1400 falling back to `💰` — the captain's original symptom, reproduced and then removed.
+- **AC-4 / AC-8** — real write to staging, then restored. `PATCH cat_001 {"icon":"🦄"}` → 200; fresh `GET` → `🦄` (persisted); deployed resolver `eating-out` → `🦄` while the baked-in map still says `🍜`; bridge chunk sha256 identical before and after, so nothing was rebuilt. Restore → `GET` byte-identical to the pre-mutation snapshot. What would make it fail: `resolveCategory` returning the `DEFAULT_CATEGORIES` entry instead of the live twin — then the answer stays `🍜`.
+- **AC-5** — `resolveCategory("no-such-category-anywhere", live)` → `undefined`, `categoryIcon` → `💰`, no throw.
+- **AC-6** — with the unfiltered live list an archived `cat_001` resolves to its own icon; the same list filtered to `is_active` falls back to the baked-in `🍜`. That gap is exactly what holding the unfiltered list fixes.
+- **AC-10** — `categoryIcon(c) === c.icon` for all 25 live categories, so a live-id surface renders what it rendered before.
+- **AC-11** — empty live list (the state after `getCategories()` rejects) → `🍜`, a defined glyph, no throw.
+- **AC-12** — deployed guard is `||`, not `??`: `icon:""` → `💰` and `icon:"   "` → `💰`.
+- **AC-4 refetch path** — the deployed history chunk registers `getCategories()` on mount *and* on `popstate`; TabBar `<Link>` navigation remounts the page, so returning to History refetches without a reload.
+- Build's 13 tests still pass on this branch (`npm test`), unchanged.
+
+### Limits — please read before approving
+
+- **No browser run was possible.** Chromium, WebKit and Firefox all fail to start on this machine; a freshly downloaded Chromium segfaults (`SIGSEGV`) even on `about:blank`, with and without the sandbox. So there is no screenshot and no observed-in-page behaviour. Everything above executes the *deployed bytes* against the *live API*, which is stronger than build's local-source-plus-fixtures evidence but is still not a rendered page. Entity 041's verify hit the same wall.
+- **AC-2 and AC-9 are the weakest links.** Both are asserted from the hash-matched deployed bundle and from build's jsdom render tests, not from a live rendered sheet or `<select>`. They are the first things worth a click in the captain's manual test.
+- ~~**One link in AC-4/AC-8 is unproven end-to-end.**~~ **Closed.** Ran with captain approval: the icon edit persists through `PATCH`, comes back on a fresh `GET`, and the deployed resolver follows it — no rebuild, chunk hash unchanged. `cat_001` was restored and re-verified byte-identical to its pre-mutation state; staging carries no residue from this test.
+- **Unrelated bug found while reading the write path:** `PATCH /api/categories/:id` reads columns `A:F` but writes `A:G`, so `existing[6]` is always `undefined` and `gov_category` is silently blanked on every PATCH that omits it (`functions/src/index.ts:283-311`). Harmless on staging today (all 25 categories have `gov_category: null`) but it directly threatens entity 042's column-G work on production. Not this entity's to fix — filing it is worth a decision.
+
+### Summary
+
+The fix is live on staging and does what it claims on real data: 1400 of 1404 staging expenses carry a legacy slug that exists in no live category, and the deployed code resolves every one of them to its live category's icon instead of the single generic `💰` that the pre-fix lookup still produces for all 1400 when replayed over the same payload. The durable half also holds — because all 22 baked-in glyphs currently equal their live twins, a screenshot could never tell the bridge from the old fallback, so I set a sentinel icon on `cat_001` — first in the fetched payload, then for real on staging with the captain's approval — and confirmed the deployed resolver follows the live record rather than the baked-in map, with the bridge chunk's hash unchanged throughout. That is AC-4/AC-8 end to end: edit the icon in Category Management, and 509 legacy-slug expenses pick it up with no rebuild and no deploy. `cat_001` was restored and re-verified byte-identical, so staging carries no residue. The two build-flagged changes are inert on real data: no staging expense can reach the changed orphan glyph, and Subscriptions' new `getCategories()` call hits an endpoint the app already used. The one gap to be honest about is that no browser will run on this machine, so nothing here was seen rendered — the captain's manual pass on staging is what closes AC-2 and AC-9.

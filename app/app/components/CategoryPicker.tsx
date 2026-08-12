@@ -1,5 +1,6 @@
 "use client";
 import { useTranslation } from "react-i18next";
+import { categoryIcon } from "../lib/categories";
 
 interface Category {
   id: string;
@@ -31,7 +32,7 @@ export default function CategoryPicker({ categories, selectedId, onSelect }: Pro
               ${selected ? "ring-2 ring-primary ring-offset-1 ring-offset-base-100" : ""}`}
           >
             <span className="grid place-items-center w-12 h-12 rounded-xl bg-base-100 border border-base-300">
-              <span className="text-2xl">{cat.icon ?? "💰"}</span>
+              <span className="text-2xl">{categoryIcon(cat)}</span>
             </span>
             <span className={`text-[13px] leading-tight text-center ${selected ? "font-medium text-primary" : "text-base-content/70"}`}>
               {label}
