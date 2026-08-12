@@ -98,9 +98,9 @@ async function type(input, value) {
   });
 }
 
-/** The form's heading, whichever container the form happens to live in. */
+/** The form's heading, whichever container or heading level the form uses. */
 function formTitle(container) {
-  return [...container.querySelectorAll("h2")].find((h) =>
+  return [...container.querySelectorAll("h1, h2, h3, h4")].find((h) =>
     /^cat_mgmt\.form_(edit|add)$/.test(h.textContent.trim())
   );
 }
