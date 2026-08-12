@@ -69,17 +69,28 @@ const SUBSCRIPTIONS = [
 ];
 
 /**
- * @param {{offline?: boolean, failWrites?: boolean}} opts
+ * @param {{offline?: boolean, failWrites?: boolean, categories?: object[]}} opts
  *   offline simulates GET /api/categories failing.
  *   failWrites simulates POST/PATCH /api/categories failing while GET still works.
+ *   categories overrides the default fixture (a long list, for the
+ *   below-the-fold cases).
  */
-function installGlobals({ offline = false, failWrites = false } = {}) {
+function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES } = {}) {
   const dom = installDom();
+
+  // jsdom implements neither API, so these records are the only way to observe a
+  // page trying to move the viewport. A fix that keeps the captain's place must
+  // leave `scrolls` empty.
+  const scrolls = [];
+  dom.window.HTMLElement.prototype.scrollIntoView = function (options) {
+    scrolls.push({ api: "scrollIntoView", target: this, options });
+  };
+  dom.window.scrollTo = (...args) => scrolls.push({ api: "scrollTo", args });
 
   const requests = [];
   // A per-run copy so a test can edit an icon mid-run, the way Category
   // Management would, and re-observe without rebuilding anything.
-  const categories = CATEGORIES.map((c) => ({ ...c }));
+  const categories = fixture.map((c) => ({ ...c }));
   const setCategoryIcon = (id, icon) => {
     categories.find((c) => c.id === id).icon = icon;
   };
@@ -123,7 +134,7 @@ function installGlobals({ offline = false, failWrites = false } = {}) {
     }
     return { ok: true, status: 200, json: async () => EXPENSES };
   };
-  return { dom, requests, writes, categories, setCategoryIcon };
+  return { dom, requests, writes, categories, setCategoryIcon, scrolls };
 }
 
 /**
