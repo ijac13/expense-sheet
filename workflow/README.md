@@ -128,6 +128,21 @@ Before marking verify complete, the agent must confirm all of the following. If 
 
 Feature is shipped — verified, approved by Captain, and merged.
 
+**Merging to `main` does not deploy anything.** This repo has no CI/CD — production only runs what was last manually deployed there. A feature is not actually live until someone runs the deploy commands below, no matter how long ago it merged.
+
+**Before marking an entity `done`, deploy it to production and confirm it's live:**
+
+1. Determine blast radius from the diff: hosting-only (`app/` changed, `functions/` untouched) or both.
+   - Hosting only: `firebase deploy --only hosting --project production`
+   - Both: `firebase deploy --only functions,hosting --project production`
+2. Confirm it's actually live — don't trust the deploy command's exit code alone:
+   - Hosting: `curl -sI https://expense-sheet-b2db8.web.app` and check `Last-Modified` is recent, not stale from a prior deploy.
+   - Functions: hit an endpoint whose behavior changed and confirm the new behavior, not just HTTP 200 (e.g. a field that used to return `null` now returns a real value).
+3. Record the deploy in the entity's body (a short note near the top, above the original ideation text) with the command run, timestamp, and the concrete evidence from step 2 — see any recent `_archive/*.md` entity for the pattern.
+4. Only then set `status: done`.
+
+If a functions deploy fails on an orphaned function that no longer exists in the source (a leftover from some earlier, unrelated cleanup), that's a pre-existing deploy hygiene issue, not something to route around — delete the orphaned function (`firebase functions:delete <name> --region us-central1 --project production`) and redeploy.
+
 ## Spec Template
 
 When writing a spec in the `spec` stage, use this structure:
