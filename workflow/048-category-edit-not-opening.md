@@ -1,13 +1,13 @@
 ---
 id: 048
 title: Category Edit Form Doesn't Open in Category Management
-status: spec
+status: build
 source: captain (found manually testing entity 044 on staging)
 started: 2026-08-12T04:41:49Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-048-category-edit-not-opening
 issue:
 pr:
 ---
