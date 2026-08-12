@@ -223,3 +223,102 @@ factually wrong and would have biased the build stage toward route 1 for a bad r
 was corrected in both places it appeared. One captain-authored tension (live-reproduction
 requirement vs. a sandbox where that was impossible) is surfaced for the gate rather than
 silently resolved.
+
+## Stage Report: build
+
+- DONE: Pick between the two spec-offered routes (scroll the form into view vs. make it a real
+  modal) and justify the choice
+  Route 2, on a fact the spec did not have — see Route choice below. Commit `9551325`.
+- DONE: Implement all 10 ACs, including the regression test (AC-9) that must fail on current
+  main and pass after the fix — write both results into the stage report
+  Both results below. 14-line change to `app/app/settings/categories/page.tsx`; 8 new tests.
+- DONE: Cover the edge cases named in spec: short lists, tall forms, last-row edits, the
+  StagingBanner overlap, and the Cancel/Save scroll-position guarantees (AC-7, AC-8)
+  All five covered by tests 8, 13, 14 and 15 in `app/test/category-edit-form.render.test.js`.
+
+### Route choice — modal, on evidence the spec lacked
+
+The spec framed route 2 as the larger diff introducing a new pattern. It is not: this app
+already ships three daisyUI `.modal` overlays — `app/page.tsx:218` (notes) and
+`app/subscriptions/page.tsx:325,423` (add/edit subscription), all using the same
+`<div className="modal modal-open"><div className="modal-box">…<div className="modal-backdrop"
+onClick={close} /></div>` shape. So route 2 is the convention-matching route, and after the
+spec stage's correction route 1's `scrollIntoView` is the one new API. The diff came to 14
+lines. Three further reasons:
+
+- **It removes the bug class instead of compensating for it.** `.modal` is
+  `position:fixed;inset:0;place-items:center` (verified in the shipped bundle,
+  `out/_next/static/chunks/0jejgqrfcrb~..css`), so the form is in view at any scroll offset.
+  Route 1 would have kept the form in flow and asked the browser to scroll to it — still
+  subject to the scroll anchoring that caused this.
+- **AC-7/AC-8 fall out rather than needing scroll-restore bookkeeping.** The page never
+  scrolls at all, so the captain's place is kept by construction.
+- **jsdom cannot verify route 1 honestly.** It implements neither `scrollIntoView` nor layout,
+  so a route-1 test could only assert "we called the stub". Route 2's anchoring is a CSS
+  property, which the test asserts against `daisyui.css` itself.
+
+### AC-9, both results
+
+`npm test` at `7f123b4` (tests only, page component byte-identical to `main`): **16 pass, 5
+fail**. The same suite after `9551325`: **21 pass, 0 fail**. Re-confirmed by restoring
+`main`'s page component into the worktree and re-running — same 5 failures, all on the single
+assertion "the form is inside a .modal container, not in page flow".
+
+### Acceptance criteria
+
+- AC-1, AC-9 — test 8 opens rows 1, 9 and 18 of an 18-row fixture and asserts the form's
+  ancestor carries `.modal`/`.modal-open` and that `daisyui.css` fixes `.modal` to the
+  viewport. Re-inlining the form, or renaming the container to a class that is not
+  viewport-fixed, fails it.
+- AC-2, AC-3, AC-4 — test 9 asserts the three fields equal `cat_012`'s stored values, that the
+  stored `gov_category` is the *selected* option, and the title is `cat_mgmt.form_edit`.
+  Test 10 covers the no-`gov_category` row: select value `""`, placeholder option first.
+- AC-5 — test 11 opens row 3 then row 16 and asserts the name field switched and exactly one
+  `.modal-box` exists. Caveat below.
+- AC-6 — test 12: `cat_mgmt.add` still opens an empty, viewport-anchored add form.
+- AC-7, AC-8 — test 13 cancels from row 17, then reopens, renames it and saves: the edited row
+  is still rendered, the PATCH went to `/api/categories/cat_017`, the success toast rendered,
+  and the recorded scroll-attempt list is empty at every step. A fix that scrolled the page to
+  reach the form would fail this.
+- AC-10 — `npm test`: 21 pass, 0 fail, including all 13 pre-existing tests.
+
+### Edge cases
+
+Short list (2 rows, test 15) and last row (test 8) open anchored with zero scroll attempts.
+Blank icon renders an empty field with the 📦 placeholder, no crash (test 10). Archive from
+inside the form closes it and leaves the remaining row editable (test 15). Category API down:
+no rows, no Edit buttons, page still renders (test 15). Tall form and StagingBanner (test 14):
+`modal-middle` caps `.modal-box` at `calc(100vh - 5em)` and centres it, leaving ~40px above —
+clear of the banner's `h-6`/24px — while `.modal-box` keeps `overflow-y:auto` so the fields
+stay reachable; `.modal`'s `z-index:999` is above the banner's `z-50`. The default
+`.modal-box` cap of `100vh` would have parked a tall form's title under the banner, which is
+why `modal-middle` is there.
+
+### Things the gate should weigh
+
+- **No live browser run.** Same sandbox limits the spec documented (Chrome blocked, Google
+  sign-in not headless-able). Verification is the real compiled page mounted under jsdom with
+  real clicks, plus the shipped CSS. jsdom has no layout engine, so AC-1's literal "bounding
+  rect intersects the viewport" is proven as a CSS property of the container rather than
+  measured. A phone check on staging is still worth doing.
+- **AC-5's interaction path changes.** The guarantee holds (one form, row B's values, in view)
+  but a real tap on row B now lands on the modal backdrop and closes the form instead. The
+  test drives the button directly. This is normal modal behaviour, not a workaround.
+- **Two harness changes were needed and affect all UI tests.** `react-dom` is now required
+  inside `mount()`; loading it before `installGlobals` defined `window` left React on a legacy
+  path where `input` events never reached `onChange`, so typing into a controlled field
+  silently did nothing. `installGlobals` also gained a fixture override and scroll recording.
+  All 13 pre-existing tests still pass.
+- **No Esc-to-close.** Not in any AC, and neither existing modal has it; adding it here only
+  would be inconsistent. Worth its own entity alongside the `role="dialog"` the other two
+  modals also lack.
+
+### Summary
+
+Chose the modal route and found while implementing it that the spec's cost framing was
+backwards: the app already had three daisyUI modals, so this was the convention-matching route
+and it landed in 14 lines. The fix deletes the failure mode rather than compensating for it —
+the form is now fixed to the viewport, so it is visible from any scroll position and the page
+never moves, which is also what satisfies the keep-your-place criteria. Eight new tests mount
+the real page against an 18-row fixture; five failed against `main`'s page component and all
+pass now, with the full suite at 21/21.
