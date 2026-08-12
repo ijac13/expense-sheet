@@ -322,3 +322,108 @@ the form is now fixed to the viewport, so it is visible from any scroll position
 never moves, which is also what satisfies the keep-your-place criteria. Eight new tests mount
 the real page against an 18-row fixture; five failed against `main`'s page component and all
 pass now, with the full suite at 21/21.
+
+## Stage Report: verify
+
+**verdict: REJECTED** — no code defect found; AC-5 does not hold as written on the deployed
+build, and AC-1/AC-7/AC-8 could not be closed live. Both need a captain decision, not a rebuild.
+
+- DONE: Deploy to staging and confirm live, on the real deployed bundle — build's evidence was
+  jsdom, not a running deployed app
+  Built with `app/.env.staging`, `firebase deploy --only hosting --project staging`. The
+  categories chunk `0s_m-1hsw5gyw.js` is sha256 `0cebd981…` (22039 B) both in `app/out` and at
+  the live URL; pre-deploy that path returned the 11139-B SPA fallback HTML, so the deploy is
+  demonstrably new. `GET /api/categories` → 200, 25 active categories.
+- FAILED: Live-check the modal actually opens centered/viewport-fixed for a real below-the-fold
+  row on staging, and that Cancel/Save keep the captain's scroll position (AC-1, AC-7, AC-8)
+  No browser can run in this environment, so no pixel geometry was measured — see below.
+- FAILED: Confirm the AC-5 interaction change build flagged (tapping row B's backdrop closes the
+  form rather than switching to it directly) isn't confusing in practice
+  "In practice" needs a human on a device; worse, AC-5's literal behaviour cannot occur at all
+  on the deployed build — evidence below.
+
+### AC-5 fails as written (the one concrete failure)
+
+From the *deployed* CSS: `.modal-backdrop{z-index:-1;grid-row-start:1;grid-column-start:1;
+place-self:stretch stretch}` sits in the same grid cell as `.modal-box` inside a
+`position:fixed;inset:0;z-index:999` container. It therefore stretches over the **whole
+viewport**, above `.modal`'s own background and below the box. Every category row is behind it.
+So a real tap on row B's Edit while row A's form is open lands on the backdrop and calls
+`closeForm` — it does not switch the form to row B. Build's test passes because it drives the
+button programmatically, which bypasses hit-testing.
+
+This is not fixable in build without abandoning the modal, and the spec itself recommended the
+modal. Recommended resolution is amending AC-5 to the two-tap modal flow (close, then tap row
+B), which preserves its real guarantees — one form only, row B's values, in view — not a
+re-dispatch to build.
+
+### What the live artifacts do prove (AC-1, AC-7, AC-8 — structural, not measured)
+
+- `.modal` in the deployed CSS is `position:fixed;inset:0;place-items:center;z-index:999`, and
+  `.modal.modal-open` sets `pointer-events:auto;visibility:visible;opacity:1`. The competing
+  `opacity:0` rule is inside `@starting-style` (transition start value only), so the open modal
+  is genuinely visible — worth stating because `.modal` alone is `visibility:hidden`.
+- Audited every ancestor of the modal (`html.h-full` → `body.min-h-full.flex.flex-col` →
+  `div.pb-16` → `div.max-w-lg.mx-auto.p-4`) against the deployed CSS for `transform`,
+  `translate`, `scale`, `rotate`, `perspective`, `filter`, `backdrop-filter`, `will-change`,
+  `contain`, `content-visibility`: **zero hits**. Nothing creates a containing block, so
+  `position:fixed` resolves against the viewport. This is the failure mode that would have
+  silently reinstated the bug, and it is now ruled out on the shipped stylesheet.
+- The deployed chunk contains `scrollIntoView`, `scrollTo`, `scrollTop`, `autoFocus`: **0
+  occurrences each**. The page never scrolls itself, so it cannot throw the captain off-place.
+- daisyUI also locks the page while open: `:root:has(:is(.modal.modal-open,…)){--page-overflow:
+  hidden}` feeding `:root:not(span){overflow:var(--page-overflow)}`. `--page-overflow` has no
+  other declaration, so scrolling is normal when closed.
+- StagingBanner edge case holds at all three font sizes: `.modal-middle .modal-box` is
+  `max-height:calc(100vh - 5em)` centred, giving a top of 40/45/50 px at
+  `html[data-font-size]` = small/medium/large (16/18/20 px), all clear of the banner's 24 px.
+
+### Why no live UI observation was possible
+
+Re-proved independently and more broadly than earlier stages, all with the bash sandbox
+disabled: five Chromium builds (Playwright headless-shell 149 and chromium 149, Puppeteer
+Chrome 148 and 131, headless-shell 131) all die with `SEGV_ACCERR` at address `0x10` right after
+crashpad fails on `~/Library/Application Support/…`; `--no-sandbox`, `--single-process`,
+`--disable-crash-reporter` and a redirected `HOME` change nothing. Playwright Firefox 1532 fails
+to launch and WebKit 2311 times out on its inspector pipe (its XPC services are blocked).
+`swiftc` is absent (Command Line Tools stub), so a WKWebView probe could not be built either.
+The environment blocks the mach/XPC services every engine needs — this is not a version skew.
+
+### Residual risk for the captain's manual test
+
+The one thing structure cannot settle: applying and removing `overflow:hidden` on `:root` is the
+classic scroll-lock, and whether it preserves scroll offset is browser behaviour, not CSS. On
+Android Chrome it is expected to hold, but AC-7/AC-8 rest on it, so it is exactly what a real
+device should confirm. Also note `max-height:calc(100vh - 5em)` uses the *large* viewport while
+`position:fixed` uses the visible one; today's form (~380–450 px) never reaches that cap, but
+entity 043 is adding a note field to this same form, which eats into that margin.
+
+### Not verified for lack of live data / out of this diff's reach
+
+- AC-3's "shows the stored `gov_category` selected" half: all 25 live staging categories have
+  `gov_category: null`, so only the placeholder half is exercisable until entity 042 lands.
+- AC-8's save round trip: `handleSave` is byte-unchanged by this diff (the diff is 14 lines of
+  `className` plus the backdrop div), and entity 044's verify already exercised
+  `PATCH /api/categories/:id` live. No new write to the shared staging sheet was made here.
+- AC-2, AC-4, AC-6, AC-9, AC-10 stand on build's evidence; `npm test` re-run here: 21 pass, 0
+  fail. The five AC-9 tests assert the form's ancestor carries `.modal`/`.modal-open` — re-inlining
+  the form as a `.card` is the change that makes them fail again.
+
+### Mandatory PII / secrets check — PASS
+
+`git ls-files | grep -i env` returns only `.env.example`, `app/.env.staging.example`,
+`functions/.env.staging.example`, all still `TODO_*` placeholders. The branch diff has zero
+matches for API-key patterns, `-----BEGIN`, bearer tokens, or any email address. The
+`app/.env.local` used to build is gitignored (`app/.gitignore:34`), and the staging manifest swap
+that `prebuild` writes into the tracked `app/public/manifest.json` was reverted — tree is clean.
+
+### Summary
+
+The deploy is live and byte-identical to the build, and the fix's core mechanism holds up on the
+shipped artifacts: the modal is viewport-fixed, no ancestor breaks that, and the page has no
+scroll code left to move under the captain. Two things stop this being a clean pass — AC-5's
+literal one-tap row-switch is impossible on any modal because the deployed backdrop covers the
+whole viewport, and no browser or layout engine can run in this environment, so AC-1/AC-7/AC-8
+are proven structurally rather than measured. Neither is a code defect: the first wants an AC
+amendment from the captain, the second wants the captain's own pass on
+`https://expense-sheet-staging.web.app` → Settings → Category Management.
