@@ -1,7 +1,7 @@
 ---
 id: 043
 title: Category Notes — Tooltip on Home
-status: build
+status: verify
 source: captain
 started: 2026-08-12T04:41:49Z
 completed:
