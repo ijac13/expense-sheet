@@ -1,0 +1,4 @@
+[
+  { "id": "sub-1001", "name": "房屋稅", "amount": 1001, "category_id": "tax", "frequency": "annual", "due_day": 12, "due_month": 5, "paid_by": "ijac", "is_active": true },
+  { "id": "sub-1002", "name": "Netflix", "amount": 390, "category_id": "digital", "frequency": "monthly", "due_day": 1, "due_month": null, "paid_by": "wei", "is_active": true }
+]

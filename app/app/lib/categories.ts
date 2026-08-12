@@ -3,7 +3,7 @@ import {
   Utensils, ShoppingCart, Carrot, Stethoscope, Plane, Bus,
   Smartphone, Baby, Shirt, Dumbbell, Gift, GraduationCap,
   Milestone, Wrench, Fuel, Gamepad2, Home, ShoppingBag,
-  Car, HandHeart, Key, Package,
+  Car, HandHeart, Key, Package, Shield, Receipt,
 } from "lucide-react";
 
 export const CATEGORY_ICONS: Record<string, LucideIcon> = {
@@ -29,6 +29,8 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "donate": HandHeart,
   "mortgage": Key,
   "other": Package,
+  "insurance": Shield,
+  "tax": Receipt,
 };
 
 export type GovCategory =
@@ -102,6 +104,8 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: "donate", name_en: "Donate", name_zh: "捐款", icon: "💝", sort_order: 20, is_active: true, gov_category: "miscellaneous" },
   { id: "mortgage", name_en: "Mortgage", name_zh: "房貸", icon: "🏡", sort_order: 21, is_active: true, gov_category: "housing_utilities" },
   { id: "other", name_en: "Other", name_zh: "其他", icon: "📦", sort_order: 22, is_active: true, gov_category: "miscellaneous" },
+  { id: "insurance", name_en: "Insurance", name_zh: "保險", icon: "🛡️", sort_order: 23, is_active: true, gov_category: "insurance_financial" },
+  { id: "tax", name_en: "Tax", name_zh: "稅金", icon: "🧾", sort_order: 24, is_active: true, gov_category: "miscellaneous" },
 ];
 
 export const LAST_CATEGORY_KEY = "expense_last_category_id";
