@@ -1,13 +1,13 @@
 ---
 id: 043
 title: Category Notes — Tooltip on Home
-status: spec
+status: build
 source: captain
 started: 2026-08-12T04:41:49Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-043-category-notes
 issue:
 pr:
 ---
@@ -128,6 +128,8 @@ Non-binding, but these were confirmed by reading the code and will save the buil
 
 1. **Persistent header line vs. a popover that pops.** The decision above trades salience for zero gesture conflict and zero clipping risk. If the note being always-on feels like wallpaper you stop reading, say so at this gate — switching to a transient, timed reveal is a small change now and a rewrite later.
 2. **One note field, or `note_en` / `note_zh`?** Specced as one field, because the note is a private reminder for you rather than user-facing copy, and doubling it doubles the sheet columns and the form. Say so if you want it bilingual like the names.
+
+**Captain decision, 2026-08-12:** (1) Persistent header line, as specced. (2) One field, as specced — the captain will always write it in Traditional Chinese in practice; no bilingual split, no language field, still plain free text with no language validation.
 
 ## Stage Report: spec
 
