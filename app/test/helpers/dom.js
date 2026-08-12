@@ -5,16 +5,40 @@
 const { JSDOM } = require("jsdom");
 const React = require("react");
 const { act } = require("react");
+
+function installDom() {
+  const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
+  global.window = dom.window;
+  global.document = dom.window.document;
+  global.navigator = dom.window.navigator;
+  global.HTMLElement = dom.window.HTMLElement;
+  global.Node = dom.window.Node;
+  // categories.ts reads bare `localStorage`, and next/link reads bare `self`.
+  global.localStorage = dom.window.localStorage;
+  global.self = dom.window;
+  global.IS_REACT_ACT_ENVIRONMENT = true;
+  return dom;
+}
+
+// Order matters: react-dom decides ONCE, at module-init, whether the native
+// `input` event exists, by reading `window`. Required with no DOM global it
+// concludes "no" and downgrades onChange to a keydown/selectionchange polyfill —
+// so a dispatched `input` event updates the DOM node but never reaches React,
+// and a controlled input silently ignores every programmatic edit. Install a DOM
+// before the require.
+installDom();
 const { createRoot } = require("react-dom/client");
 
 // Production shape: live categories are cat_NNN, and every icon here differs from
 // the DEFAULT_CATEGORIES one for the same name, so a rendered icon tells you which
 // source the component read. cat_015 is archived; cat_099 has a blank icon cell.
+// The `note` values cover the three shapes the API can return: a real note, the
+// "" a blank column-H cell produces, and — on cat_015 — the key being absent.
 const CATEGORIES = [
-  { id: "cat_001", name_en: "Eating Out", name_zh: "外食", icon: "🍕", sort_order: 1, is_active: true },
-  { id: "cat_003", name_en: "Groceries", name_zh: "食材", icon: "🥕", sort_order: 3, is_active: true },
-  { id: "cat_015", name_en: "Fuel", name_zh: "加油", icon: "🛢️", sort_order: 15, is_active: false },
-  { id: "cat_099", name_en: "Blank Icon", name_zh: "空白", icon: "", sort_order: 99, is_active: true },
+  { id: "cat_001", name_en: "Eating Out", name_zh: "外食", icon: "🍕", sort_order: 1, is_active: true, gov_category: "restaurants_accommodation", note: "restaurants and takeaway, not groceries" },
+  { id: "cat_003", name_en: "Groceries", name_zh: "食材", icon: "🥕", sort_order: 3, is_active: true, gov_category: "food_beverage_tobacco", note: "" },
+  { id: "cat_015", name_en: "Fuel", name_zh: "加油", icon: "🛢️", sort_order: 15, is_active: false, gov_category: "transport_communication" },
+  { id: "cat_099", name_en: "Blank Icon", name_zh: "空白", icon: "", sort_order: 99, is_active: true, gov_category: "miscellaneous", note: "   " },
 ];
 
 function expense(id, category_id, notes) {
@@ -45,16 +69,12 @@ const SUBSCRIPTIONS = [
 ];
 
 /**
- * @param {{offline?: boolean}} opts  offline simulates GET /api/categories failing.
+ * @param {{offline?: boolean, failWrites?: boolean}} opts
+ *   offline simulates GET /api/categories failing.
+ *   failWrites simulates POST/PATCH /api/categories failing while GET still works.
  */
-function installGlobals({ offline = false } = {}) {
-  const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
-  global.window = dom.window;
-  global.document = dom.window.document;
-  global.navigator = dom.window.navigator;
-  global.HTMLElement = dom.window.HTMLElement;
-  global.Node = dom.window.Node;
-  global.IS_REACT_ACT_ENVIRONMENT = true;
+function installGlobals({ offline = false, failWrites = false } = {}) {
+  const dom = installDom();
 
   const requests = [];
   // A per-run copy so a test can edit an icon mid-run, the way Category
@@ -64,20 +84,46 @@ function installGlobals({ offline = false } = {}) {
     categories.find((c) => c.id === id).icon = icon;
   };
 
-  global.fetch = async (url) => {
-    requests.push(String(url));
-    if (String(url) === "/api/categories") {
+  // Bodies of the category writes the page issued, so a test can assert on what
+  // was actually sent rather than only on what came back.
+  const writes = [];
+
+  global.fetch = async (url, init = {}) => {
+    const href = String(url);
+    const method = init.method ?? "GET";
+    requests.push(href);
+
+    if (href === "/api/categories" && method === "GET") {
       if (offline) return { ok: false, status: 503, statusText: "Service Unavailable" };
       // Fresh objects per request, as JSON parsing would give — returning the same
       // array reference would let React bail out of the re-render.
       return { ok: true, status: 200, json: async () => categories.map((c) => ({ ...c })) };
     }
-    if (String(url) === "/api/subscriptions") {
+    if (href.startsWith("/api/categories") && (method === "POST" || method === "PATCH")) {
+      const body = JSON.parse(init.body);
+      writes.push({ method, href, body });
+      if (failWrites) return { ok: false, status: 503, statusText: "Service Unavailable" };
+      if (method === "POST") {
+        const created = {
+          id: `cat_${String(categories.length + 100)}`,
+          sort_order: categories.length + 1,
+          is_active: true,
+          note: "",
+          ...body,
+        };
+        categories.push(created);
+        return { ok: true, status: 201, json: async () => ({ ...created }) };
+      }
+      const target = categories.find((c) => c.id === href.split("/").pop());
+      Object.assign(target, body);
+      return { ok: true, status: 200, json: async () => ({ ...target }) };
+    }
+    if (href === "/api/subscriptions") {
       return { ok: true, status: 200, json: async () => SUBSCRIPTIONS };
     }
     return { ok: true, status: 200, json: async () => EXPENSES };
   };
-  return { dom, requests, setCategoryIcon };
+  return { dom, requests, writes, categories, setCategoryIcon };
 }
 
 /**

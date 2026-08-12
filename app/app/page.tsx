@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, PenLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
-import { Category, DEFAULT_CATEGORIES, categoryIcon, getDefaultCategory, saveLastCategory } from "./lib/categories";
+import { Category, DEFAULT_CATEGORIES, categoryIcon, getDefaultCategory, resolveCategory, saveLastCategory } from "./lib/categories";
 import { getCategories } from "./lib/categoryService";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
 import { DEFAULT_USER, USERS, type UserId } from "./lib/users";
@@ -40,6 +40,10 @@ export default function HomePage() {
   const [saved, setSaved] = useState(false);
 
   const selectedCat = categories.find(c => c.id === categoryId) ?? DEFAULT_CATEGORIES.find(c => c.id === categoryId);
+  // Resolved separately from `selectedCat`: on page load `categoryId` is a
+  // DEFAULT_CATEGORIES slug, which matches no live `cat_NNN` id, so `selectedCat`
+  // falls back to the baked-in entry — and baked-in entries carry no note.
+  const categoryNote = resolveCategory(categoryId, categories)?.note?.trim();
 
   // Default paidBy to the signed-in user
   useEffect(() => {
@@ -142,6 +146,9 @@ export default function HomePage() {
             </button>
           </div>
         </div>
+        {categoryNote && (
+          <div className="text-xs opacity-70 mb-2 break-words">{categoryNote}</div>
+        )}
         <div className="text-5xl font-mono font-bold min-h-[52px] break-all">
           {amount || <span className="opacity-40">0</span>}
         </div>
