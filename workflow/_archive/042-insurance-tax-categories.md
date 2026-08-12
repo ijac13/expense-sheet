@@ -1,16 +1,16 @@
 ---
 id: 042
 title: Split Insurance and Tax Out of "Other" Category
-status: build
+status: done
 source: captain (category analysis of expense-sheet-prod data, 2026-05 to 2026-07)
 started: 2026-07-29T12:50:24Z
-completed:
-verdict:
+completed: 2026-08-12T04:17:58Z
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-042-insurance-tax-categories
+worktree:
 issue:
 pr: "#16"
-mod-block: merge:pr-merge
+mod-block:
 ---
 
 **Blocked, 2026-08-05:** running the build script's dry-run against real production surfaced a wrong core assumption — production's actual Categories tab uses `cat_001`…`cat_023` ids (e.g. `cat_004` = Medical), not the readable slugs (`medical`, `other`) this entity's spec/build assumed were already there. Confirmed live against the real production sheet, not staging. Captain confirmed production Reports/History already show raw `cat_00X`-looking text instead of names — the exact symptom entity 044 exists to fix. Captain's call: fix 044 first (it's the root cause — hardcoded `DEFAULT_CATEGORIES` resolution vs the live category list), then revisit whether 042 should add slug categories alongside the existing cat_NNN ones, or whether the category scheme itself needs to be addressed first. Do not run the live (non-dry-run) migration script until this is resolved — it correctly halted itself on this exact mismatch.
