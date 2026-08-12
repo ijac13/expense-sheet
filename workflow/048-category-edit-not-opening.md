@@ -75,9 +75,10 @@ viewport.
 - Shipped CSS `out/_next/static/chunks/0r9u1ja0en03n.css`: `.card{…position:relative}` — the
   form is in normal flow and occupies layout space. Contrast `.toast{…position:fixed}`, the
   viewport-anchored primitive the same page already uses for the save toast.
-- `grep` over `app/`: no `scrollIntoView` / `scrollTo` / `autoFocus` in the categories page,
-  though the codebase uses all three elsewhere (`reports/DrillDown.tsx:47`, `page.tsx:222`,
-  `history/page.tsx:440`).
+- `grep` over `app/`: no `scrollIntoView` / `scrollTo` / `autoFocus` in the categories page
+  (count 0). Elsewhere the app source uses `window.scrollTo` (`reports/DrillDown.tsx:47`) and
+  `autoFocus` (`history/page.tsx:440`); `scrollIntoView` appears **nowhere** in app source —
+  only in `node_modules` type definitions.
 - Captain screenshots `feedback-screenshots/category-003.png`, `category-004.png` confirm the
   real conditions: Android Chrome, 1080×2400, a long list, scrolled far past the header.
 
@@ -149,9 +150,12 @@ nothing.
 Outcome first: the form must be where the captain is looking. Two viable routes —
 
 1. **Keep it inline, scroll it into view.** Add a ref to the form card and
-   `scrollIntoView({ block: "center" })` after `setFormMode`. Smallest diff, matches existing
-   conventions in this codebase. Needs care for AC-7 (restore scroll on close) and for the
-   short-list edge case.
+   `scrollIntoView({ block: "center" })` after `setFormMode`. Smallest diff. Note this
+   introduces `scrollIntoView` as a *new* API for this codebase (only `window.scrollTo` and
+   `autoFocus` are used today), so it is not the "matches existing conventions" option it
+   first appears to be. Needs care for AC-7 (restore scroll on close), for the short-list edge
+   case, and for the `StagingBanner` edge case — `block: "center"` clears the 24 px bar, but
+   `block: "start"` would park the form under it.
 2. **Make it a real modal** (daisyUI `<dialog className="modal">`). Viewport-anchored by
    construction, so AC-1/AC-7/AC-8 fall out for free and scroll anchoring stops mattering; the
    page already uses daisyUI's fixed-position `toast`. Larger diff, and needs Esc/backdrop
@@ -166,3 +170,56 @@ Route 2 is the more robust fix for a phone-first app; route 1 is the cheaper one
 - Category icon resolution — entity 049.
 - Redesigning the category row layout, the archived section, or reorder.
 - Adding top padding to compensate for `StagingBanner` globally (worth its own entity).
+
+## Stage Report: spec
+
+- DONE: Review the already-written spec at this entity file for internal consistency and
+  completeness — do not redo the investigation or second-guess the root cause unless you find
+  it's actually wrong
+  Re-ran every cited anchor against the tree; the root cause holds and one factual error in the
+  Evidence section was found and corrected (details below).
+- DONE: Write the closing Stage Report: spec section (DONE/SKIPPED/FAILED against the
+  checklist, with evidence) and commit
+  This section; committed with the two Evidence/Implementation-Notes corrections.
+
+### Review findings
+
+- **Root cause stands.** Verified independently: the form renders inline at `page.tsx:260`
+  (`{isFormOpen && (<div className="card …">`), `openEdit` at `page.tsx:66-69` calls only
+  `setForm` + `setFormMode`, the categories page contains 0 occurrences of
+  `scrollIntoView`/`scrollTo`/`autoFocus`, shipped CSS has `.card{…position:relative}` vs
+  `.toast{…position:fixed;…bottom:1rem}`, and `overflow-anchor` count is 0. Nothing contradicts
+  the off-screen-render diagnosis.
+- **CORRECTED — one wrong citation.** The Evidence bullet claimed the codebase "uses all three
+  elsewhere (`reports/DrillDown.tsx:47`, `page.tsx:222`, `history/page.tsx:440`)".
+  `scrollIntoView` appears **nowhere** in app source (only `node_modules` type defs), and
+  `page.tsx:222` resolves to unrelated lines in every candidate page. Rewrote the bullet, and
+  softened Implementation Notes route 1, which had sold `scrollIntoView` as "matches existing
+  conventions" — it would be a new API here. This is load-bearing for the build stage's
+  route choice, so it was worth fixing rather than noting.
+- **AC-4 exact strings confirmed:** `cat_mgmt.form_edit` = "Edit Category" / 編輯分類 in
+  `app/public/locales/{en,zh}/common.json:89`. AC-4 is checkable as written.
+- **AC-3 is supported by the code:** `openEdit` does `gov_category: cat.gov_category ?? ""`, so
+  the no-gov_category → placeholder path exists rather than being aspirational.
+- **Out-of-scope deferrals are real:** 042, 044, 049 are all `status: done` / `verdict: PASSED`
+  in `workflow/_archive/`. Nothing is deferred to work that does not exist.
+- **`StagingBanner` edge case verified verbatim:** `fixed top-0 left-0 right-0 z-50 h-6` at
+  `app/app/components/StagingBanner.tsx:4`.
+- **Flagged, not rewritten:** the Success bullet asks that root cause come "from live
+  reproduction, not a guess", but Evidence documents that live browser repro was impossible in
+  this sandbox (Chrome blocked; Google sign-in not headless-able). The adapted method — mounting
+  the real page and driving real clicks — meets the intent, but the captain authored that line,
+  so the captain should confirm the substitution rather than have it edited away.
+- **Minor, left as-is:** AC-8's "success toast is on screen" is trivially true given
+  `.toast{position:fixed}`; the discriminating half of AC-8 is "the edited row is visible".
+
+### Summary
+
+Reviewed the spec written in cycle 1 rather than re-investigating. The root cause, all ten
+acceptance criteria, and the edge-case list are internally consistent and independently
+checkable; every file/line/string citation was re-verified against the tree and all but one
+held. The exception — a claim that `scrollIntoView` is already used in this codebase — was
+factually wrong and would have biased the build stage toward route 1 for a bad reason, so it
+was corrected in both places it appeared. One captain-authored tension (live-reproduction
+requirement vs. a sandbox where that was impossible) is surfaced for the gate rather than
+silently resolved.
