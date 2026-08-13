@@ -9,7 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-048-category-edit-not-opening
 issue:
-pr:
+pr: "#19"
+mod-block: merge:pr-merge
 ---
 
 Tapping a category's Edit button in Settings → Category Management does nothing — no form, no modal, no visible response at all, every time. Confirmed pre-existing and unrelated to entity 044: the button/open-form code (`openEdit`, `isFormOpen`, the button's `onClick`) is byte-identical between `main` and entity 044's branch, and a static read of that logic shows nothing obviously wrong — this needs live/runtime investigation (browser console error, event handler not attaching, an overlay blocking the click target, a hydration issue, etc.), not a guessed fix.
