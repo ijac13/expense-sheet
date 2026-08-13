@@ -431,3 +431,19 @@ amendment from the captain, the second wants the captain's own pass on
 ### Captain decision, 2026-08-13
 
 Approved: AC-5 amended to the two-tap flow (close the open form, then tap Edit on the next row) — confirmed as expected, standard modal behavior once explained, not a defect. AC-1/AC-7/AC-8 accepted on the structural evidence above; no live browser observation was possible in this sandbox. Separately, the captain independently reproduced the pre-fix bug live on **production** (edit form appearing inline at the top of the list, invisible when scrolled down) while testing entity 043 — real-world confirmation the root cause diagnosis is correct and this fix is needed now. Approved to merge and deploy.
+
+### Rebase note, 2026-08-13
+
+Rebased onto `main` after entity 043 merged. Two conflicts, both in files 043 and 048 had each extended:
+
+- `app/package.json` — union merge. `test` now runs all four files (`categories`, `icons.render`, `category-notes.render`, `category-edit-form.render`); `test:compile` keeps 043's superset of UI sources, which already covered 048's `app/settings/categories/page.tsx`.
+- `app/test/helpers/dom.js` — the real conflict. Both entities independently fixed the same latent bug (react-dom decides at module-load time whether the native `input` event exists; loaded before a DOM global exists it downgrades `onChange` to a polyfill, so controlled inputs silently ignore programmatic edits) using different timing strategies: 043 hoisted a standalone `installDom()` called before the top-level `require("react-dom/client")`; 048 deleted the top-level require and deferred it into `mount()`.
+
+Kept 043's hoisted `installDom()` and dropped 048's deferred require rather than carrying both. Reason: the hoisted version fixes the ordering at module load regardless of when a test calls `mount()`, whereas the deferred version stays correct only while every test calls `installGlobals()` before `mount()` — an unstated ordering rule a future test could break silently. Both sides' functionality was preserved on top of it: 043's `note`/`gov_category` fixture fields, `failWrites` option, `writes` tracking and POST/PATCH fetch handling, plus 048's `scrolls` tracking (`scrollIntoView`/`scrollTo` overrides) and the `categories` fixture-override parameter. `installGlobals` now takes `{ offline, failWrites, categories }` and returns `{ dom, requests, writes, categories, setCategoryIcon, scrolls }`.
+
+Final test counts, whole suite, after rebase:
+
+- `app/` — 34 pass, 0 fail (`categories` 7, `icons.render` 6, 043's `category-notes.render` 13, 048's `category-edit-form.render` 8).
+- `functions/` — 21 pass, 0 fail (043's `categories.api` 9, `insights` 12). These need `npm ci && npm run build` in `functions/` first; a fresh worktree has neither `node_modules` nor the compiled `lib/`, and without them all tests error out rather than fail.
+
+Verified the retained fix is load-bearing for both entities, not just present: deleting the hoisted `installDom()` call turns 4 of 043's tests and 1 of 048's red (both suites dispatch native `input` events into controlled fields). Restored afterwards; the committed file is byte-identical to the version that passed.
