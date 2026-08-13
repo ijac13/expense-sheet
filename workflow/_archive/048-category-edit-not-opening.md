@@ -1,16 +1,16 @@
 ---
 id: 048
 title: Category Edit Form Doesn't Open in Category Management
-status: verify
+status: done
 source: captain (found manually testing entity 044 on staging)
 started: 2026-08-12T04:41:49Z
-completed:
-verdict:
+completed: 2026-08-13T03:04:58Z
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-048-category-edit-not-opening
+worktree:
 issue:
 pr: "#19"
-mod-block: merge:pr-merge
+mod-block:
 ---
 
 Tapping a category's Edit button in Settings → Category Management does nothing — no form, no modal, no visible response at all, every time. Confirmed pre-existing and unrelated to entity 044: the button/open-form code (`openEdit`, `isFormOpen`, the button's `onClick`) is byte-identical between `main` and entity 044's branch, and a static read of that logic shows nothing obviously wrong — this needs live/runtime investigation (browser console error, event handler not attaching, an overlay blocking the click target, a hydration issue, etc.), not a guessed fix.
