@@ -13,6 +13,8 @@ pr: "#19"
 mod-block:
 ---
 
+**Production deploy:** `firebase deploy --only hosting --project production` run 2026-08-13 (hosting-only — this entity touched no `functions/` code). Confirmed live: `https://expense-sheet-b2db8.web.app` (`Last-Modified: Thu, 13 Aug 2026 03:09:48 GMT`).
+
 Tapping a category's Edit button in Settings → Category Management does nothing — no form, no modal, no visible response at all, every time. Confirmed pre-existing and unrelated to entity 044: the button/open-form code (`openEdit`, `isFormOpen`, the button's `onClick`) is byte-identical between `main` and entity 044's branch, and a static read of that logic shows nothing obviously wrong — this needs live/runtime investigation (browser console error, event handler not attaching, an overlay blocking the click target, a hydration issue, etc.), not a guessed fix.
 
 ## User Stories
