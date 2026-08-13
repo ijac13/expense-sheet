@@ -108,7 +108,7 @@ If the verify ensign cannot run shell commands (Bash permission denied), it must
 When verify passes, the FO:
 1. Confirms the verify report contains live evidence (HTTP calls or observed staging behaviour) — rejects immediately if not
 2. Checks that the deployed chunk hashes on staging match the built output — if they differ, the deploy didn't go through
-3. Presents the gate summary with the staging URL and a one-line test checklist per AC
+3. Presents the gate summary **with concrete manual-test steps for the captain, unprompted — not only when asked.** Numbered, plain-language, no jargon: the URL to open (staging pre-merge, production post-deploy), exactly what to tap, and what should happen at each step. Pull these from the verify report's own ACs and any browser-only items it flagged as unconfirmed — don't make the captain ask for this every time.
 4. Waits for captain approval before merging
 
 #### Rejection Protocol
