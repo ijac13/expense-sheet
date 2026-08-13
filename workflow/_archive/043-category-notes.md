@@ -13,6 +13,8 @@ pr: "#18"
 mod-block:
 ---
 
+**Production deploy:** `firebase deploy --only functions,hosting --project production` run 2026-08-13. Confirmed live: hosting (`Last-Modified: Thu, 13 Aug 2026 02:03:28 GMT`) and `GET /api/categories` returning a `note` field on every category.
+
 Categories get ambiguous over time — what's the real difference between "Daily Necessities" and "Other," or why "Digital" covers phone bills. A short note attached to each category, set once, would let the captain remember the intended meaning instead of guessing from old entries months later.
 
 ## User Stories
