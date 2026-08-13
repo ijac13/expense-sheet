@@ -254,6 +254,10 @@ spreadsheet IDs, or internal URLs. `app/.env.local` / `.env.staging` are gitigno
 no `app/out/` build output is tracked. The staging manifest swap that `prebuild` writes into the
 tracked `app/public/manifest.json` was reverted — working tree is clean.
 
+### Captain decision, 2026-08-13
+
+On the captain's own manual staging pass, the note did not visibly render under the category name on Home — contradicting this report's structural (deployed-markup) proof of AC-14/AC-17, which could not be confirmed by an actual rendered page in this sandbox. Captain's call: acceptable as-is, no fix required — Category Management already shows the note on demand, and that's sufficient. Approved to merge and deploy with the Home-display ACs (AC-14, AC-16, AC-17) unresolved/unconfirmed rather than holding the merge on a browser-only defect this sandbox cannot chase down. Worth a fresh look if it ever becomes a real bother.
+
 ### Summary
 
 The feature works on the deployed staging bundle: the note round-trips through column H against the
