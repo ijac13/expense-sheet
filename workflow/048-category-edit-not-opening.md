@@ -427,3 +427,7 @@ whole viewport, and no browser or layout engine can run in this environment, so 
 are proven structurally rather than measured. Neither is a code defect: the first wants an AC
 amendment from the captain, the second wants the captain's own pass on
 `https://expense-sheet-staging.web.app` → Settings → Category Management.
+
+### Captain decision, 2026-08-13
+
+Approved: AC-5 amended to the two-tap flow (close the open form, then tap Edit on the next row) — confirmed as expected, standard modal behavior once explained, not a defect. AC-1/AC-7/AC-8 accepted on the structural evidence above; no live browser observation was possible in this sandbox. Separately, the captain independently reproduced the pre-fix bug live on **production** (edit form appearing inline at the top of the list, invisible when scrolled down) while testing entity 043 — real-world confirmation the root cause diagnosis is correct and this fix is needed now. Approved to merge and deploy.
