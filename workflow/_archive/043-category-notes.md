@@ -1,16 +1,16 @@
 ---
 id: 043
 title: Category Notes — Tooltip on Home
-status: verify
+status: done
 source: captain
 started: 2026-08-12T04:41:49Z
-completed:
-verdict:
+completed: 2026-08-13T02:00:32Z
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-043-category-notes
+worktree:
 issue:
 pr: "#18"
-mod-block: merge:pr-merge
+mod-block:
 ---
 
 Categories get ambiguous over time — what's the real difference between "Daily Necessities" and "Other," or why "Digital" covers phone bills. A short note attached to each category, set once, would let the captain remember the intended meaning instead of guessing from old entries months later.
