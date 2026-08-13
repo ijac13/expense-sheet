@@ -187,3 +187,79 @@ The first negative-control run found a hole in my own stub — it ignored a writ
 ### Summary
 
 The note round-trips through a new column H that is read and written positionally, so it works on the production sheet with no captain action and no precondition — deliberately avoiding the blocker that stopped entity 042. The one judgement call worth the reviewer's attention is Home reading the note through `resolveCategory()`: the spec assumed a resolution that does not happen on page load, and without the bridge the feature would render nothing until the captain first tapped a tile. Tap-to-select and the header's icon/name are untouched, so AC-18's regression surface carries no change at all.
+
+## Stage Report: verify
+
+**verdict: PASSED** — all three checklist items closed with live evidence on the deployed
+staging bundle. No code defect found. Two pre-existing behaviours and one AC-letter deviation
+are surfaced below for the captain; none is fixable in build without leaving this entity's scope.
+
+- DONE: Deploy to staging and confirm live, on the real deployed bundle — build's evidence was jsdom, not a running deployed app
+  Live at https://expense-sheet-staging.web.app. Live `index.html` is sha256 `dcfd519e…`, byte-identical to `app/out/index.html` and different from the pre-deploy `6defd12a…` I captured first. Home chunk `100i5a--by91y.js` sha256 `94d03d7c…` matches local exactly, and that path appears 0 times in the pre-deploy HTML — a genuinely new artifact. `GET /api/categories` → 200, 25 categories, every one carrying `note`.
+- DONE: Live-check the deviation build made (note resolves via resolveCategory(), not selectedCat) actually makes the note appear on a fresh page load / restored-from-localStorage category, not just after re-tapping a tile
+  Deviation vindicated, and it is load-bearing. I extracted `getDefaultCategory` and `resolveCategory` **verbatim from the deployed chunk** and ran them against the **live** staging payload after setting a real note on `cat_001`. Fresh load (empty localStorage) → `categoryId="eating-out"` → shipped path yields `"外食：餐廳、外送、飲料"`; the specced `selectedCat` path yields `undefined`. Without the bridge the note would render on no fresh load at all.
+- DONE: Live-check the data round-trip on real staging: set a note in Category Management, confirm it appears on Home for that category, confirm it survives an unrelated edit (rename/reorder) to the same category
+  `PATCH /api/categories/cat_025 {"note":"手機、網路帳單與訂閱"}` → 200; `GET` returns it (AC-2/AC-3). A rename-only PATCH and then a reorder-only PATCH — neither body carrying a `note` key — both left the note intact (AC-4). Staging was then restored: a field-by-field diff of all 25 categories against the pre-verify snapshot shows **0 differences**.
+
+### Live evidence for the remaining Home ACs
+
+Run with the deployed functions against the live payload, so both the code and the data are real:
+
+- AC-15 / AC-19 — a category with no note yields `""` and an offline list (`categories=[]`) yields `undefined`; the render is `B&&jsx("div",…)`, so the element is absent, not hidden. Fails closed: never a stale note.
+- AC-14 / AC-17 — deployed markup is `B&&jsx("div",{className:"text-xs opacity-70 mb-2 break-words",children:B})`, sitting between the name row and the `text-5xl` amount. In-flow, no `absolute`/`fixed`, nothing portaled.
+- AC-18 — the header icon/name still read `P = M.find(e=>e.id===w) ?? DEFAULT_CATEGORIES.find(…)`, i.e. `selectedCat` untouched, exactly as build claimed.
+- AC-9 / AC-10 / AC-12 — deployed Category Management chunk `0499wg~nsub7v.js` (live sha256 `5993833…`, matches local) has `maxLength:NOTE_MAX_LENGTH` **and** `.slice(0,NOTE_MAX_LENGTH)` with `NOTE_MAX_LENGTH=120`, `note:u.note.trim()` in **both** the add and edit payloads, and the label from `t("cat_mgmt.note_label")`. The live locale files serve `"Note"` / `"備註"`.
+- `npm test` 26/26, `node --test test/` 21/21, both green on this branch.
+
+### Finding 1 — "restored from localStorage" never happens (pre-existing, not a 043 defect)
+
+`getDefaultCategory()` returns the stored id only if it is a `DEFAULT_CATEGORIES` slug. Tapping a
+live tile stores a `cat_NNN` id, which fails that test, so **every** reload falls back to
+`eating-out`. Live-verified: with `expense_last_category_id="cat_007"` (Digital), the load-time
+category is still `eating-out`. So Home always opens on Eating Out and always shows Eating Out's
+note, whatever the captain last picked. `getDefaultCategory` is byte-identical to `main` — 043 did
+not cause this — but it makes the approved spec sentence "including the category restored from
+`localStorage` on page load" rest on a false premise. The note-on-load behaviour is correct; the
+category it is a note *for* is not the one the captain last used.
+
+### Finding 2 — renaming a category breaks its note on fresh load (known limit, fails closed)
+
+The bridge matches on `name_en`. Live test: renaming `cat_001` to "Dining Out" made the fresh-load
+note disappear (`undefined`), while tapping the tile directly still showed it. The note itself
+survived the rename in the sheet — only the slug→live bridge stops matching. Build flagged the
+archived-category variant of this; the rename variant matters more, because the captain edits names
+in the very same form that sets notes. It fails closed — no note, never a wrong note.
+
+### Finding 3 — AC-3's "columns A–G byte-identical" is not literally met (pre-existing)
+
+A note PATCH flips `gov_category` from `null` to `""` in the GET response, because the PATCH path
+rewrites the full row with `existing[6] ?? ""`. That line is identical on `main`, so it predates
+this branch. The sheet cell is empty either way and no data is lost. Flagging it rather than
+rejecting: a build fix would change pre-existing `gov_category` behaviour that belongs to 042/047.
+
+### Not verifiable in this environment
+
+No browser engine can run here, re-confirmed independently: `chrome-headless-shell` 1228 dies with
+`SEGV_ACCERR` at `0x10`, and Puppeteer Chrome 131 fails on Crashpad with "Operation not permitted".
+So AC-16's tap-to-switch and the visual layout of AC-14/AC-17 are proven from the deployed markup
+and deployed logic, not from rendered pixels. That is what the captain's own pass should confirm:
+open the staging URL, Settings → Category Management, set a note, return Home.
+
+### Mandatory PII / secrets check — PASS
+
+Tracked env files are only `.env.example`, `app/.env.staging.example`, `functions/.env.staging.example`,
+all still empty or `TODO_*` placeholders. The branch diff vs `main` has zero matches for API-key
+patterns, `-----BEGIN`, bearer/OAuth tokens, `client_secret`, email addresses, phone numbers,
+spreadsheet IDs, or internal URLs. `app/.env.local` / `.env.staging` are gitignored and untracked;
+no `app/out/` build output is tracked. The staging manifest swap that `prebuild` writes into the
+tracked `app/public/manifest.json` was reverted — working tree is clean.
+
+### Summary
+
+The feature works on the deployed staging bundle: the note round-trips through column H against the
+real Google Sheet, survives unrelated edits, and renders on a fresh page load — which it would not
+do had build followed the spec's `selectedCat` note literally, so the one deviation build flagged is
+the reason the feature works at all. The staging sheet was left byte-for-byte as found. What the
+captain should weigh at this gate is Finding 1: the note shown on load is always Eating Out's,
+because Home never actually restores the last-used live category — pre-existing, out of this
+entity's scope, but it quietly narrows what this feature delivers on load and is worth its own entity.
