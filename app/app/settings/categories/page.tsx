@@ -259,13 +259,16 @@ export default function CategoryManagementPage() {
         </div>
       )}
 
-      {/* Add/Edit Form */}
+      {/* Add/Edit Form. A modal, not an inline card: rendered in page flow it
+          always appeared at the top of the document, so tapping Edit on a row
+          below the fold opened a form the captain could not see. `modal-middle`
+          caps the box at 100vh - 5em, which keeps its top clear of StagingBanner. */}
       {isFormOpen && (
-        <div className="card bg-base-200 mb-4">
-          <div className="card-body p-4">
-            <h2 className="card-title text-base">
+        <div className="modal modal-middle modal-open">
+          <div className="modal-box w-full max-w-sm">
+            <h3 className="font-bold text-lg mb-4">
               {formMode?.type === "add" ? t("cat_mgmt.form_add") : t("cat_mgmt.form_edit")}
-            </h2>
+            </h3>
             <div className="form-control gap-3">
               <div>
                 <label className="label pb-1">
@@ -334,7 +337,7 @@ export default function CategoryManagementPage() {
               {form.error && (
                 <p className="text-error text-sm">{form.error}</p>
               )}
-              <div className="flex gap-2 mt-1">
+              <div className="modal-action mt-4">
                 <button className="btn btn-primary btn-sm" onClick={handleSave}>
                   {t("common.save")}
                 </button>
@@ -352,6 +355,7 @@ export default function CategoryManagementPage() {
               </div>
             </div>
           </div>
+          <div className="modal-backdrop" onClick={closeForm} />
         </div>
       )}
 

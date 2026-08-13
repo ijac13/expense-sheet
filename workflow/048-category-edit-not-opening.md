@@ -224,3 +224,227 @@ factually wrong and would have biased the build stage toward route 1 for a bad r
 was corrected in both places it appeared. One captain-authored tension (live-reproduction
 requirement vs. a sandbox where that was impossible) is surfaced for the gate rather than
 silently resolved.
+
+## Stage Report: build
+
+- DONE: Pick between the two spec-offered routes (scroll the form into view vs. make it a real
+  modal) and justify the choice
+  Route 2, on a fact the spec did not have — see Route choice below. Commit `9551325`.
+- DONE: Implement all 10 ACs, including the regression test (AC-9) that must fail on current
+  main and pass after the fix — write both results into the stage report
+  Both results below. 14-line change to `app/app/settings/categories/page.tsx`; 8 new tests.
+- DONE: Cover the edge cases named in spec: short lists, tall forms, last-row edits, the
+  StagingBanner overlap, and the Cancel/Save scroll-position guarantees (AC-7, AC-8)
+  All five covered by tests 8, 13, 14 and 15 in `app/test/category-edit-form.render.test.js`.
+
+### Route choice — modal, on evidence the spec lacked
+
+The spec framed route 2 as the larger diff introducing a new pattern. It is not: this app
+already ships three daisyUI `.modal` overlays — `app/page.tsx:218` (notes) and
+`app/subscriptions/page.tsx:325,423` (add/edit subscription), all using the same
+`<div className="modal modal-open"><div className="modal-box">…<div className="modal-backdrop"
+onClick={close} /></div>` shape. So route 2 is the convention-matching route, and after the
+spec stage's correction route 1's `scrollIntoView` is the one new API. The diff came to 14
+lines. Three further reasons:
+
+- **It removes the bug class instead of compensating for it.** `.modal` is
+  `position:fixed;inset:0;place-items:center` (verified in the shipped bundle,
+  `out/_next/static/chunks/0jejgqrfcrb~..css`), so the form is in view at any scroll offset.
+  Route 1 would have kept the form in flow and asked the browser to scroll to it — still
+  subject to the scroll anchoring that caused this.
+- **AC-7/AC-8 fall out rather than needing scroll-restore bookkeeping.** The page never
+  scrolls at all, so the captain's place is kept by construction.
+- **jsdom cannot verify route 1 honestly.** It implements neither `scrollIntoView` nor layout,
+  so a route-1 test could only assert "we called the stub". Route 2's anchoring is a CSS
+  property, which the test asserts against `daisyui.css` itself.
+
+### AC-9, both results
+
+`npm test` at `7f123b4` (tests only, page component byte-identical to `main`): **16 pass, 5
+fail**. The same suite after `9551325`: **21 pass, 0 fail**. Re-confirmed by restoring
+`main`'s page component into the worktree and re-running — same 5 failures, all on the single
+assertion "the form is inside a .modal container, not in page flow".
+
+### Acceptance criteria
+
+- AC-1, AC-9 — test 8 opens rows 1, 9 and 18 of an 18-row fixture and asserts the form's
+  ancestor carries `.modal`/`.modal-open` and that `daisyui.css` fixes `.modal` to the
+  viewport. Re-inlining the form, or renaming the container to a class that is not
+  viewport-fixed, fails it.
+- AC-2, AC-3, AC-4 — test 9 asserts the three fields equal `cat_012`'s stored values, that the
+  stored `gov_category` is the *selected* option, and the title is `cat_mgmt.form_edit`.
+  Test 10 covers the no-`gov_category` row: select value `""`, placeholder option first.
+- AC-5 — test 11 opens row 3 then row 16 and asserts the name field switched and exactly one
+  `.modal-box` exists. Caveat below.
+- AC-6 — test 12: `cat_mgmt.add` still opens an empty, viewport-anchored add form.
+- AC-7, AC-8 — test 13 cancels from row 17, then reopens, renames it and saves: the edited row
+  is still rendered, the PATCH went to `/api/categories/cat_017`, the success toast rendered,
+  and the recorded scroll-attempt list is empty at every step. A fix that scrolled the page to
+  reach the form would fail this.
+- AC-10 — `npm test`: 21 pass, 0 fail, including all 13 pre-existing tests.
+
+### Edge cases
+
+Short list (2 rows, test 15) and last row (test 8) open anchored with zero scroll attempts.
+Blank icon renders an empty field with the 📦 placeholder, no crash (test 10). Archive from
+inside the form closes it and leaves the remaining row editable (test 15). Category API down:
+no rows, no Edit buttons, page still renders (test 15). Tall form and StagingBanner (test 14):
+`modal-middle` caps `.modal-box` at `calc(100vh - 5em)` and centres it, leaving ~40px above —
+clear of the banner's `h-6`/24px — while `.modal-box` keeps `overflow-y:auto` so the fields
+stay reachable; `.modal`'s `z-index:999` is above the banner's `z-50`. The default
+`.modal-box` cap of `100vh` would have parked a tall form's title under the banner, which is
+why `modal-middle` is there.
+
+### Things the gate should weigh
+
+- **No live browser run.** Same sandbox limits the spec documented (Chrome blocked, Google
+  sign-in not headless-able). Verification is the real compiled page mounted under jsdom with
+  real clicks, plus the shipped CSS. jsdom has no layout engine, so AC-1's literal "bounding
+  rect intersects the viewport" is proven as a CSS property of the container rather than
+  measured. A phone check on staging is still worth doing.
+- **AC-5's interaction path changes.** The guarantee holds (one form, row B's values, in view)
+  but a real tap on row B now lands on the modal backdrop and closes the form instead. The
+  test drives the button directly. This is normal modal behaviour, not a workaround.
+- **Two harness changes were needed and affect all UI tests.** `react-dom` is now required
+  inside `mount()`; loading it before `installGlobals` defined `window` left React on a legacy
+  path where `input` events never reached `onChange`, so typing into a controlled field
+  silently did nothing. `installGlobals` also gained a fixture override and scroll recording.
+  All 13 pre-existing tests still pass.
+- **No Esc-to-close.** Not in any AC, and neither existing modal has it; adding it here only
+  would be inconsistent. Worth its own entity alongside the `role="dialog"` the other two
+  modals also lack.
+
+### Summary
+
+Chose the modal route and found while implementing it that the spec's cost framing was
+backwards: the app already had three daisyUI modals, so this was the convention-matching route
+and it landed in 14 lines. The fix deletes the failure mode rather than compensating for it —
+the form is now fixed to the viewport, so it is visible from any scroll position and the page
+never moves, which is also what satisfies the keep-your-place criteria. Eight new tests mount
+the real page against an 18-row fixture; five failed against `main`'s page component and all
+pass now, with the full suite at 21/21.
+
+## Stage Report: verify
+
+**verdict: REJECTED** — no code defect found; AC-5 does not hold as written on the deployed
+build, and AC-1/AC-7/AC-8 could not be closed live. Both need a captain decision, not a rebuild.
+
+- DONE: Deploy to staging and confirm live, on the real deployed bundle — build's evidence was
+  jsdom, not a running deployed app
+  Built with `app/.env.staging`, `firebase deploy --only hosting --project staging`. The
+  categories chunk `0s_m-1hsw5gyw.js` is sha256 `0cebd981…` (22039 B) both in `app/out` and at
+  the live URL; pre-deploy that path returned the 11139-B SPA fallback HTML, so the deploy is
+  demonstrably new. `GET /api/categories` → 200, 25 active categories.
+- FAILED: Live-check the modal actually opens centered/viewport-fixed for a real below-the-fold
+  row on staging, and that Cancel/Save keep the captain's scroll position (AC-1, AC-7, AC-8)
+  No browser can run in this environment, so no pixel geometry was measured — see below.
+- FAILED: Confirm the AC-5 interaction change build flagged (tapping row B's backdrop closes the
+  form rather than switching to it directly) isn't confusing in practice
+  "In practice" needs a human on a device; worse, AC-5's literal behaviour cannot occur at all
+  on the deployed build — evidence below.
+
+### AC-5 fails as written (the one concrete failure)
+
+From the *deployed* CSS: `.modal-backdrop{z-index:-1;grid-row-start:1;grid-column-start:1;
+place-self:stretch stretch}` sits in the same grid cell as `.modal-box` inside a
+`position:fixed;inset:0;z-index:999` container. It therefore stretches over the **whole
+viewport**, above `.modal`'s own background and below the box. Every category row is behind it.
+So a real tap on row B's Edit while row A's form is open lands on the backdrop and calls
+`closeForm` — it does not switch the form to row B. Build's test passes because it drives the
+button programmatically, which bypasses hit-testing.
+
+This is not fixable in build without abandoning the modal, and the spec itself recommended the
+modal. Recommended resolution is amending AC-5 to the two-tap modal flow (close, then tap row
+B), which preserves its real guarantees — one form only, row B's values, in view — not a
+re-dispatch to build.
+
+### What the live artifacts do prove (AC-1, AC-7, AC-8 — structural, not measured)
+
+- `.modal` in the deployed CSS is `position:fixed;inset:0;place-items:center;z-index:999`, and
+  `.modal.modal-open` sets `pointer-events:auto;visibility:visible;opacity:1`. The competing
+  `opacity:0` rule is inside `@starting-style` (transition start value only), so the open modal
+  is genuinely visible — worth stating because `.modal` alone is `visibility:hidden`.
+- Audited every ancestor of the modal (`html.h-full` → `body.min-h-full.flex.flex-col` →
+  `div.pb-16` → `div.max-w-lg.mx-auto.p-4`) against the deployed CSS for `transform`,
+  `translate`, `scale`, `rotate`, `perspective`, `filter`, `backdrop-filter`, `will-change`,
+  `contain`, `content-visibility`: **zero hits**. Nothing creates a containing block, so
+  `position:fixed` resolves against the viewport. This is the failure mode that would have
+  silently reinstated the bug, and it is now ruled out on the shipped stylesheet.
+- The deployed chunk contains `scrollIntoView`, `scrollTo`, `scrollTop`, `autoFocus`: **0
+  occurrences each**. The page never scrolls itself, so it cannot throw the captain off-place.
+- daisyUI also locks the page while open: `:root:has(:is(.modal.modal-open,…)){--page-overflow:
+  hidden}` feeding `:root:not(span){overflow:var(--page-overflow)}`. `--page-overflow` has no
+  other declaration, so scrolling is normal when closed.
+- StagingBanner edge case holds at all three font sizes: `.modal-middle .modal-box` is
+  `max-height:calc(100vh - 5em)` centred, giving a top of 40/45/50 px at
+  `html[data-font-size]` = small/medium/large (16/18/20 px), all clear of the banner's 24 px.
+
+### Why no live UI observation was possible
+
+Re-proved independently and more broadly than earlier stages, all with the bash sandbox
+disabled: five Chromium builds (Playwright headless-shell 149 and chromium 149, Puppeteer
+Chrome 148 and 131, headless-shell 131) all die with `SEGV_ACCERR` at address `0x10` right after
+crashpad fails on `~/Library/Application Support/…`; `--no-sandbox`, `--single-process`,
+`--disable-crash-reporter` and a redirected `HOME` change nothing. Playwright Firefox 1532 fails
+to launch and WebKit 2311 times out on its inspector pipe (its XPC services are blocked).
+`swiftc` is absent (Command Line Tools stub), so a WKWebView probe could not be built either.
+The environment blocks the mach/XPC services every engine needs — this is not a version skew.
+
+### Residual risk for the captain's manual test
+
+The one thing structure cannot settle: applying and removing `overflow:hidden` on `:root` is the
+classic scroll-lock, and whether it preserves scroll offset is browser behaviour, not CSS. On
+Android Chrome it is expected to hold, but AC-7/AC-8 rest on it, so it is exactly what a real
+device should confirm. Also note `max-height:calc(100vh - 5em)` uses the *large* viewport while
+`position:fixed` uses the visible one; today's form (~380–450 px) never reaches that cap, but
+entity 043 is adding a note field to this same form, which eats into that margin.
+
+### Not verified for lack of live data / out of this diff's reach
+
+- AC-3's "shows the stored `gov_category` selected" half: all 25 live staging categories have
+  `gov_category: null`, so only the placeholder half is exercisable until entity 042 lands.
+- AC-8's save round trip: `handleSave` is byte-unchanged by this diff (the diff is 14 lines of
+  `className` plus the backdrop div), and entity 044's verify already exercised
+  `PATCH /api/categories/:id` live. No new write to the shared staging sheet was made here.
+- AC-2, AC-4, AC-6, AC-9, AC-10 stand on build's evidence; `npm test` re-run here: 21 pass, 0
+  fail. The five AC-9 tests assert the form's ancestor carries `.modal`/`.modal-open` — re-inlining
+  the form as a `.card` is the change that makes them fail again.
+
+### Mandatory PII / secrets check — PASS
+
+`git ls-files | grep -i env` returns only `.env.example`, `app/.env.staging.example`,
+`functions/.env.staging.example`, all still `TODO_*` placeholders. The branch diff has zero
+matches for API-key patterns, `-----BEGIN`, bearer tokens, or any email address. The
+`app/.env.local` used to build is gitignored (`app/.gitignore:34`), and the staging manifest swap
+that `prebuild` writes into the tracked `app/public/manifest.json` was reverted — tree is clean.
+
+### Summary
+
+The deploy is live and byte-identical to the build, and the fix's core mechanism holds up on the
+shipped artifacts: the modal is viewport-fixed, no ancestor breaks that, and the page has no
+scroll code left to move under the captain. Two things stop this being a clean pass — AC-5's
+literal one-tap row-switch is impossible on any modal because the deployed backdrop covers the
+whole viewport, and no browser or layout engine can run in this environment, so AC-1/AC-7/AC-8
+are proven structurally rather than measured. Neither is a code defect: the first wants an AC
+amendment from the captain, the second wants the captain's own pass on
+`https://expense-sheet-staging.web.app` → Settings → Category Management.
+
+### Captain decision, 2026-08-13
+
+Approved: AC-5 amended to the two-tap flow (close the open form, then tap Edit on the next row) — confirmed as expected, standard modal behavior once explained, not a defect. AC-1/AC-7/AC-8 accepted on the structural evidence above; no live browser observation was possible in this sandbox. Separately, the captain independently reproduced the pre-fix bug live on **production** (edit form appearing inline at the top of the list, invisible when scrolled down) while testing entity 043 — real-world confirmation the root cause diagnosis is correct and this fix is needed now. Approved to merge and deploy.
+
+### Rebase note, 2026-08-13
+
+Rebased onto `main` after entity 043 merged. Two conflicts, both in files 043 and 048 had each extended:
+
+- `app/package.json` — union merge. `test` now runs all four files (`categories`, `icons.render`, `category-notes.render`, `category-edit-form.render`); `test:compile` keeps 043's superset of UI sources, which already covered 048's `app/settings/categories/page.tsx`.
+- `app/test/helpers/dom.js` — the real conflict. Both entities independently fixed the same latent bug (react-dom decides at module-load time whether the native `input` event exists; loaded before a DOM global exists it downgrades `onChange` to a polyfill, so controlled inputs silently ignore programmatic edits) using different timing strategies: 043 hoisted a standalone `installDom()` called before the top-level `require("react-dom/client")`; 048 deleted the top-level require and deferred it into `mount()`.
+
+Kept 043's hoisted `installDom()` and dropped 048's deferred require rather than carrying both. Reason: the hoisted version fixes the ordering at module load regardless of when a test calls `mount()`, whereas the deferred version stays correct only while every test calls `installGlobals()` before `mount()` — an unstated ordering rule a future test could break silently. Both sides' functionality was preserved on top of it: 043's `note`/`gov_category` fixture fields, `failWrites` option, `writes` tracking and POST/PATCH fetch handling, plus 048's `scrolls` tracking (`scrollIntoView`/`scrollTo` overrides) and the `categories` fixture-override parameter. `installGlobals` now takes `{ offline, failWrites, categories }` and returns `{ dom, requests, writes, categories, setCategoryIcon, scrolls }`.
+
+Final test counts, whole suite, after rebase:
+
+- `app/` — 34 pass, 0 fail (`categories` 7, `icons.render` 6, 043's `category-notes.render` 13, 048's `category-edit-form.render` 8).
+- `functions/` — 21 pass, 0 fail (043's `categories.api` 9, `insights` 12). These need `npm ci && npm run build` in `functions/` first; a fresh worktree has neither `node_modules` nor the compiled `lib/`, and without them all tests error out rather than fail.
+
+Verified the retained fix is load-bearing for both entities, not just present: deleting the hoisted `installDom()` call turns 4 of 043's tests and 1 of 048's red (both suites dispatch native `input` events into controlled fields). Restored afterwards; the committed file is byte-identical to the version that passed.
