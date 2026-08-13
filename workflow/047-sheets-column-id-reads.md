@@ -1,7 +1,7 @@
 ---
 id: 047
 title: Read/Write Sheets Data by Column Header, Not Column Position
-status: build
+status: verify
 source: captain
 started: 2026-08-13T08:35:02Z
 completed:
