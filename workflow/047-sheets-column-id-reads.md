@@ -1,13 +1,13 @@
 ---
 id: 047
 title: Read/Write Sheets Data by Column Header, Not Column Position
-status: spec
+status: build
 source: captain
 started: 2026-08-13T08:35:02Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-047-sheets-column-id-reads
 issue:
 pr:
 ---
