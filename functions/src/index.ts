@@ -14,7 +14,7 @@ const USERS_TAB = "Users";
 const SUBSCRIPTIONS_TAB = "Subscriptions";
 const CATEGORIES_TAB = "Categories";
 
-const CATEGORIES_HEADER = ["id", "name_en", "name_zh", "icon", "sort_order", "is_active", "gov_category"];
+const CATEGORIES_HEADER = ["id", "name_en", "name_zh", "icon", "sort_order", "is_active", "gov_category", "note"];
 
 const EXPENSES_HEADER = ["id", "date", "amount", "category_id", "paid_by", "created_by", "notes", "created_at"];
 const SUBSCRIPTIONS_HEADER = ["id", "name", "amount", "category_id", "frequency", "due_day", "due_month", "paid_by", "is_active"];
@@ -79,6 +79,7 @@ function rowToCategory(row: (string | null | undefined)[]): Record<string, unkno
     sort_order: Number(row[4] ?? 0),
     is_active: row[5] !== "false",
     gov_category: row[6] ?? null,
+    note: row[7] ?? "",
   };
 }
 
@@ -206,7 +207,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       if (req.method === "GET") {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A:G`,
+          range: `${CATEGORIES_TAB}!A:H`,
         });
         const rows = response.data.values ?? [];
         res.status(200).json(rows.slice(1).map(rowToCategory));
@@ -220,7 +221,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         // Read existing rows to determine next id and sort_order
         const existing = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A:F`,
+          range: `${CATEGORIES_TAB}!A:H`,
         });
         const existingRows = (existing.data.values ?? []).slice(1).map(rowToCategory);
 
@@ -244,13 +245,14 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           String(sortOrder),
           "true",
           String(body.gov_category ?? ""),
+          String(body.note ?? ""),
         ];
 
         // Append row at the end (categories are ordered by sort_order, not insertion order)
-        const colLetter = "G";
+        const colLetter = "H";
         const existingCheck = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A1:G1`,
+          range: `${CATEGORIES_TAB}!A1:H1`,
         });
         if (!existingCheck.data.values?.[0]?.[0] || existingCheck.data.values[0][0] !== "id") {
           await sheets.spreadsheets.values.update({
@@ -262,7 +264,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         }
         await sheets.spreadsheets.values.append({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A:G`,
+          range: `${CATEGORIES_TAB}!A:H`,
           valueInputOption: "RAW",
           requestBody: { values: [row] },
         });
@@ -282,7 +284,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
 
         const allRows = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A:G`,
+          range: `${CATEGORIES_TAB}!A:H`,
         });
         const rows = allRows.data.values ?? [];
         const rowIndex = rows.findIndex((r, i) => i > 0 && r[0] === targetId);
@@ -301,11 +303,12 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           body.sort_order !== undefined ? String(body.sort_order) : existing[4],
           body.is_active !== undefined ? String(body.is_active) : existing[5],
           body.gov_category !== undefined ? String(body.gov_category) : (existing[6] ?? ""),
+          body.note !== undefined ? String(body.note) : (existing[7] ?? ""),
         ];
 
         await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: `${CATEGORIES_TAB}!A${rowIndex + 1}:G${rowIndex + 1}`,
+          range: `${CATEGORIES_TAB}!A${rowIndex + 1}:H${rowIndex + 1}`,
           valueInputOption: "RAW",
           requestBody: { values: [updated] },
         });

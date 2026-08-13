@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Category, GovCategory, GOV_CATEGORY_LABELS, GOV_CATEGORY_OPTIONS, categoryIcon } from "../../lib/categories";
+import { Category, GovCategory, GOV_CATEGORY_LABELS, GOV_CATEGORY_OPTIONS, NOTE_MAX_LENGTH, categoryIcon } from "../../lib/categories";
 import {
   getCategories,
   addCategory,
@@ -21,10 +21,11 @@ interface FormState {
   name_en: string;
   name_zh: string;
   gov_category: GovCategory | "";
+  note: string;
   error: string;
 }
 
-const emptyForm: FormState = { icon: "", name_en: "", name_zh: "", gov_category: "", error: "" };
+const emptyForm: FormState = { icon: "", name_en: "", name_zh: "", gov_category: "", note: "", error: "" };
 
 type SaveStatus = { type: "success" | "error"; message: string } | null;
 
@@ -64,7 +65,7 @@ export default function CategoryManagementPage() {
   }
 
   function openEdit(cat: Category) {
-    setForm({ icon: cat.icon, name_en: cat.name_en, name_zh: cat.name_zh, gov_category: cat.gov_category ?? "", error: "" });
+    setForm({ icon: cat.icon, name_en: cat.name_en, name_zh: cat.name_zh, gov_category: cat.gov_category ?? "", note: cat.note ?? "", error: "" });
     setFormMode({ type: "edit", id: cat.id });
   }
 
@@ -102,6 +103,7 @@ export default function CategoryManagementPage() {
         name_en: form.name_en.trim(),
         name_zh: form.name_zh.trim(),
         gov_category: form.gov_category as GovCategory,
+        note: form.note.trim(),
       };
 
       // Optimistic update with a placeholder
@@ -141,6 +143,7 @@ export default function CategoryManagementPage() {
         name_en: form.name_en.trim(),
         name_zh: form.name_zh.trim(),
         gov_category: form.gov_category as GovCategory,
+        note: form.note.trim(),
       };
 
       // Snapshot the pre-edit category so a failed save can revert deterministically
@@ -315,6 +318,18 @@ export default function CategoryManagementPage() {
                     <option key={key} value={key}>{GOV_CATEGORY_LABELS[key]}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="label pb-1">
+                  <span className="label-text">{t("cat_mgmt.note_label")}</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered w-full"
+                  maxLength={NOTE_MAX_LENGTH}
+                  value={form.note}
+                  onChange={(e) => setForm((f) => ({ ...f, note: e.target.value.slice(0, NOTE_MAX_LENGTH), error: "" }))}
+                />
               </div>
               {form.error && (
                 <p className="text-error text-sm">{form.error}</p>
