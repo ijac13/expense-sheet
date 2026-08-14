@@ -258,3 +258,35 @@ This is a spec defect surfaced by live data, not a coding slip — the build fai
 ### Summary
 
 Deployed this branch to staging and found a live regression the test harness could not: on the real staging sheet, `GET /api/categories` silently dropped `gov_category` and `note` for every row that had them, because those columns carry data under header cells that do not name them. Everything else held up — expenses and subscriptions are byte-identical before and after, the write path lands values by header name and preserves untouched fields through a full PATCH-and-restore round trip, and the missing-optional-column PATCH returns the clear 400 AC-6 asks for. The blocking question is a spec one: AC-5 deliberately makes an absent optional header return empty defaults with a 200, which for a populated-but-unnamed column means serving real data as blank — the opposite of the entity's own "clear error, never silently misread" success criterion. AC-15 to AC-18 remain unverified because this session cannot read or write the staging spreadsheet; per the dispatch they were left undone rather than simulated in code.
+
+## Stage Report: verify (cycle 2)
+
+**verdict: PASSED** — with one outstanding captain action (AC-18 revert) and one data finding on production, both below.
+
+Re-run after the captain named staging `Categories!G1`/`H1`, named production `Categories!H1`, swapped staging `Subscriptions` `frequency`⇄`due_day`, and renamed staging `Expenses` `notes`→`note_text`. Staging header rows re-read live, read-only, confirming the sheet state each check was run against.
+
+- DONE: Confirm the previously-blanked staging `gov_category`/`note` now read correctly
+  `GET /api/categories` → `cat_001` returns `gov_category:"restaurants_accommodation"`, `note:"吃外面"` — the exact two values that read as `null`/`""` in cycle 1. Root cause was the unnamed header cells, as diagnosed; no code change was needed. Staging header row now reads `G="gov_category" H="note"`.
+- DONE: AC-15 — two columns physically swapped in staging `Subscriptions` (`frequency` ⇄ `due_day`), `GET` returns the same values as before the swap
+  Sheet state, read live: row 1 is `[id, name, amount, category_id, due_day, frequency, due_month, paid_by, is_active]` — `E`/`F` are swapped from canonical — and the data moved with the headers (`row 2 = [..., "1", "monthly", ...]`, so `E` holds the day and `F` holds the word). `GET /api/subscriptions` returned `frequency:"monthly"`, `due_day:1`. A positional reader would have returned `frequency:"1"`, `due_day:"monthly"`; that is the falsifying difference, and it is exactly what cycle 1 could not test.
+  Strongest single result: this response is **byte-identical** to the pre-deploy baseline captured with the old code on unswapped columns — the API output is invariant under a physical column swap, which is the feature's whole claim.
+- DONE: AC-16 — a PATCH under that same swap writes `amount` correctly and leaves the swapped cells untouched
+  `PATCH /api/subscriptions {amount:168}` → 200, response `amount:168` with `frequency:"monthly"` / `due_day:1` unchanged; a fresh `GET` confirms it persisted. Patched back to 166 and the full `GET` is byte-identical to the pre-deploy baseline, so staging is left exactly as found. Read-back is via the deployed API rather than raw cells — the raw-cell read was blocked by the sandbox classifier on two attempts after succeeding twice minutes earlier, and I stopped rather than work around the denial.
+- DONE: AC-17 — renamed column produces a clear 500, not a 200 with blank data
+  `GET /api` → `HTTP 500 {"error":"Expenses tab: missing required column header \"notes\". Found: \"id\", \"date\", \"amount\", \"category_id\", \"paid_by\", \"created_by\", \"note_text\", \"created_at\"."}`. Names the tab and the missing field and lists what it found; the `note_text` in that list is independent live confirmation of the rename.
+- FAILED: AC-18 — both staging changes reverted and a final GET confirms normal behaviour restored
+  I cannot write to the staging spreadsheet, so the revert is **not done** and staging is still in its modified state — `GET /api` (expenses) currently returns 500 by design. The captain needs to undo the two edits they made: swap `Subscriptions` `E`/`F` back so `E=frequency, F=due_day`, and rename `Expenses` `G` back from `note_text` to `notes`. One curl each re-confirms; happy to run them.
+- DONE: AC-19 — production copes with its real header row
+  Production header row re-read live, read-only: Expenses `A–H` named with `I="month" J="amount value"`, Categories `A–G` named with `H="note"` (the captain's fix landed) and `I="udpate"`, Subscriptions `A–I` named. Every required field per AC-4 is present on all three tabs, so no 500; both optional Categories fields now resolve; the three unknown columns stay unknown and are preserved by `buildWriteRow` copying the existing row. The three production GETs return 200 with 25 categories, 1956 expenses, 31 subscriptions, no blank ids. Production still runs the old code — it is deployed post-merge — so this is verified from production's actual header shape plus the staging equivalence, not from production executing the new resolver.
+
+### Finding: one production note value disappeared during the header edit
+
+`cat_005.note` was `"出國"` in my cycle-1 production capture and is `""` now. Production ran the old positional code throughout and I only ever issued GETs against it, so this is a change in the spreadsheet, not the code — it happened in the window when `Categories!H1` was being named. Worth a look at `Categories!H` for `cat_005` and a restore from Sheets version history. Production note count went 3 → 2; `gov_category` is unaffected at 25/25.
+
+### Note: `due_month` is absent from 25 of 31 production subscriptions
+
+Pre-existing and unchanged by this feature — the mapper omits an empty `due_month`, and staging shows the identical shape before and after the change (the byte-identical GETs above include this). Recording it so it is not mistaken for a regression later.
+
+### Summary
+
+Every criterion cycle 1 could not reach now passes against the real deployed staging app with the columns physically swapped and renamed in the Sheets UI. AC-15 is the one that matters: with `frequency` and `due_day` genuinely swapped in the sheet, the API returned byte-identical JSON to the pre-change baseline — a positional reader would have returned the day where the word belongs. The cycle-1 regression was exactly what it was diagnosed as, and the captain's two header-cell edits cleared it with no code change. Two things still need the captain: revert the staging swap and rename (AC-18, staging expenses currently 500 by design), and check whether `cat_005`'s note was cleared on production while `H1` was being named.
