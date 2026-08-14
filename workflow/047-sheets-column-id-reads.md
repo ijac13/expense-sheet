@@ -290,3 +290,28 @@ Pre-existing and unchanged by this feature — the mapper omits an empty `due_mo
 ### Summary
 
 Every criterion cycle 1 could not reach now passes against the real deployed staging app with the columns physically swapped and renamed in the Sheets UI. AC-15 is the one that matters: with `frequency` and `due_day` genuinely swapped in the sheet, the API returned byte-identical JSON to the pre-change baseline — a positional reader would have returned the day where the word belongs. The cycle-1 regression was exactly what it was diagnosed as, and the captain's two header-cell edits cleared it with no code change. Two things still need the captain: revert the staging swap and rename (AC-18, staging expenses currently 500 by design), and check whether `cat_005`'s note was cleared on production while `H1` was being named.
+
+## Stage Report: verify (cycle 3 — AC-18 close-out)
+
+**verdict: PASSED** — all 19 acceptance criteria are now verified. Nothing outstanding.
+
+- DONE: AC-18 — both staging changes reverted and a final GET confirms normal behaviour restored
+  Sheet state re-read live after the captain's revert: `Expenses G="notes"` (back from `note_text`), `Subscriptions E="frequency" F="due_day"` (back to canonical). The `Categories` header fix is correctly retained (`G="gov_category" H="note"`) — that was a repair, not a test change. All three endpoints healthy: `GET /api/subscriptions` 200, `GET /api` 200 with 246133 bytes of expenses carrying `notes` data, `GET /api/categories` 200 with `gov_category`/`note` populated.
+- DONE: `cat_005` production note
+  Captain re-entered the value; closed, no further action.
+
+### The closing result
+
+All three GETs are now **byte-identical to the original pre-deploy baseline** — the capture taken before any of this landed, running the old positional code against the sheet in its original layout:
+
+| endpoint | pre-deploy baseline (old code) | now (new code, after swap + revert cycle) |
+|---|---|---|
+| `GET /api/subscriptions` | 300 bytes | identical |
+| `GET /api` (expenses) | 246133 bytes | identical |
+| `GET /api/categories` | 3 fields incl. `gov_category`/`note` | identical |
+
+The categories row is the one worth reading twice: the baseline was produced by positional code reading columns G and H whose header cells were blank, and today's response is produced by header-resolving code reading those same columns now that they are named. Same bytes out. Between those two captures the `Subscriptions` columns were physically swapped and swapped back, and the `Expenses` `notes` header was renamed and renamed back, and the API's output never moved except where it was supposed to — the 500 during the rename.
+
+### Summary
+
+AC-18 closes the set: the captain reverted both staging test edits, the sheet header rows confirm it live, and all three endpoints return byte-identical JSON to the pre-deploy baseline. That round trip — swap, verify, revert, verify — is the full claim of this entity demonstrated end to end on the deployed app rather than in a harness. All 19 ACs pass, the PII/secrets check is clean, staging is left exactly as it was found, and production's header row is now fully named so the resolver will find every required and optional field when this deploys.
