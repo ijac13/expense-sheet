@@ -1,16 +1,16 @@
 ---
 id: 047
 title: Read/Write Sheets Data by Column Header, Not Column Position
-status: verify
+status: done
 source: captain
 started: 2026-08-13T08:35:02Z
-completed:
-verdict:
+completed: 2026-08-16T03:39:11Z
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-047-sheets-column-id-reads
+worktree:
 issue:
 pr: "#20"
-mod-block: merge:pr-merge
+mod-block:
 ---
 
 The backend reads and writes Google Sheets rows by fixed column position (e.g. "column D", ranges like `A:F`/`A:G`/`A:H`) instead of matching each field by its header name (e.g. `category_id`). This is fragile: inserting, reordering, or renaming a column in the Sheet silently breaks the mapping — no error, just wrong data landing in the wrong field. Already bit us twice: entity 042 found `gov_category` unreadable because the read range stopped one column short of where it actually lives, and entity 044 found category/payer names resolved against a hardcoded list rather than live data. Both are symptoms of the same root cause — code assumes a fixed column shape instead of reading it from the Sheet itself.
