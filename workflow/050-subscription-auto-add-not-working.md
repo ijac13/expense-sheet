@@ -1,13 +1,13 @@
 ---
 id: 050
 title: Subscriptions Never Auto-Generate Expense Entries on Due Date
-status: spec
+status: build
 source: captain (found checking expense history for recurring entries)
 started: 2026-08-17T08:21:20Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-050-subscription-auto-add-not-working
 issue:
 pr:
 ---
