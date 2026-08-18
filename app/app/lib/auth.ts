@@ -14,7 +14,7 @@ export function signOutUser() {
 
 // Stub: check if email is authorized
 // Real check reads Users tab via Firebase Function — deferred to integration phase
-const AUTHORIZED_EMAILS_STUB = ["ijac.wei@gmail.com"]; // captain's email
+const AUTHORIZED_EMAILS_STUB = [process.env.NEXT_PUBLIC_USER1_EMAIL ?? ""]; // captain's email
 
 export function isAuthorizedEmail(email: string): boolean {
   // In production, this check happens server-side via Firebase Function
