@@ -82,7 +82,9 @@
     "amount_label": "金額（NT$）",
     "frequency": "頻率",
     "due_month_label": "到期月份（1–12）",
-    "due_day_label": "到期日（1–31）"
+    "due_day_label": "到期日（1–31）",
+    "auto_add_last_ran": "自動新增上次執行於",
+    "auto_add_not_running": "自動新增未執行"
   },
   "settings": { "title": "設定", "signed_in_as": "目前登入", "sign_out": "登出", "font_size": "字體大小", "small": "小", "medium": "中", "large": "大", "language": "語言", "category_management": "分類管理", "user_management": "使用者管理", "open_sheet": "開啟 Google 試算表" },
   "users": { "title": "使用者管理", "description": "請至 Google 試算表的「使用者」分頁新增或移除使用者。", "loading": "載入中…", "no_email": "未設定信箱", "empty": "使用者分頁中未找到任何使用者。" },

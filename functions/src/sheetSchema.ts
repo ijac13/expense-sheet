@@ -37,6 +37,20 @@ export const SUBSCRIPTIONS_SPEC: TabSpec = {
   optional: [],
 };
 
+// A type alias rather than an interface so it keeps an implicit index signature
+// and stays assignable to the `Record<string, unknown>` rows insights.ts takes.
+export type Subscription = {
+  id: string;
+  name: string;
+  amount: number;
+  category_id: string;
+  frequency: string;
+  due_day: number;
+  due_month: number | undefined;
+  paid_by: string;
+  is_active: boolean;
+};
+
 export class SheetSchemaError extends Error {
   readonly status: number;
   constructor(message: string, status = 500) {
@@ -115,6 +129,25 @@ export function cell(row: Row, map: ColumnMap, field: string): Cell {
   const i = map.index[field];
   if (i === undefined) return undefined;
   return row[i];
+}
+
+// Both the HTTP API and the daily scheduler read subscriptions through this one
+// function, so "active" cannot mean two different things. The Apps Script it
+// replaced had its own check against the boolean `true`, but every `is_active`
+// cell holds the string "true" — so it skipped all 31 rows, silently, for months.
+export function rowToSubscription(row: Row, map: ColumnMap): Subscription {
+  const dueMonth = cell(row, map, "due_month");
+  return {
+    id: String(cell(row, map, "id") ?? ""),
+    name: String(cell(row, map, "name") ?? ""),
+    amount: Number(cell(row, map, "amount") ?? 0),
+    category_id: String(cell(row, map, "category_id") ?? ""),
+    frequency: String(cell(row, map, "frequency") ?? "monthly"),
+    due_day: Number(cell(row, map, "due_day") ?? 1),
+    due_month: dueMonth ? Number(dueMonth) : undefined,
+    paid_by: String(cell(row, map, "paid_by") ?? ""),
+    is_active: cell(row, map, "is_active") !== "false",
+  };
 }
 
 // The row to write back: every existing cell carried forward by position, with

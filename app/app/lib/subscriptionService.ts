@@ -2,6 +2,36 @@ import { Subscription } from "./subscriptions";
 
 const API_BASE = "/api/subscriptions";
 
+export interface SchedulerStatus {
+  last_run_at: string | null;
+  due_count: number;
+  created_count: number;
+  skipped_count: number;
+  error: string;
+  stale: boolean;
+}
+
+// A scheduler that stopped and an API that cannot answer are the same thing from
+// the captain's side: no evidence auto-add ran. Both report stale, because this
+// feature exists precisely because a silent stoppage went unnoticed for months.
+export async function getSchedulerStatus(): Promise<SchedulerStatus> {
+  const unknown: SchedulerStatus = {
+    last_run_at: null,
+    due_count: 0,
+    created_count: 0,
+    skipped_count: 0,
+    error: "",
+    stale: true,
+  };
+  try {
+    const res = await fetch("/api/scheduler-status");
+    if (!res.ok) return unknown;
+    return (await res.json()) as SchedulerStatus;
+  } catch {
+    return unknown;
+  }
+}
+
 export async function getSubscriptions(): Promise<Subscription[]> {
   const res = await fetch(API_BASE);
   if (!res.ok) throw new Error(`Failed to load subscriptions: ${res.status}`);
