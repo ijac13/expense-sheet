@@ -9,7 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-050-subscription-auto-add-not-working
 issue:
-pr:
+pr: "#21"
+mod-block: merge:pr-merge
 ---
 
 Recurring subscriptions are supposed to automatically create a matching expense entry on their due date — that's the entire point of `apps-script/subscription-scheduler.gs`. Checked production directly: of 1,962 expense rows, none carry the id format (`Utilities.getUuid()`) that script would produce. Zero evidence it has ever run, despite 21 active subscriptions with due dates that should have fired repeatedly across the months of real data in the sheet. The script is a Google Apps Script meant to run on its own daily trigger set up manually inside the Google Sheet's Apps Script editor — a one-time setup step separate from the app's own deploy pipeline, and the evidence says it was never done.
