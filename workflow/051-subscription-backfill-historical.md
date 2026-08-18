@@ -7,7 +7,7 @@ started:
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-051-subscription-backfill-historical
 issue:
 pr:
 ---
