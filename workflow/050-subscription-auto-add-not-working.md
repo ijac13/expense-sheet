@@ -142,3 +142,30 @@ Deploy prerequisite to flag: the Cloud Scheduler API must be enabled on both pro
 ### Summary
 
 Traced both schemas live rather than trusting the code, which turned the entity's open question from a judgment call into a settled one: the Apps Script has two independent bugs (a boolean-vs-string active check that skips every row, and two written fields with no matching column), so "install the missing trigger" was never a viable fix. The spec therefore replaces it with an `onSchedule` Firebase Function on `firebase-functions@6.6.0` — already present, no new dependency — pinned to `Asia/Taipei` because the spreadsheet is UTC+8 and a UTC "today" would misdate entries for a third of each day. Two design choices are worth the captain's attention at the gate: a deterministic expense id (`exp-auto-{sub_id}-{date}`) gives idempotency and a subscription link without adding a column to the sheet by hand, and a `SchedulerLog` heartbeat plus a line on the Subscriptions screen answers "is it running?" from the app, which is what made this invisible for months.
+
+## Implementation Plan (build)
+
+1. Move `rowToSubscription` from `index.ts` into `sheetSchema.ts` so the API and the scheduler share ONE active check — AC-2's bug class cannot recur if there is only one implementation.
+2. New `functions/src/scheduler.ts`: Taipei-date resolution, due matching with clamping, deterministic ids, the `SchedulerLog` heartbeat, and the status read. Pure helpers exported so the date logic is testable without a sheet.
+3. `index.ts`: export `subscriptionScheduler` via `onSchedule`, add `GET /api/scheduler-status`.
+4. Frontend: `getSchedulerStatus()` in `subscriptionService.ts`, one line under the Subscriptions title, strings in both locales.
+5. Delete the Apps Script and rewrite SETUP.md Step 8.
+
+## Stage Report: build
+
+- DONE: Mechanism: onSchedule Firebase Function (0 1 * * *, Asia/Taipei), delete apps-script/subscription-scheduler.gs and its SETUP.md reference; active filter matches the API's own logic, not the old script's broken strict-boolean check (AC-1, AC-2)
+  `functions/src/index.ts` exports `subscriptionScheduler`; the test reads the compiled `__endpoint.scheduleTrigger` that `firebase deploy` actually registers (`schedule: "0 1 * * *"`, `timeZone: "Asia/Taipei"`) rather than the source, and invokes `.run({})` end-to-end. `.gs` deleted; SETUP.md Step 8 is now "nothing to set up". `rowToSubscription` moved to `sheetSchema.ts` and is the single active check for both callers.
+- DONE: Correct monthly/annual due-date matching with clamping, and rows built through entity 047's buildColumnMap/buildWriteRow matching the live schema exactly — no fabricated status/subscription_id fields, helper columns left blank like POST /api does (AC-3 through AC-6)
+  AC-4 sweeps all 365 dates of 2026 and asserts the annual sub fires on exactly `["2026-06-05"]`. AC-6 writes through `buildWriteRow` and compares the row against one the real `POST /api` writes into the same stub sheet — same width 10, same blanks at indices 8/9.
+- DONE: Idempotent deterministic ids so re-runs never duplicate, a SchedulerLog heartbeat on every run including failures, a status endpoint, and a captain-visible last-ran indicator on the Subscriptions screen (AC-7 through AC-11)
+  Two runs on the same date produce `created_count: 1` then `created_count: 0, skipped_count: 1` with the row count unchanged. A zero-due run still appends exactly one `SchedulerLog` row, and the tab plus header are recreated after deletion. AC-11 mounts the real Subscriptions page: four status shapes, warning style driven only by the API's `stale` flag.
+- SKIPPED: AC-12 (LIVE demonstration on staging) and AC-13 (LIVE confirmation on production)
+  Both are owned by the verify and done stages by the spec's own wording; nothing was deployed from this stage.
+
+### Summary
+
+Two design decisions go beyond the letter of the spec and should be looked at. First, the insert and the write ride in a **single** `batchUpdate` (`insertDimension` + `updateCells`), because Sheets applies a batch all-or-nothing: the obvious two-call version leaves a blank row in Expenses when the write fails, which the AC-9 failure test provoked on the first run. Second, idempotency reads the header plus the id column alone rather than all of `A:Z` — the tab is ~2,000 rows and grows daily, and only the ids are needed.
+
+The suite was falsified, not just run. Reintroducing the old script's `is_active === true` check collapses 15 of 25 scheduler tests including both AC-2 tests; building the row positionally at 8 columns fails AC-5 and AC-6. A first attempt to falsify AC-6 by passing an 8-cell `existing` array did **not** fail, because `buildWriteRow` widens to the header on its own — worth knowing that the guarantee lives in 047's helper, not in the scheduler.
+
+79 functions tests and 40 app tests pass, with `next build` clean. `SPREADSHEET_ID` needs no new wiring: Firebase applies `functions/.env.<project>` to the whole codebase, so the scheduled function reads the same value `api` does. The verify stage will need Cloud Scheduler enabled on staging — `firebase deploy` prompts for it on the first scheduled-function deploy.
