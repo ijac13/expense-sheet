@@ -1,7 +1,7 @@
 ---
 id: 050
 title: Subscriptions Never Auto-Generate Expense Entries on Due Date
-status: build
+status: verify
 source: captain (found checking expense history for recurring entries)
 started: 2026-08-17T08:21:20Z
 completed:
