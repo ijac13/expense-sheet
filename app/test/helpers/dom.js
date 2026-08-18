@@ -68,14 +68,28 @@ const SUBSCRIPTIONS = [
   { id: "sub-3", name: "iCloud", amount: 30, category_id: "fuel", frequency: "monthly", due_day: 20, paid_by: "Karen", is_active: false },
 ];
 
+// A healthy scheduler: a run recorded minutes ago. `stale` comes from the API,
+// never from the page, so the page cannot disagree with the backend about it.
+const SCHEDULER_OK = {
+  last_run_at: "2026-08-18T01:00:00.000Z",
+  due_count: 2,
+  created_count: 2,
+  skipped_count: 0,
+  error: "",
+  stale: false,
+};
+
 /**
- * @param {{offline?: boolean, failWrites?: boolean, categories?: object[]}} opts
+ * @param {{offline?: boolean, failWrites?: boolean, categories?: object[],
+ *          schedulerStatus?: object|null}} opts
  *   offline simulates GET /api/categories failing.
  *   failWrites simulates POST/PATCH /api/categories failing while GET still works.
  *   categories overrides the default fixture (a long list, for the
  *   below-the-fold cases).
+ *   schedulerStatus is the GET /api/scheduler-status body; null makes that
+ *   endpoint fail, the shape an un-deployed or broken scheduler produces.
  */
-function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES } = {}) {
+function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK } = {}) {
   const dom = installDom();
 
   // jsdom implements neither API, so these records are the only way to observe a
@@ -128,6 +142,10 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
       const target = categories.find((c) => c.id === href.split("/").pop());
       Object.assign(target, body);
       return { ok: true, status: 200, json: async () => ({ ...target }) };
+    }
+    if (href === "/api/scheduler-status") {
+      if (!schedulerStatus) return { ok: false, status: 503, statusText: "Service Unavailable" };
+      return { ok: true, status: 200, json: async () => ({ ...schedulerStatus }) };
     }
     if (href === "/api/subscriptions") {
       return { ok: true, status: 200, json: async () => SUBSCRIPTIONS };
@@ -187,4 +205,4 @@ function iconForRow(container, marker) {
   return icon.textContent;
 }
 
-module.exports = { CATEGORIES, EXPENSES, SUBSCRIPTIONS, installGlobals, mockAuth, mount, iconForRow };
+module.exports = { CATEGORIES, EXPENSES, SUBSCRIPTIONS, SCHEDULER_OK, installGlobals, mockAuth, mount, iconForRow };
