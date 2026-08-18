@@ -7,8 +7,8 @@
     "prebuild": "node scripts/set-manifest.js",
     "build": "next build",
     "start": "next start",
-    "test": "npm run test:compile && node --test test/categories.test.js test/icons.render.test.js test/category-notes.render.test.js test/category-edit-form.render.test.js test/scheduler-indicator.render.test.js",
-    "test:compile": "tsc app/lib/categories.ts --outDir .test-build --module commonjs --target es2020 --moduleResolution node --skipLibCheck && tsc app/history/page.tsx app/subscriptions/page.tsx app/page.tsx app/settings/categories/page.tsx --outDir .test-build-ui --module commonjs --target es2020 --moduleResolution node --jsx react-jsx --esModuleInterop --resolveJsonModule --skipLibCheck"
+    "test": "npm run test:compile && node --test test/categories.test.js test/users-env.test.js test/icons.render.test.js test/category-notes.render.test.js test/category-edit-form.render.test.js test/scheduler-indicator.render.test.js",
+    "test:compile": "tsc app/lib/categories.ts app/lib/users.ts --outDir .test-build --module commonjs --target es2020 --moduleResolution node --skipLibCheck && tsc app/history/page.tsx app/subscriptions/page.tsx app/page.tsx app/settings/categories/page.tsx --outDir .test-build-ui --module commonjs --target es2020 --moduleResolution node --jsx react-jsx --esModuleInterop --resolveJsonModule --skipLibCheck"
   },
   "dependencies": {
     "daisyui": "^5.5.19",
