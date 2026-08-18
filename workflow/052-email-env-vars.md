@@ -62,3 +62,38 @@ Three things the captain should weigh, none of which this stage can fix:
 3. `AUTHORIZED_EMAILS_STUB` is dead code — declared, never read; `isAuthorizedEmail` returns `true` unconditionally. I pointed it at the env var as the spec directs rather than deleting it, but deleting it is the honest cleanup if the captain wants it.
 
 Git history still contains both addresses, per the spec's Out of Scope.
+
+## Stage Report: verify
+
+Verdict: PASSED — with one finding the captain should rule on (see Summary).
+
+- DONE: Deploy to staging (or confirm via local production-mode build) and prove live that the app actually signs in correctly with the env vars set — not just that the build compiles
+  Staging deploy was denied by the sandbox permission classifier (`firebase deploy --only hosting --project staging`), so I took the checklist's sanctioned fallback: a real production build from `app/.env.staging`, served over HTTP at `127.0.0.1:8801`. Live responses: `/`, `/sign-in.html`, `/settings/users.html`, `/history.html` → HTTP 200 `text/html`; `/manifest.json` → 200 `application/json`; the email-bearing chunk `04-l-9gpp3pun.js` → 200, and it is a direct `<script>` tag on the served sign-in page, so a browser really loads it.
+  Gate proven by execution, not inspection: extracted webpack module `89299` from the chunk **fetched over HTTP** and ran the shipped `getUserByEmail` under a runtime with no `globalThis.process`, so the bundle's own process polyfill takes the browser path. Real USER1 → `{id:user1,name:ijac}`, real USER2 → `{id:user2,name:wei}`; `stranger@example.com`, `""`, `null`, `undefined` → all rejected. Fails if the env plumbing yields a wrong or empty value for a known user.
+  Not covered: the Google OAuth round-trip. No browser exists in this sandbox and I cannot authenticate as either household member — captain manual test in Summary.
+- DONE: Re-confirm the build-inlining claim independently: the deployed/built bundle actually contains the emails when vars are set, and that a missing var truly fails closed (locks out) rather than silently allowing an empty-email sign-in
+  Vars set: sweeping every chunk the sign-in page loads, each address appears exactly once, in `04-l-9gpp3pun.js` alone. Vars stripped: the same sweep returns zero, and zero anywhere in `out/`. Cross-check confirmed the two builds are distinct artifacts, not one directory served twice.
+  Fail-closed proven on the artifact: the vars-stripped build compiles to a *runtime* lookup (`process.env.NEXT_PUBLIC_USER1_EMAIL ?? ""`), not an inlined `""` — a structural difference the build report did not surface. Under the browser-faithful runtime both fields resolve to `""` and every input is rejected, including `""`, with no throw. So a missing var locks everyone out cleanly rather than admitting a blank-email session *or* white-screening on load.
+  Build's warning confirmed: the vars-stripped `npm run build` exited 0 with no error or warning.
+- DONE: Mandatory PII/secrets check: confirm no tracked file, including this entity's own history if checkable, leaks either literal email going forward
+  `git grep` at branch HEAD: 0 files for either address. The one new commit (`8dafca7`) adds 0 occurrences and removes 5 across 4 lines (`users.ts` 2, `auth.ts` 1, this entity's prose 1).
+  Only `.env*.example` templates are tracked — no real `.env` — and their two new keys hold empty / `TODO_` placeholders. Secrets sweep over every added line: 0 hits for Google API keys, private keys, `sk-`/`ghp_` tokens, passwords, client secrets, service accounts, phone numbers. The only emails in added lines are `user-one@example.com`, `user-two@example.com`, `stranger@example.com` — test placeholders.
+  Finding (see Summary): commit `394dedc`, already on `origin/main`, added both real addresses to `workflow/052-email-env-vars.md`.
+
+### Verification notes
+
+- 44/44 tests pass. Worktree clean: I reverted `app/public/manifest.json`, which the staging `prebuild` step rewrites — a pre-existing footgun where building for staging dirties a tracked file that drives the production PWA manifest.
+- Confirmed the blast radius is one call site: of 12 `lib/users` importers only `lib/authContext.tsx:44` reads `.email`; the rest use `id`/`name`. `settings/users/page.tsx` renders emails fetched from `/api/users` (Sheets), unaffected.
+- `isAuthorizedEmail` has no callers and `AUTHORIZED_EMAILS_STUB` is never read, so the `auth.ts` edit is inert at runtime — corroborated by USER1 appearing exactly once in the bundle rather than twice, i.e. the dead constant was tree-shaken.
+
+### Summary
+
+Both addresses are gone from tracked source, the shipped bundle resolves each to the same `{id, name}` the hardcoded table produced, and a missing var locks everyone out cleanly instead of authorizing a blank email — all proven by executing the real built chunks fetched over HTTP, not by reading code.
+
+One finding the captain should rule on, which this stage cannot fix: **filing this entity leaked the thing the entity exists to protect.** Commit `394dedc` ("file+dispatch: 052") wrote both real addresses into `workflow/052-email-env-vars.md`, and that commit is already on `origin/main` at the public `github.com/ijac13/expense-sheet`. Build later redacted the prose so HEAD is clean, and history scrubbing is formally Out of Scope — but that call was made about *old* `users.ts` commits, not about a fresh commit this workflow itself pushed. Same decision, new facts.
+
+Two limits on this verification: staging was never exercised (deploy denied by the permission classifier), and with no browser available the Google sign-in round-trip is unproven. Captain manual test, once deployed with both vars set:
+
+1. Open the app and tap sign in; complete Google sign-in as user1 → you should land in the app, not the "unauthorized" state.
+2. Sign out, repeat as user2 → same result.
+3. Before any production deploy, confirm `NEXT_PUBLIC_USER1_EMAIL` and `NEXT_PUBLIC_USER2_EMAIL` are set in that build environment — without them the build still succeeds and silently locks both of you out.
