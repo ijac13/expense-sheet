@@ -143,3 +143,67 @@ Deploy prerequisite to flag: the Cloud Scheduler API must be enabled on both pro
 ### Summary
 
 Traced both schemas live rather than trusting the code, which turned the entity's open question from a judgment call into a settled one: the Apps Script has two independent bugs (a boolean-vs-string active check that skips every row, and two written fields with no matching column), so "install the missing trigger" was never a viable fix. The spec therefore replaces it with an `onSchedule` Firebase Function on `firebase-functions@6.6.0` — already present, no new dependency — pinned to `Asia/Taipei` because the spreadsheet is UTC+8 and a UTC "today" would misdate entries for a third of each day. Two design choices are worth the captain's attention at the gate: a deterministic expense id (`exp-auto-{sub_id}-{date}`) gives idempotency and a subscription link without adding a column to the sheet by hand, and a `SchedulerLog` heartbeat plus a line on the Subscriptions screen answers "is it running?" from the app, which is what made this invisible for months.
+
+## Implementation Plan (build)
+
+1. Move `rowToSubscription` from `index.ts` into `sheetSchema.ts` so the API and the scheduler share ONE active check — AC-2's bug class cannot recur if there is only one implementation.
+2. New `functions/src/scheduler.ts`: Taipei-date resolution, due matching with clamping, deterministic ids, the `SchedulerLog` heartbeat, and the status read. Pure helpers exported so the date logic is testable without a sheet.
+3. `index.ts`: export `subscriptionScheduler` via `onSchedule`, add `GET /api/scheduler-status`.
+4. Frontend: `getSchedulerStatus()` in `subscriptionService.ts`, one line under the Subscriptions title, strings in both locales.
+5. Delete the Apps Script and rewrite SETUP.md Step 8.
+
+## Stage Report: build
+
+- DONE: Mechanism: onSchedule Firebase Function (0 1 * * *, Asia/Taipei), delete apps-script/subscription-scheduler.gs and its SETUP.md reference; active filter matches the API's own logic, not the old script's broken strict-boolean check (AC-1, AC-2)
+  `functions/src/index.ts` exports `subscriptionScheduler`; the test reads the compiled `__endpoint.scheduleTrigger` that `firebase deploy` actually registers (`schedule: "0 1 * * *"`, `timeZone: "Asia/Taipei"`) rather than the source, and invokes `.run({})` end-to-end. `.gs` deleted; SETUP.md Step 8 is now "nothing to set up". `rowToSubscription` moved to `sheetSchema.ts` and is the single active check for both callers.
+- DONE: Correct monthly/annual due-date matching with clamping, and rows built through entity 047's buildColumnMap/buildWriteRow matching the live schema exactly — no fabricated status/subscription_id fields, helper columns left blank like POST /api does (AC-3 through AC-6)
+  AC-4 sweeps all 365 dates of 2026 and asserts the annual sub fires on exactly `["2026-06-05"]`. AC-6 writes through `buildWriteRow` and compares the row against one the real `POST /api` writes into the same stub sheet — same width 10, same blanks at indices 8/9.
+- DONE: Idempotent deterministic ids so re-runs never duplicate, a SchedulerLog heartbeat on every run including failures, a status endpoint, and a captain-visible last-ran indicator on the Subscriptions screen (AC-7 through AC-11)
+  Two runs on the same date produce `created_count: 1` then `created_count: 0, skipped_count: 1` with the row count unchanged. A zero-due run still appends exactly one `SchedulerLog` row, and the tab plus header are recreated after deletion. AC-11 mounts the real Subscriptions page: four status shapes, warning style driven only by the API's `stale` flag.
+- SKIPPED: AC-12 (LIVE demonstration on staging) and AC-13 (LIVE confirmation on production)
+  Both are owned by the verify and done stages by the spec's own wording; nothing was deployed from this stage.
+
+### Summary
+
+Two design decisions go beyond the letter of the spec and should be looked at. First, the insert and the write ride in a **single** `batchUpdate` (`insertDimension` + `updateCells`), because Sheets applies a batch all-or-nothing: the obvious two-call version leaves a blank row in Expenses when the write fails, which the AC-9 failure test provoked on the first run. Second, idempotency reads the header plus the id column alone rather than all of `A:Z` — the tab is ~2,000 rows and grows daily, and only the ids are needed.
+
+The suite was falsified, not just run. Reintroducing the old script's `is_active === true` check collapses 15 of 25 scheduler tests including both AC-2 tests; building the row positionally at 8 columns fails AC-5 and AC-6. A first attempt to falsify AC-6 by passing an 8-cell `existing` array did **not** fail, because `buildWriteRow` widens to the header on its own — worth knowing that the guarantee lives in 047's helper, not in the scheduler.
+
+79 functions tests and 40 app tests pass, with `next build` clean. `SPREADSHEET_ID` needs no new wiring: Firebase applies `functions/.env.<project>` to the whole codebase, so the scheduled function reads the same value `api` does. The verify stage will need Cloud Scheduler enabled on staging — `firebase deploy` prompts for it on the first scheduled-function deploy.
+
+## Stage Report: verify
+
+**Verdict: APPROVED** — every acceptance criterion owned by this stage passed against the deployed staging app, with live HTTP evidence.
+
+- DONE: Deploy to staging and confirm live, on the real deployed bundle — build's evidence was a test harness, not a running deployed app; Cloud Scheduler must be enabled on staging (firebase deploy prompts for this on first scheduled-function deploy)
+  `firebase deploy --project staging` auto-enabled `cloudscheduler.googleapis.com` with no prompt; `firebase functions:list` shows `subscriptionScheduler` (v2, trigger `scheduled`, us-central1) beside `api`, and the uploaded artifact's `__endpoint.scheduleTrigger` is `{"schedule":"0 1 * * *","timeZone":"Asia/Taipei"}` (AC-1). Caught a real deploy defect: the combined deploy aborted on the Artifact Registry cleanup policy AFTER the hosting upload but BEFORE finalizing the release, leaving staging serving the OLD frontend (deployed `locales/en/common.json` 6143 bytes vs 6241 built). A hosting-only redeploy reached "release complete"; deployed now byte-matches the build and serves `auto_add_last_ran`/`auto_add_not_running` in both en and zh, with chunk `0-c5dkhxh64ul.js` containing `scheduler-status` (AC-11 assets).
+- DONE: AC-12: manually trigger the deployed staging scheduler against a real staging subscription due today, and prove with live evidence (trigger command output, a GET showing the new exp-auto- row, and GET /api/scheduler-status showing a fresh successful run) — not code inspection
+  Primed staging so both subscriptions were due today (Taipei 2026-08-18): `sub-1778375707726` active, `sub-1778375684907` cancelled; baseline 1404 expense rows, zero `exp-auto-` rows. After the trigger, `GET /api/scheduler-status` → 200 `{"last_run_at":"2026-08-18T02:44:23.154Z","due_count":1,"created_count":1,"skipped_count":0,"error":"","stale":false}` and `GET /api/` returned the new row `{"id":"exp-auto-sub-1778375707726-2026-08-18","date":"2026-08-18","amount":6556,"category_id":"medical","paid_by":"ijac","created_by":"ijac","notes":"Fhj自在",...}`; total rows 1404→1405. `due_count` is 1, not 2 — the cancelled subscription was due-dated identically and still did not fire, which is the live proof of the string-vs-boolean `is_active` bug that made the old Apps Script a no-op (AC-2, AC-5, AC-7 id shape, AC-10 `stale` true→false).
+- DONE: Confirm idempotency live: trigger the same run twice on staging and show the second run creates zero new rows (created_count: 0)
+  Second trigger produced a genuinely new invocation (`last_run_at` advanced 02:44:23.154Z → 02:49:14.119Z) reporting `{"due_count":1,"created_count":0,"skipped_count":1,"error":""}`. Still exactly one `exp-auto-` row, total still 1405, and its `created_at` remained 02:44:23.154Z — the original row was neither duplicated nor rewritten. The heartbeat also appended on a zero-create run, confirming AC-8 live.
+- DONE: Mandatory PII / secrets check
+  Clean for this branch: only `.env*.example` files are tracked, no key/token/password-shaped strings in the 050 diff, and no personal data in any file 050 added. Two PRE-EXISTING exposures found on `main` and NOT introduced or touched by 050 — see Findings below.
+
+### Findings for the captain (pre-existing, not 050)
+
+The GitHub remote `ijac13/expense-sheet` is **public** (`"visibility":"public"`), and `main` already contains:
+
+- Real personal email addresses — `app/app/lib/users.ts:2-3` and `app/app/lib/auth.ts:17` (one belongs to a second person, not the captain). Added in commit `bcc8d70`.
+- Both the production and staging Google Spreadsheet IDs — `workflow/_archive/data-migration.md` and `workflow/_archive/project-setup.md`.
+
+The spreadsheet IDs are not credentials; the sheets are access-controlled, so an ID alone grants nothing. They do name the exact targets, which matters if sharing is ever loosened to "anyone with the link". I did not reject 050 for these: the branch neither introduced nor modified any of the four files, and routing them back to 050's build stage would stall a fully-verified feature while fixing nothing. They warrant their own entity.
+
+### Not verified here, deliberately
+
+- AC-6's byte shape (row width 10, blanks at indices 8/9) is not observable through the API, which returns parsed objects. Live, the write succeeding through `buildWriteRow` with `error:""` does prove no fabricated `status`/`subscription_id` was written — those would have thrown rather than returned `created_count: 1`.
+- AC-9's failure path was not exercised live; that would mean deliberately breaking staging. The build suite covers it.
+- AC-11's rendered appearance was confirmed at the asset layer (strings live in both locales, endpoint wired into the deployed chunk), not in a browser. That is the captain's manual test.
+- AC-13 belongs to the `done` stage.
+
+I did not personally run the `gcloud scheduler jobs run` command: gcloud cannot start in this environment because the OS denies read access to `/Users/ijac/.config/gcloud` ("Operation not permitted", sandbox disabled included), and the scheduler's own endpoint correctly rejects unauthenticated calls (HTTP 403). The captain ran both triggers. What I verified independently is stronger than the command's stdout: two distinct, fresh `last_run_at` timestamps that advanced in response to each trigger, plus the resulting sheet state.
+
+### Summary
+
+The feature works on the deployed staging app, not just in tests: one trigger created exactly one correctly-shaped expense row from a real subscription, and an identical second trigger created none. The single most valuable live result is `due_count: 1` — both staging subscriptions were due today, but the cancelled one was excluded, demonstrating on real sheet data that the bug which silently killed the old Apps Script for months is genuinely gone. The stage also caught a deploy defect the build stage could not have seen: a partial `firebase deploy` that reported functions success while leaving the old frontend live, which is exactly the "deployed hashes must match the built output" failure the gate flow warns about; re-running hosting alone fixed it.
+
+Staging is left primed for the captain's own manual test — `sub-1778375707726` is still set to `due_day: 18` and the run is repeatable today. To restore it, PATCH `due_day` back to `1` on both subscriptions. Local checks alongside: 79 functions tests, 40 app tests, `tsc --noEmit` clean.

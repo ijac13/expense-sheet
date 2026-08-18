@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Subscription, getNextDueDate } from "../lib/subscriptions";
-import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription } from "../lib/subscriptionService";
+import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription, getSchedulerStatus, SchedulerStatus } from "../lib/subscriptionService";
 import { Category, DEFAULT_CATEGORIES, categoryIcon, resolveCategory } from "../lib/categories";
 import { getCategories } from "../lib/categoryService";
 import { USERS, DEFAULT_USER } from "../lib/users";
@@ -18,6 +18,15 @@ function getCategoryDisplay(category_id: string, categories: Category[]) {
 
 function formatDueDate(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function formatRunTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 interface AddFormState {
@@ -72,6 +81,23 @@ export default function SubscriptionsPage() {
         // Keep DEFAULT_CATEGORIES as fallback
       });
   }, []);
+
+  const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null);
+
+  useEffect(() => {
+    getSchedulerStatus().then(setSchedulerStatus);
+  }, []);
+
+  // A stale scheduler still names the date it last ran, so "how long has this
+  // been broken?" is answerable from the screen rather than from the sheet.
+  const autoAddLine = useMemo(() => {
+    if (!schedulerStatus) return "";
+    const lastRan = schedulerStatus.last_run_at
+      ? `${t("subscriptions.auto_add_last_ran")} ${formatRunTime(schedulerStatus.last_run_at)}`
+      : "";
+    if (!schedulerStatus.stale) return lastRan;
+    return [t("subscriptions.auto_add_not_running"), lastRan].filter(Boolean).join(" · ");
+  }, [schedulerStatus, t]);
 
   const activeCategories = useMemo(
     () => categories.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order),
@@ -220,8 +246,20 @@ export default function SubscriptionsPage() {
   return (
     <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto px-4 pt-6 pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">{t("subscriptions.title")}</h1>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">{t("subscriptions.title")}</h1>
+          {/* Whether auto-add is still running, on the screen it affects. Its
+              absence is what let a dead scheduler go unnoticed for months. */}
+          {autoAddLine && (
+            <div
+              data-testid="auto-add-status"
+              className={`text-xs mt-0.5 ${schedulerStatus?.stale ? "text-warning" : "text-base-content/50"}`}
+            >
+              {autoAddLine}
+            </div>
+          )}
+        </div>
         <button className="btn btn-primary btn-sm gap-1" onClick={openAdd}>
           <span className="text-lg leading-none">+</span>
           {t("subscriptions.add")}

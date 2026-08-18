@@ -209,15 +209,24 @@ firebase hosting:channel:deploy preview
 
 ---
 
-## Step 8 — Set Up Subscription Scheduler (optional)
+## Step 8 — Subscription Auto-Add
 
-If you use recurring subscriptions:
+Nothing to set up. The `subscriptionScheduler` function deploys with Step 7 and
+runs daily at 01:00 Asia/Taipei, adding an expense entry for every active
+subscription due that day.
 
-1. Open your production Google Spreadsheet
-2. Go to Extensions > Apps Script
-3. Copy the contents of `apps-script/subscription-scheduler.gs`
-4. Paste into the Apps Script editor
-5. Set up a daily time-driven trigger on `runSubscriptionScheduler`
+This used to be an Apps Script pasted into the Sheet by hand. That step was
+marked optional, was never done, and nothing in the app could tell — so
+subscriptions generated zero entries for months. It is now a scheduled Firebase
+Function precisely so there is no manual step to skip.
+
+`firebase deploy` enables the Cloud Scheduler API on first deploy of a scheduled
+function; approve the prompt if it appears.
+
+To confirm it is running, open the Subscriptions screen — the line under the
+title shows when auto-add last ran, and warns if it has stopped. The same data is
+at `/api/scheduler-status`, and every run appends a row to the `SchedulerLog` tab
+(created automatically).
 
 ---
 
@@ -230,3 +239,4 @@ After completing setup:
 - [ ] Adding an expense writes a row to the production Spreadsheet
 - [ ] Reports load correctly
 - [ ] Both users can sign in and see shared data
+- [ ] `/api/scheduler-status` returns a `last_run_at` with `stale: false`

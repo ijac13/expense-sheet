@@ -49,15 +49,37 @@ function makeSheets(tabs) {
       }),
       batchUpdate: async ({ requestBody }) => {
         for (const req of requestBody.requests) {
+          if (req.addSheet) {
+            const title = req.addSheet.properties.title;
+            requests.push(`ADDSHEET ${title}`);
+            grids[title] = [];
+            sheetIds[title] = nextSheetId++;
+            continue;
+          }
+          if (req.updateCells) {
+            const { start, rows } = req.updateCells;
+            const title = Object.keys(sheetIds).find((t) => sheetIds[t] === start.sheetId);
+            const grid = gridFor(title);
+            requests.push(`UPDATECELLS ${title} @${start.rowIndex} x${rows.length}`);
+            rows.forEach(({ values }, r) => {
+              const rowIdx = start.rowIndex + r;
+              while (grid.length <= rowIdx) grid.push([]);
+              values.forEach((v, c) => {
+                grid[rowIdx][start.columnIndex + c] = v.userEnteredValue.stringValue;
+              });
+            });
+            continue;
+          }
           const spec = req.insertDimension ?? req.deleteDimension;
           const title = Object.keys(sheetIds).find((t) => sheetIds[t] === spec.range.sheetId);
           const grid = gridFor(title);
+          const count = spec.range.endIndex - spec.range.startIndex;
           if (req.insertDimension) {
-            requests.push(`INSERT ${title} @${spec.range.startIndex}`);
-            grid.splice(spec.range.startIndex, 0, []);
+            requests.push(`INSERT ${title} @${spec.range.startIndex} x${count}`);
+            grid.splice(spec.range.startIndex, 0, ...Array.from({ length: count }, () => []));
           } else {
             requests.push(`DELETE ${title} @${spec.range.startIndex}`);
-            grid.splice(spec.range.startIndex, spec.range.endIndex - spec.range.startIndex);
+            grid.splice(spec.range.startIndex, count);
           }
         }
         return {};
@@ -86,13 +108,17 @@ function makeSheets(tabs) {
           // widening the range. Without this, a write range one column short of
           // the payload would look like it worked.
           const width = to.col - from.col + 1;
-          if (requestBody.values[0].length > width) {
-            throw new Error(`Requested writing within range ${range}, but tried writing ${requestBody.values[0].length} columns`);
+          const widest = Math.max(...requestBody.values.map((v) => v.length));
+          if (widest > width) {
+            throw new Error(`Requested writing within range ${range}, but tried writing ${widest} columns`);
           }
-          const rowIdx = (from.row ?? 1) - 1;
-          while (grid.length <= rowIdx) grid.push([]);
-          requestBody.values[0].forEach((v, i) => {
-            grid[rowIdx][from.col + i] = v;
+          const firstRow = (from.row ?? 1) - 1;
+          requestBody.values.forEach((values, r) => {
+            const rowIdx = firstRow + r;
+            while (grid.length <= rowIdx) grid.push([]);
+            values.forEach((v, i) => {
+              grid[rowIdx][from.col + i] = v;
+            });
           });
           return {};
         },
@@ -105,7 +131,14 @@ function makeSheets(tabs) {
     },
   };
 
-  return { grids, requests, sheets };
+  // Removing a tab takes it out of the metadata too, so code that checks for a
+  // tab before reading it sees what the real API would report.
+  const deleteTab = (name) => {
+    delete grids[name];
+    delete sheetIds[name];
+  };
+
+  return { grids, requests, sheets, deleteTab };
 }
 
 /** Install the stub, then load the compiled handler on top of it. */

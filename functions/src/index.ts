@@ -1,4 +1,5 @@
 import { onRequest } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
@@ -15,7 +16,9 @@ import {
   buildWriteRow,
   cell,
   columnLetter,
+  rowToSubscription,
 } from "./sheetSchema";
+import { TIME_ZONE, runSubscriptionScheduler, readSchedulerStatus } from "./scheduler";
 
 const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
 
@@ -101,21 +104,6 @@ function rowToUser(row: (string | null | undefined)[]): Record<string, unknown> 
   const email = col1.includes("@") ? col1 : col2;
   const name = col1.includes("@") ? (col2 || col1) : (col1 || col2);
   return { id, name, email };
-}
-
-function rowToSubscription(row: Row, map: ColumnMap): Record<string, unknown> {
-  const dueMonth = cell(row, map, "due_month");
-  return {
-    id: cell(row, map, "id") ?? "",
-    name: cell(row, map, "name") ?? "",
-    amount: Number(cell(row, map, "amount") ?? 0),
-    category_id: cell(row, map, "category_id") ?? "",
-    frequency: cell(row, map, "frequency") ?? "monthly",
-    due_day: Number(cell(row, map, "due_day") ?? 1),
-    due_month: dueMonth ? Number(dueMonth) : undefined,
-    paid_by: cell(row, map, "paid_by") ?? "",
-    is_active: cell(row, map, "is_active") !== "false",
-  };
 }
 
 function rowToCategory(row: Row, map: ColumnMap): Record<string, unknown> {
@@ -230,6 +218,15 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       });
       const rows = response.data.values ?? [];
       res.status(200).json(rows.slice(1).map(rowToUser));
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // /api/scheduler-status — GET (is subscription auto-add still running?)
+    // -----------------------------------------------------------------------
+    if (path.includes("scheduler-status")) {
+      if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+      res.status(200).json(await readSchedulerStatus(sheets, spreadsheetId, Date.now()));
       return;
     }
 
@@ -685,3 +682,21 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
     res.status(503).json({ error: "Service error", detail: String(err) });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Daily subscription auto-add
+// ---------------------------------------------------------------------------
+// 01:00 Asia/Taipei, matching the spreadsheet's own timezone so a subscription
+// due on the 15th is filed under the 15th the captain sees. Deployed by
+// `firebase deploy --only functions` like every other function here — the Apps
+// Script this replaced needed a manual trigger nobody ever installed.
+export const subscriptionScheduler = onSchedule(
+  { schedule: "0 1 * * *", timeZone: TIME_ZONE },
+  async () => {
+    const spreadsheetId = process.env.SPREADSHEET_ID;
+    if (!spreadsheetId) throw new Error("SPREADSHEET_ID not configured");
+    const sheets = await getSheetsClient();
+    const result = await runSubscriptionScheduler(sheets, spreadsheetId, Date.now());
+    console.log("subscriptionScheduler:", JSON.stringify(result));
+  }
+);
