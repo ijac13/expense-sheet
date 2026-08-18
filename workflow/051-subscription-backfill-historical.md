@@ -1,7 +1,7 @@
 ---
 id: 051
 title: Backfill Missing Historical Subscription Expense Entries
-status: ideation
+status: spec
 source: captain (found while scoping entity 050)
 started:
 completed:
