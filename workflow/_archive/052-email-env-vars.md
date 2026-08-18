@@ -1,16 +1,20 @@
 ---
 id: 052
 title: Move Hardcoded Personal Emails to Environment Variables
-status: verify
+status: done
 source: captain
 started: 2026-08-18T03:07:29Z
-completed:
-verdict:
+completed: 2026-08-18T10:13:00Z
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-052-email-env-vars
 issue:
-pr:
+pr: "#22"
 ---
+
+**Production deploy:** `firebase deploy --only hosting --project production` run 2026-08-18. Confirmed live via `firebase hosting:channel:list` (live channel released 2026-08-18 18:12:44) and by fetching the deployed sign-in chunk directly: both real emails appear inlined exactly once each, matching the verify-stage proof. Captain manually tested Google sign-in on staging (pre-deploy) for both users — successful.
+
+**Open finding, captain to decide:** commit `394dedc` (this entity's own filing commit), already on public `origin/main`, contains both real email addresses in this file's original ideation prose. HEAD is redacted; the commit itself is still in history. Captain has not yet ruled on leave-as-is vs. history scrub.
 
 `app/app/lib/users.ts` and `app/app/lib/auth.ts` have two real personal email addresses hardcoded directly in committed source — the captain's (`user1`/`ijac`) and the second household user's (`user2`/`wei`). This repo's GitHub remote is public, so both are currently exposed to anyone. (The literal addresses are deliberately not written out here — this file is tracked too.) Every other secret in this repo (Firebase keys, service-account credentials, spreadsheet IDs) already goes through environment variables, gitignored `.env*` files, and `.env*.example` placeholders — these two emails are the one place that pattern wasn't followed.
 
