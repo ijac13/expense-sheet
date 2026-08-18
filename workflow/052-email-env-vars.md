@@ -1,7 +1,7 @@
 ---
 id: 052
 title: Move Hardcoded Personal Emails to Environment Variables
-status: build
+status: verify
 source: captain
 started: 2026-08-18T03:07:29Z
 completed:
