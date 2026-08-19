@@ -33,4 +33,8 @@ out/
 
 # Feedback screenshots (personal)
 feedback-screenshots/
+
+# Subscription backfill candidate reports (entity 051) — these hold real expense
+# history and this remote is public. Only aggregate counts belong in the repo.
+functions/backfill-reports/
 .claire/

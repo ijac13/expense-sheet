@@ -15,7 +15,10 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "migrate:insurance-tax": "node -r ./scripts/load-local-env.js scripts/apply-insurance-tax-categories.js",
-    "migrate:insurance-tax:dry-run": "node -r ./scripts/load-local-env.js scripts/apply-insurance-tax-categories.js --dry-run"
+    "migrate:insurance-tax:dry-run": "node -r ./scripts/load-local-env.js scripts/apply-insurance-tax-categories.js --dry-run",
+    "backfill:analyze": "npm run build && node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --analyze",
+    "backfill:apply:dry-run": "npm run build && node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --apply --dry-run",
+    "backfill:apply": "npm run build && node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --apply"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
