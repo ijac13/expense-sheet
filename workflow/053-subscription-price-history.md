@@ -224,3 +224,28 @@ Fix direction: derive `first` from the widest occupied row, not row 1's length. 
 Everything else verified strongly. Both suites reproduce their counts on a genuinely fresh install, and all four of the build's mutation claims hold exactly as reported — the 78-failure `required` mutation in particular makes the spec's central design decision falsifiable rather than asserted. Cut scope was honored, and the PII sweep is clean, including the specific real figures named in the ideation.
 
 Rejecting on AC-5 alone. `ensureSubscriptionColumns` positions new headers by row 1's trimmed length, so a column with data under a blank header cell gets claimed and its cells destroyed — silent, irreversible loss of captain-typed data in the live sheet, and the same surface entity 042 is blocked on. The fix is small and local to `ensureSubscriptionColumns`; the rest of the build looks sound and should not need rework.
+
+## Stage Report: build (cycle 2)
+
+- DONE: Fix the verify-stage REJECTED finding — `ensureSubscriptionColumns` places new headers by row 1's trimmed length, silently claiming and destroying a column with data under a blank header cell
+  `functions/src/index.ts`: the helper now takes the full `rows` array and derives placement via `rows.reduce((widest, r) => Math.max(widest, r.length), map.width)` instead of `map.width` alone. The POST path now does a full-tab `readTab` instead of an `A1:Z1`-only `readColumnMap`, since it needs to see data rows, not just the header, to compute a safe placement.
+- DONE: Add a test at the exact trailing-blank-header shape verify used to reproduce the bug
+  New test in `functions/test/subscriptionDates.api.test.js`: nine-header row (blank J1), two data rows each carrying a real 10th-column value. PATCH needing a new column must not touch J and must land the new header at K1; both rows' pre-existing cells stay byte-identical; the archived row's own new date still writes correctly. The original labelled-unknown-column AC-5 test is untouched and still passes.
+- DONE: Re-run the full suite fresh and confirm all previously-passing tests still pass plus the new test
+  `functions`: 132/132 (131 + 1 new). `app`: 63/63, unaffected (this fix is backend-only). Build clean (`tsc`).
+- DONE: Everything else from cycle 1 confirmed correct by verify — not re-touched
+  Diff for this cycle is exactly the two files above; nothing else changed.
+- DONE: Do not attempt any write against production or staging
+  All verification against the in-memory `sheetsStub`. No credential read, no network call.
+
+### Verification
+
+Falsifiability checked by mutation, not assumed: reverted `functions/src/index.ts` alone (keeping the new test) and re-ran `subscriptionDates.api.test.js` — 17/18, the one failure being the new trailing-blank-header test itself. Restored, full suite green again at 132/132.
+
+### Note on this cycle's provenance
+
+The ensign that did this fix hit its session's usage limit right after finishing — the code and test were complete and correct in the worktree, uncommitted. The FO reviewed the diff against the checklist and verify's exact fix direction, ran the full suite fresh, ran the same falsification check independently, and committed on confirming both. No code was written by the FO; this stage report documents what was salvaged and independently re-verified.
+
+### Summary
+
+AC-5 is fixed at its root cause: header placement now looks at where data actually is, not at row 1's length after Sheets trims trailing blanks. The reproduction verify used is now a permanent regression test. Nothing else in the entity changed.
