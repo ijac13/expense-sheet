@@ -157,3 +157,32 @@ The spec settles four decisions the build would otherwise get wrong, and each wa
 The fourth decision is a latent off-by-one: the app's existing `new Date().toISOString().split("T")[0]` convention returns `2026-08-18` for a clock at 00:30 Taipei on the 19th, confirmed by running it under `TZ=Asia/Taipei`. Since "pre-filled with today's date" is a literal acceptance criterion, AC-8 pins the local-date derivation with that exact clock as its test.
 
 Three questions are flagged for the gate: whether to keep the replacement pre-fill, whether the 10 already-cancelled subscriptions get an in-app edit form or are typed straight into the sheet (recommended), and whether a replacement should start the day after the end date or on the next billing date.
+
+## Stage Report: build
+
+- DONE: Implement AC-1 through AC-6 (data model and sheet)
+  `SUBSCRIPTIONS_SPEC.optional = ["start_date","end_date"]`; both `Subscription` declarations carry the fields; `ensureSubscriptionColumns` (functions/src/index.ts) appends only the header a write actually needs, to the right of row 1's last header. Commit 0a0989a.
+- DONE: Implement AC-7 through AC-12 (archiving)
+  Cancel calls `openCancel` instead of `cancelSubscription`; the modal's `<input type="date">` is filled by `todayLocalIso()` (local calendar parts, no `toISOString()`); `endsBeforeStart` guards client-side and a mirrored guard 400s server-side.
+- DONE: Do NOT implement a "start a replacement" pre-fill flow
+  Nothing was built: no pre-fill, no link column, no modal chaining. The Add modal's Start Date field (AC-13) is the only new affordance, and it defaults to today like any other Add.
+- DONE: Implement AC-13 through AC-16 (starting a subscription)
+  Add modal has a Start Date input using the same derivation; POST writes `String(body.start_date ?? "")` and a literal `""` end_date, substituting nothing of its own.
+- DONE: Implement AC-20/AC-21 (display)
+  `{sub.end_date && (...)}` on the cancelled card, rendered verbatim rather than reformatted so a hand-typed locale-formatted cell is not misread.
+- DONE: Implement AC-22/AC-23 (non-regression, both proven false-if-broken)
+  scheduler.ts and insights.ts are byte-unchanged. AC-22 diffs an expense row generated from a fixture carrying a past `end_date` against one from a fixture with no date columns; AC-23 diffs the prompt against one built from the same subscriptions with both fields stripped.
+- DONE: AC-24/AC-25
+  `functions/package.json` had **no** `test` script at all — added `npm run build && node --test test/`. New frontend file added to `app/package.json`'s explicit list. Six new keys in both locales; the test asserts the two `subscriptions` blocks have identical key sets and that zh differs from en.
+- DONE: Self-check every AC against a fixture/stub before marking build complete
+  Seven mutation runs, each reverted after: UTC date derivation (3 fail), unconditional end-date render (1), immediate-PATCH Cancel (14), columns moved to `required` (78), dropped server guard (2), scheduler filtering on `end_date` (1), start_date leaked into the insights prompt (1).
+- DONE: Do not attempt any write against production or staging
+  Every test runs against the in-memory `sheetsStub` or jsdom. No credential was read and no Sheets API was contacted.
+
+### Summary
+
+`npm test` is green in both packages: functions 131 passing (114 before), app 63 (44 before). Design Decision 1 is now measured rather than argued — moving `start_date`/`end_date` into `required` fails 78 of the 131 functions tests, taking down the scheduler, the backfill script, insights and every subscriptions route, which is exactly the deploy-time breakage the spec predicted.
+
+Two spec details resolved in the code's favour. AC-4 asks a `{is_active, end_date}` PATCH to put `end_date` at J1, so `ensureSubscriptionColumns` creates only the columns a given write needs rather than both — a POST creates both because it writes both. And the existing `sheetColumns.api.test.js` BEFORE literal for `GET /api/subscriptions` had to change, since AC-3 requires the two new fields in the payload; it is annotated with why, and the fixture still carries only the nine legacy headers so it doubles as the AC-3 legacy-header case.
+
+One thing the next stage needs: this worktree has no `node_modules`. I symlinked both from the main checkout to run the suites; the symlinks are untracked and were never staged. Note that root `.gitignore` says `node_modules/` (directory-only), so a *symlinked* `functions/node_modules` shows up as untracked and a `git add -A` here would commit it — `app/.gitignore` catches its own via `/node_modules`. Run `npm install` in `app/` and `functions/`, or re-symlink, before running the tests.
