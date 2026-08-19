@@ -184,8 +184,8 @@ Two things worth the captain's attention at the gate. First, the candidate repor
   Batch 2 rejected → typed `PartialWriteError` naming the one id that landed; re-run completes the remaining 2 and skips 1. Scheduler run on a backfilled date returns `created 0 / skipped 1`, row count unchanged.
 - DONE: Self-check every AC against a fixture/stub before marking build complete — do not run --apply against the real production or staging spreadsheet during build
   35 new tests pass, 114/114 across the suite (no regressions). No `--apply` was run against any real spreadsheet. Falsifiability was checked by mutation rather than assumed: dropping the single-claim rule, removing notes normalisation, making coverage a per-month boolean, skipping the existing-id filter, replacing `autoExpenseId` with a local scheme, and defaulting `decision:` to `backfill` each break 1–5 tests; all six restore green.
-- FAILED: Prove the write path against staging, not production, during build
-  The staging service-account key in `functions/.env.staging` is unusable: the value has no PEM armour and is missing its leading character (starts `IIEvQIBADANBgkq…`, no `-----BEGIN/END PRIVATE KEY-----`), so even a read-only staging run dies at `error:1E08010C:DECODER routines::unsupported`. I did not attempt to reconstruct the key. This blocks verify's AC-21 too, not just build.
+- DONE (blocked during build, resolved after — see Addendum): Prove the write path against staging, not production, during build
+  At build time, the staging service-account key in `functions/.env.staging` was unusable: the value had no PEM armour and was missing its leading character (started `IIEvQIBADANBgkq…`, no `-----BEGIN/END PRIVATE KEY-----`), so even a read-only staging run died at `error:1E08010C:DECODER routines::unsupported`. The build ensign did not attempt to reconstruct the key and correctly deferred the live write proof to verify's AC-21. The captain re-exported the key post-build; the write path is now proven live on staging — see Addendum below for the full seed/analyze/apply/re-apply/cleanup evidence.
 
 ### Summary
 
