@@ -36,3 +36,128 @@ Captain's direct instruction: add a start date and end date to each subscription
 - Multiple price periods / full price-change history per subscription (e.g. "NT$399 from Jan 2025, NT$497 from Jul 2026") — this entity is just start/end date, not a price-history log. A follow-up can revisit whether price changes need their own dated record, informed by how much 051's backfill actually needed it.
 - Retroactively backfilling start/end dates for existing subscriptions — a separate data-entry pass, not this entity's build.
 - Changing entity 050's scheduler or 051's backfill logic to use these new dates — future work can use them once they exist.
+
+## Spec
+
+### Goal
+
+Give every subscription a start date and an end date so that ending a subscription records *when* it ended, and so the captain can retire a subscription at its old price and start a new one at the new price without any record of the old price being overwritten.
+
+### Design Decisions
+
+Four decisions the build must not re-litigate, each forced by something in the current code:
+
+**1. The two columns are `optional`, never `required`, in `SUBSCRIPTIONS_SPEC`.**
+`buildColumnMap` throws a 500 `SheetSchemaError` when a required column is absent from row 1 (`functions/src/sheetSchema.ts:109-116`). `CATEGORIES_SPEC` already carries `optional: ["gov_category", "note"]` for precisely this reason — its own comment records that requiring them "would 500 every categories request on both sheets" (`sheetSchema.ts:27-32`). Adding `start_date`/`end_date` to `required` would 500 every subscriptions request, every insights request, and the daily scheduler, on staging and production both, the instant the code deploys and before any header is touched.
+
+**2. The code writes the headers; the captain does not.**
+Since entity 047, reads and writes resolve by header *name*, so the header text is now load-bearing in a way it was not for entity 043's positional writes: `buildWriteRow` throws a 400 for any field with no column (`sheetSchema.ts:162-169`), meaning the feature genuinely cannot store a date until row 1 says `end_date`. Entity 042 is blocked right now on exactly this shape of production-sheet precondition. `ensureSchedulerLog` (`functions/src/scheduler.ts:129-157`) is the existing precedent — it creates sheet structure on demand "so the captain never has to touch the sheet by hand." Follow it.
+
+**3. Dates are stored as ISO `YYYY-MM-DD` text**, matching the Expenses `date` column and the scheduler's `taipeiDate().iso` (`scheduler.ts:51-68`). Writes already use `valueInputOption: "RAW"`, so the string is stored as text and not coerced to a Sheets date serial.
+
+**4. "Today" is the local calendar date, derived without `toISOString()`.**
+The existing frontend convention `new Date().toISOString().split("T")[0]` (`app/app/lib/expenses.ts:16`) is UTC. In Taipei (UTC+8) it returns *yesterday* for anything done between 00:00 and 07:59 local. "Pre-filled with today's date" is a literal acceptance criterion here, so the build must not inherit that defect.
+
+### User Stories
+
+- As the captain, I want to change a subscription's price by ending the old record and starting a new one, so the old price and the months it applied to survive the change intact — the failure that made YouTube's 17 months at NT$399 invisible once its record said NT$497.
+- As the captain, I want the app to ask me when a subscription actually ended as I archive it, defaulting to today but editable, so I can record a cancellation I'm entering a few days late.
+- As the captain, I want starting the replacement subscription to carry over everything that didn't change — name, category, frequency, due day, payer — so only the amount and the start date need typing.
+- As the captain, I want an active subscription to carry no end date at all, so "has this ended?" is answerable without interpretation.
+
+### Acceptance Criteria
+
+Data model and sheet
+
+- [ ] AC-1 — `SUBSCRIPTIONS_SPEC` lists `start_date` and `end_date` under `optional`, not `required`. Test: `buildColumnMap` against a header row holding only today's nine columns returns a map with no error and `hasColumn(map, "end_date") === false`. Fails if either name is moved to `required` — the call then throws.
+- [ ] AC-2 — Both `Subscription` declarations — `functions/src/sheetSchema.ts:42-52` and `app/app/lib/subscriptions.ts:5-15` — carry `start_date: string` and `end_date: string`, and `rowToSubscription` yields `""` (never `null`, never `undefined`) in all three unset shapes: column absent from the header, column present with a blank cell, and a row truncated before the column by Sheets' trailing-blank trimming.
+- [ ] AC-3 — `GET /api/subscriptions` returns `start_date` and `end_date` on every subscription, `""` where unset, and returns **200** against a Subscriptions tab whose row 1 has neither header. Fails if a legacy header 500s.
+- [ ] AC-4 — A write needing `start_date` or `end_date` against a tab lacking the header appends the missing header(s) to the first free column(s) of row 1, then performs the write. Test: stub tab with the nine legacy headers (A–I); `PATCH {id, is_active: false, end_date: "2026-08-19"}` → 200, cell `J1` reads `end_date`, and that subscription's `J` cell reads `2026-08-19`. Fails if the response is the 400 `buildWriteRow` raises today.
+- [ ] AC-5 — Adding the headers preserves every pre-existing column and cell. Test: a tab carrying an unknown column the resolver ignores → after the ensure, that column's header and all its data cells are byte-identical and the new headers land to its right, never on top of it.
+- [ ] AC-6 — `start_date` and `end_date` join the PATCH allowlist at `functions/src/index.ts:385`, and a PATCH omitting them leaves the stored cells unchanged. Test: set `end_date`, then `PATCH {id, amount: 500}` → the `end_date` cell is unchanged. (An unrelated edit must not blank a date, the same rule entity 043 needed for its note column.)
+
+Archiving an active subscription
+
+- [ ] AC-7 — Clicking Cancel on an active subscription no longer PATCHes immediately (`app/app/subscriptions/page.tsx:208-217` does today); it opens a confirmation modal. Test: click Cancel → zero fetch calls issued and the modal is in the DOM.
+- [ ] AC-8 — That modal contains an editable `<input type="date">` pre-filled with the **local** calendar date. Test with a fixed clock of `2026-08-18T16:30:00Z` under `TZ=Asia/Taipei` (00:30 on the 19th, local) → the field's value is `2026-08-19`. Fails on any `toISOString()`-derived default, which yields `2026-08-18`.
+- [ ] AC-9 — Confirming issues exactly one PATCH carrying both `is_active: false` and the date currently shown in the field, and the card moves from Active to Cancelled. Test: change the field to `2026-07-01`, confirm → the request body contains `end_date: "2026-07-01"`, not today's date.
+- [ ] AC-10 — Dismissing the modal (backdrop or its own Cancel button) issues no request and leaves the subscription in Active with no end date.
+- [ ] AC-11 — Confirm is blocked while the entered end date is strictly earlier than that subscription's non-empty `start_date`, with a visible message, and no request is issued. Test: `start_date: "2026-03-01"`, enter `2026-02-28` → confirm is a no-op and the message is in the DOM.
+- [ ] AC-12 — The API rejects the same case independently of the client: `PATCH` with an `end_date` strictly earlier than a stored ISO `start_date` returns 400 with an error naming both dates, and the sheet row is byte-identical afterwards. The comparison applies **only** when both values are non-empty and both parse as ISO `YYYY-MM-DD`; otherwise the write proceeds.
+
+Starting a subscription
+
+- [ ] AC-13 — The Add modal has a Start Date `<input type="date">`, pre-filled with the local calendar date by the same derivation AC-8 tests, and editable before submitting.
+- [ ] AC-14 — `POST /api/subscriptions` writes the submitted `start_date` and writes `end_date` as `""`. Test: the created row's `end_date` cell is empty and the 201 body carries `end_date: ""`.
+- [ ] AC-15 — The server writes whatever `start_date` the form submitted and does not substitute its own date when the field is empty (it stores `""`). "Today" is decided in one place — the browser, which is the only side that knows the captain's local date.
+- [ ] AC-16 — An active subscription's `end_date` stays `""` through every non-archive path: creation, an edit to name/amount/category/due day/due month, and a daily scheduler run. Test: assert the cell is `""` after each.
+
+Replacing a subscription at a new price
+
+- [ ] AC-17 — After an archive-with-end-date succeeds, the app offers a "start a replacement" action. Declining it leaves exactly one subscription row and changes nothing further.
+- [ ] AC-18 — Taking it opens the Add modal pre-filled from the archived subscription: `name`, `category_id`, `frequency`, `due_day`, `due_month` and `paid_by` copied; `amount` **empty** (it is the thing that changed, so it must be typed); `start_date` pre-filled with the day after the end date just recorded. Test: archive `Netflix / entertainment / monthly / due 15 / NT$380` with end date `2026-08-19` → those five fields match, amount is `""`, start date is `2026-08-20`.
+- [ ] AC-19 — The replacement is an ordinary new subscription: its own `sub-{Date.now()}` id, `is_active` true, `end_date` `""`, and the archived row untouched (still inactive, still carrying its end date). No link column is written between them. Test: both rows present, ids differ, tab width unchanged beyond AC-4's two columns.
+
+Display
+
+- [ ] AC-20 — A cancelled subscription's card shows its end date when `end_date` is non-empty.
+- [ ] AC-21 — A cancelled subscription whose `end_date` is `""` renders **no** end-date element at all — absent from the DOM, not an empty span and not a placeholder date. This is the state of all 10 subscriptions already cancelled today.
+
+Non-regression
+
+- [ ] AC-22 — The daily scheduler is untouched: it still selects on `is_active` alone and neither reads nor writes the new columns. Test: a scheduler run against a fixture holding an **active** subscription whose `end_date` is in the past still generates its expense row, and that row is byte-identical to the one today's code produces. Fails if any end-date filtering is slipped in — which would be entity 050's scope, explicitly excluded.
+- [ ] AC-23 — The insights prompt payload is byte-identical to today's for the same fixture. `rowToSubscription`'s output is passed straight into `buildInsightsPrompt` (`functions/src/index.ts:442-448`), so two new fields would otherwise silently enter the Claude prompt.
+- [ ] AC-24 — `npm test` passes in both `app/` and `functions/`, and any new frontend test file is added to the explicit file list in `app/package.json`'s `test` script. Test: the script names the new file — that list is enumerated by hand, so a file left out never runs at all.
+- [ ] AC-25 — Every new user-facing string has a key in both `app/public/locales/en/common.json` and `.../zh/common.json`; the `subscriptions` blocks in the two files have identical key sets and the new UI contains no hardcoded English.
+
+### Edge Cases
+
+- **A subscription archived before this feature existed, with no end date.** All 10 of today's cancelled subscriptions. They render with no end-date line (AC-21) rather than a fabricated or blank one, and nothing backfills them. The captain can type a date straight into the sheet cell — it reads back and displays with no deploy, which is the whole premise of keeping the data in Sheets.
+- **A hand-typed date coming back locale-formatted.** `readTab` sets no `valueRenderOption` (`functions/src/index.ts:59-63`), so it gets `FORMATTED_VALUE`: a cell the captain enters as a real Sheets date returns as e.g. `2026/8/19`, not ISO. Display such a value as-is — never parse-and-reformat — and let it skip AC-12's comparison rather than 400 on it.
+- **End date earlier than start date.** Blocked in the modal (AC-11) and rejected by the API (AC-12). Both, because the modal is not the only caller.
+- **End date equal to the start date.** Allowed — a subscription started and cancelled the same day is real. The guard is strictly-earlier.
+- **A legacy row with an empty start date, being archived now.** No comparison is possible, so AC-12's guard does not fire and the end date is accepted. A missing start date must never block recording an end date.
+- **Reactivating an archived subscription.** No reactivate affordance exists — a cancelled card renders a badge and no buttons (`app/app/subscriptions/page.tsx:330-352`), and `is_active` is not settable to true from any UI path. Out of scope. Because PATCH leaves `end_date` untouched unless it is sent (AC-6), no reactivation route can silently clear a date; whether it *should* clear one is a decision for whoever adds that flow.
+- **A subscription that is never archived.** It never meets an end-date field. `end_date` stays `""` for its whole life (AC-16) and the Subscriptions screen looks exactly as it does today apart from the added start-date field on the Add form.
+- **Archiving just after midnight, Taipei.** The pre-filled date is the local day, not the UTC one (AC-8) — otherwise every archive between 00:00 and 08:00 records yesterday.
+- **The archive PATCH fails (offline, 500, schema error).** The modal stays open showing the error, the card stays in Active, and no local state is mutated — preserving today's behaviour, where `handleCancel` alerts and leaves the list untouched on failure.
+- **Both household members editing the same subscription at once.** PATCH still rewrites the whole row, so it stays last-write-wins. Unchanged from today and not this entity's problem — named here so it is not mistaken for a regression this feature introduced.
+
+### Out of Scope
+
+- Entity 050's scheduler logic. It keeps selecting on `is_active` alone; AC-22 pins that with a test that fails if end-date filtering is added.
+- Entity 051's backfill script logic. It is not read, called, or modified.
+- Retroactively backfilling start or end dates for the 21 active and 10 cancelled subscriptions already in the sheet — a separate data-entry pass, as the ideation states.
+- Multiple price periods / a full price-change history per subscription. The end-and-replace workflow this spec supports is the deliberate alternative to that.
+- A flow for reactivating an archived subscription.
+- Editing an archived subscription's dates inside the app.
+- Any link between a replacement subscription and the one it replaced — no parent, successor, or group column.
+- Using start/end dates to filter or scope reports, insights, or history.
+- Multi-currency handling (entity 009).
+
+### Open Questions for the Gate
+
+1. **Keep or cut the replacement pre-fill (AC-17 to AC-19)?** It is the only part of this spec not literally in the ideation's Success list — it exists to serve the user story you added ("I'll end the subscription if the price change and create a new subscription"). Cutting it leaves the feature complete and the workflow intact, just with five fields retyped each time. Recommend keeping it: retyping is where the workflow gets abandoned.
+2. **The 10 already-cancelled subscriptions.** Specced as: type the date into the sheet yourself, and the app displays it. The alternative is an in-app edit form for archived subscriptions, which is real UI scope. Recommend the sheet, since it is ten one-time edits.
+3. **The replacement's start date defaults to the day after the end date.** That assumes no gap and no overlap. If a price change in practice takes effect on the next billing date instead, say so and it becomes that date instead.
+
+## Stage Report: spec
+
+- DONE: Write the formal spec using the Spec Template (Goal, User Stories, Acceptance Criteria, Edge Cases, Out of Scope) from the ideation body already in workflow/053-subscription-price-history.md
+  All five template sections present, plus a Design Decisions section recording four choices forced by the current code and an Open Questions section for the gate.
+- DONE: Acceptance criteria must be binary/independently testable, covering: start_date and end_date fields added to the Subscriptions schema; end_date nullable/blank for an active subscription; archiving (deactivating) a subscription prompts for an end date pre-filled with today's date, editable before confirming; an active subscription's end_date stays empty
+  25 ACs, each naming its test and the change that would fail it. Schema AC-1/AC-2; blank-for-active AC-14/AC-16/AC-21; archive prompt AC-7 to AC-9 (pre-filled, editable, one PATCH carrying the shown date).
+- DONE: Incorporate the captain's own clarified workflow (end the old subscription, create a new record at the new price) and consider convenience for creating the replacement
+  Specced as AC-17 to AC-19: a post-archive "start a replacement" action pre-filling name/category/frequency/due day/due month/payer, leaving amount empty because it is the field that changed, and start date at the day after the end date. Deliberately writes no link column between the two rows, so it stays end-and-replace and does not become the price-history log the ideation excluded. Flagged as gate question 1 with a recommendation to keep, since it is the only part not literally in the ideation's Success list.
+- DONE: Edge cases: archived subscription with no end date (existing already-archived rows); end_date earlier than start_date; reactivating an archived subscription; a subscription never archived
+  All four covered, plus six found by reading the code: locale-formatted hand-typed dates (`readTab` uses FORMATTED_VALUE), end date equal to start date, a legacy row with an empty start date, archiving just after midnight Taipei, a failed archive PATCH, and concurrent edits. Reactivation resolved as out of scope on evidence — no reactivate affordance exists at `app/app/subscriptions/page.tsx:330-352`, and AC-6 guarantees no route can silently clear a date.
+- DONE: Confirm scope boundary: no changes to entity 050's scheduler or entity 051's backfill script logic, and no retroactive backfill of start/end dates
+  All three restated in Out of Scope. AC-22 makes the scheduler boundary falsifiable rather than declarative: an active subscription with a past end_date must still generate its expense row, so the test fails if end-date filtering is added.
+
+### Summary
+
+The spec settles four decisions the build would otherwise get wrong, and each was verified by running the real `sheetSchema` module rather than by reading it. Putting `start_date`/`end_date` in `required` throws a 500 against today's header (`missing required column headers`), so they must be `optional` — the same reasoning `CATEGORIES_SPEC` already records; and `buildWriteRow` today throws a 400 for `end_date` with no column, which is why entity 043's "the header label is cosmetic" precedent no longer holds after entity 047 made reads resolve by name. That makes the header genuinely load-bearing, so the spec has the code write it on demand following `ensureSchedulerLog`, deliberately avoiding the production-sheet precondition that has entity 042 blocked right now.
+
+The fourth decision is a latent off-by-one: the app's existing `new Date().toISOString().split("T")[0]` convention returns `2026-08-18` for a clock at 00:30 Taipei on the 19th, confirmed by running it under `TZ=Asia/Taipei`. Since "pre-filled with today's date" is a literal acceptance criterion, AC-8 pins the local-date derivation with that exact clock as its test.
+
+Three questions are flagged for the gate: whether to keep the replacement pre-fill, whether the 10 already-cancelled subscriptions get an in-app edit form or are typed straight into the sheet (recommended), and whether a replacement should start the day after the end date or on the next billing date.
