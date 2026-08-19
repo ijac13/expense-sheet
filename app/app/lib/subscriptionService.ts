@@ -60,11 +60,13 @@ export async function updateSubscription(
   if (!res.ok) throw new Error(`Failed to update subscription: ${res.status}`);
 }
 
-export async function cancelSubscription(id: string): Promise<void> {
+// The end date is passed in rather than derived here: it is whatever the captain
+// confirmed in the modal, which may be days earlier than today.
+export async function cancelSubscription(id: string, end_date: string): Promise<void> {
   const res = await fetch(API_BASE, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, is_active: false }),
+    body: JSON.stringify({ id, is_active: false, end_date }),
   });
   if (!res.ok) throw new Error(`Failed to cancel subscription: ${res.status}`);
 }
