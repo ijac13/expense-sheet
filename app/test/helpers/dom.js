@@ -62,10 +62,16 @@ const EXPENSES = [
   expense("e5", "cat_099", "row-blank-icon"),
 ];
 
+// The four date shapes the API can return. Netflix carries a start date, so an
+// end date before it can be rejected; Spotify has none, the legacy shape that
+// must never block an archive. iCloud is a subscription cancelled before this
+// feature existed — end_date "" — which is the state of all 10 live cancelled
+// rows; Disney+ is one cancelled since, carrying a real date.
 const SUBSCRIPTIONS = [
-  { id: "sub-1", name: "Netflix", amount: 390, category_id: "eating-out", frequency: "monthly", due_day: 15, paid_by: "Karen", is_active: true },
-  { id: "sub-2", name: "Spotify", amount: 149, category_id: "cat_003", frequency: "monthly", due_day: 1, paid_by: "Karen", is_active: true },
-  { id: "sub-3", name: "iCloud", amount: 30, category_id: "fuel", frequency: "monthly", due_day: 20, paid_by: "Karen", is_active: false },
+  { id: "sub-1", name: "Netflix", amount: 390, category_id: "eating-out", frequency: "monthly", due_day: 15, paid_by: "Karen", is_active: true, start_date: "2026-03-01", end_date: "" },
+  { id: "sub-2", name: "Spotify", amount: 149, category_id: "cat_003", frequency: "monthly", due_day: 1, paid_by: "Karen", is_active: true, start_date: "", end_date: "" },
+  { id: "sub-3", name: "iCloud", amount: 30, category_id: "fuel", frequency: "monthly", due_day: 20, paid_by: "Karen", is_active: false, start_date: "", end_date: "" },
+  { id: "sub-4", name: "Disney+", amount: 270, category_id: "cat_003", frequency: "monthly", due_day: 8, paid_by: "Karen", is_active: false, start_date: "2025-01-15", end_date: "2026-06-30" },
 ];
 
 // A healthy scheduler: a run recorded minutes ago. `stale` comes from the API,
@@ -89,7 +95,7 @@ const SCHEDULER_OK = {
  *   schedulerStatus is the GET /api/scheduler-status body; null makes that
  *   endpoint fail, the shape an un-deployed or broken scheduler produces.
  */
-function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK } = {}) {
+function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK, subscriptions: subFixture = SUBSCRIPTIONS, failSubscriptionWrites = false } = {}) {
   const dom = installDom();
 
   // jsdom implements neither API, so these records are the only way to observe a
@@ -112,6 +118,8 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
   // Bodies of the category writes the page issued, so a test can assert on what
   // was actually sent rather than only on what came back.
   const writes = [];
+  const subscriptions = subFixture.map((s) => ({ ...s }));
+  const subWrites = [];
 
   global.fetch = async (url, init = {}) => {
     const href = String(url);
@@ -148,11 +156,27 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
       return { ok: true, status: 200, json: async () => ({ ...schedulerStatus }) };
     }
     if (href === "/api/subscriptions") {
-      return { ok: true, status: 200, json: async () => SUBSCRIPTIONS };
+      if (method === "GET") {
+        return { ok: true, status: 200, json: async () => subscriptions.map((s) => ({ ...s })) };
+      }
+      // Bodies of the subscription writes the page issued, so a test can assert
+      // on what was actually SENT — the date shown in the modal rather than the
+      // date the page could have recomputed at submit time.
+      const body = JSON.parse(init.body);
+      subWrites.push({ method, body });
+      if (failSubscriptionWrites) return { ok: false, status: 503, statusText: "Service Unavailable" };
+      if (method === "POST") {
+        const created = { id: `sub-${subscriptions.length + 100}`, is_active: true, ...body };
+        subscriptions.push(created);
+        return { ok: true, status: 201, json: async () => ({ ...created }) };
+      }
+      const target = subscriptions.find((s) => s.id === body.id);
+      Object.assign(target, body);
+      return { ok: true, status: 200, json: async () => ({ ...target }) };
     }
     return { ok: true, status: 200, json: async () => EXPENSES };
   };
-  return { dom, requests, writes, categories, setCategoryIcon, scrolls };
+  return { dom, requests, writes, categories, setCategoryIcon, scrolls, subscriptions, subWrites };
 }
 
 /**
