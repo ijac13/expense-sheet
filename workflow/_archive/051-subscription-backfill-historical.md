@@ -1,16 +1,18 @@
 ---
 id: 051
 title: Backfill Missing Historical Subscription Expense Entries
-status: verify
+status: done
 source: captain (found while scoping entity 050)
 started:
 completed:
-verdict: REJECTED
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-051-subscription-backfill-historical
 issue:
-pr:
+pr: "#23"
 ---
+
+**Production backfill applied:** `node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --apply` run 2026-08-19 against production. Dry-run first confirmed exactly 148 rows, 0 already present, matching the captain-reviewed decision list. Real run: `created=148 skipped=0`. Confirmed live via `GET /api`: 148 `exp-auto-*` rows, total NT$589,415, per-subscription counts match the plan exactly (20×5 monthly-gap subscriptions, 13×房貸, 4×Alisa 零用/健身/Netflix, 3×four gym subs + Libi 零用錢, 2×0981811423/YouTube, 1×陽明山網路房客/Google One/房屋稅/濾心). Re-ran `--apply` immediately after: `created=0 skipped=148`, confirming idempotency on real data. `Libi 國泰人壽` (new subscription, no prior evidence) and `Libi 投資贊助`/`Whisper flow` (captain's original exclusions) were left at skip and are not in production.
 
 Entity 050 fixes subscription auto-add going forward, but explicitly excludes backfilling — the scheduler never ran successfully, so every month since Jan 2025 that should have generated an expense entry never did. An approximate check (matching by amount within the due month, ±2%) against the 21 currently-active subscriptions found the picture is mixed, not uniformly missing:
 
