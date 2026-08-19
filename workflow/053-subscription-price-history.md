@@ -62,8 +62,9 @@ The existing frontend convention `new Date().toISOString().split("T")[0]` (`app/
 
 - As the captain, I want to change a subscription's price by ending the old record and starting a new one, so the old price and the months it applied to survive the change intact — the failure that made YouTube's 17 months at NT$399 invisible once its record said NT$497.
 - As the captain, I want the app to ask me when a subscription actually ended as I archive it, defaulting to today but editable, so I can record a cancellation I'm entering a few days late.
-- As the captain, I want starting the replacement subscription to carry over everything that didn't change — name, category, frequency, due day, payer — so only the amount and the start date need typing.
 - As the captain, I want an active subscription to carry no end date at all, so "has this ended?" is answerable without interpretation.
+
+**Gate decision:** the replacement pre-fill (previously AC-17 to AC-19) is cut. Starting a subscription's replacement after archiving the old one stays a manual, ordinary Add — same as today, just now with a start date field (AC-13 below).
 
 ### Acceptance Criteria
 
@@ -91,12 +92,6 @@ Starting a subscription
 - [ ] AC-14 — `POST /api/subscriptions` writes the submitted `start_date` and writes `end_date` as `""`. Test: the created row's `end_date` cell is empty and the 201 body carries `end_date: ""`.
 - [ ] AC-15 — The server writes whatever `start_date` the form submitted and does not substitute its own date when the field is empty (it stores `""`). "Today" is decided in one place — the browser, which is the only side that knows the captain's local date.
 - [ ] AC-16 — An active subscription's `end_date` stays `""` through every non-archive path: creation, an edit to name/amount/category/due day/due month, and a daily scheduler run. Test: assert the cell is `""` after each.
-
-Replacing a subscription at a new price
-
-- [ ] AC-17 — After an archive-with-end-date succeeds, the app offers a "start a replacement" action. Declining it leaves exactly one subscription row and changes nothing further.
-- [ ] AC-18 — Taking it opens the Add modal pre-filled from the archived subscription: `name`, `category_id`, `frequency`, `due_day`, `due_month` and `paid_by` copied; `amount` **empty** (it is the thing that changed, so it must be typed); `start_date` pre-filled with the day after the end date just recorded. Test: archive `Netflix / entertainment / monthly / due 15 / NT$380` with end date `2026-08-19` → those five fields match, amount is `""`, start date is `2026-08-20`.
-- [ ] AC-19 — The replacement is an ordinary new subscription: its own `sub-{Date.now()}` id, `is_active` true, `end_date` `""`, and the archived row untouched (still inactive, still carrying its end date). No link column is written between them. Test: both rows present, ids differ, tab width unchanged beyond AC-4's two columns.
 
 Display
 
@@ -134,12 +129,13 @@ Non-regression
 - Any link between a replacement subscription and the one it replaced — no parent, successor, or group column.
 - Using start/end dates to filter or scope reports, insights, or history.
 - Multi-currency handling (entity 009).
+- The post-archive "start a replacement" pre-fill (formerly AC-17 to AC-19) — cut at the gate. Starting a replacement subscription stays an ordinary, manual Add.
 
-### Open Questions for the Gate
+### Gate Decisions
 
-1. **Keep or cut the replacement pre-fill (AC-17 to AC-19)?** It is the only part of this spec not literally in the ideation's Success list — it exists to serve the user story you added ("I'll end the subscription if the price change and create a new subscription"). Cutting it leaves the feature complete and the workflow intact, just with five fields retyped each time. Recommend keeping it: retyping is where the workflow gets abandoned.
-2. **The 10 already-cancelled subscriptions.** Specced as: type the date into the sheet yourself, and the app displays it. The alternative is an in-app edit form for archived subscriptions, which is real UI scope. Recommend the sheet, since it is ten one-time edits.
-3. **The replacement's start date defaults to the day after the end date.** That assumes no gap and no overlap. If a price change in practice takes effect on the next billing date instead, say so and it becomes that date instead.
+1. **Replacement pre-fill: cut.** Starting a subscription's replacement stays a manual Add — same as today, just with the new Start Date field (AC-13).
+2. **The 10 already-cancelled subscriptions: captain types the dates directly into the sheet.** No in-app edit form for archived subscriptions.
+3. **Replacement's start date default: day after the end date, as specced.** No change.
 
 ## Stage Report: spec
 
