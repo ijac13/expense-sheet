@@ -146,6 +146,45 @@ test("AC-5: appending the headers preserves an unknown column's header and every
   assert.deepEqual(f.grids.Subscriptions[2], before[2], "the untouched row is byte-identical");
 });
 
+test("AC-5: a column with data under a BLANK trailing header is not claimed or overwritten", async () => {
+  // The shape row 1's length cannot see. Sheets trims trailing blanks, so a
+  // nine-cell header row means J1 is genuinely empty while the data rows below
+  // carry a real tenth column. Production has exactly this: CATEGORIES_SPEC
+  // records `note` data sitting under a blank H1. Placing new headers by the
+  // header row's length claims J, overwrites the patched row's cell, and makes
+  // every other row's cell read back as an end date.
+  const f = fixture({
+    Subscriptions: {
+      header: LEGACY_HEADER, // nine cells — J1 is blank
+      rows: [
+        ["sub-1", "Netflix", "380", "cat_002", "monthly", "15", "", "ijac", "true", "KEEP-ME-1"],
+        ["sub-2", "Insurance", "12000", "cat_005", "annual", "3", "6", "wei", "true", "KEEP-ME-2"],
+      ],
+    },
+  });
+  const before = f.grids.Subscriptions.map((r) => r.slice());
+
+  const { status } = await call(loadApi(f.sheets), "PATCH", "/api/subscriptions", {
+    id: "sub-1", is_active: false, end_date: "2026-08-19",
+  });
+  assert.equal(status, 200);
+
+  const header = headerOf(f);
+  assert.notEqual(header[9], "end_date", "J1 was blank but its column holds data — it must not be claimed");
+  assert.equal(header[9] ?? "", "", "J1 is still blank");
+  assert.equal(header[10], "end_date", "the new header landed past the widest occupied row, at K1");
+
+  assert.equal(rowOf(f, "sub-1")[9], "KEEP-ME-1", "the patched row's blank-headed cell survived the write");
+  assert.deepEqual(f.grids.Subscriptions[2], before[2], "the untouched row is byte-identical");
+  assert.equal(cellOf(f, "sub-1", "end_date"), "2026-08-19", "the archive still wrote its date");
+
+  // The downstream half of the same bug: a claimed column makes the OTHER rows'
+  // pre-existing cells read back as end dates through the resolver.
+  const { body } = await call(loadApi(f.sheets), "GET", "/api/subscriptions");
+  assert.strictEqual(body.find((s) => s.id === "sub-2").end_date, "", "sub-2 never had an end date");
+  assert.equal(body.find((s) => s.id === "sub-1").end_date, "2026-08-19");
+});
+
 // ---------------------------------------------------------------------------
 // AC-6 — the allowlist, and an unrelated PATCH leaving the dates alone.
 // ---------------------------------------------------------------------------
