@@ -186,3 +186,41 @@ Three questions are flagged for the gate: whether to keep the replacement pre-fi
 Two spec details resolved in the code's favour. AC-4 asks a `{is_active, end_date}` PATCH to put `end_date` at J1, so `ensureSubscriptionColumns` creates only the columns a given write needs rather than both — a POST creates both because it writes both. And the existing `sheetColumns.api.test.js` BEFORE literal for `GET /api/subscriptions` had to change, since AC-3 requires the two new fields in the payload; it is annotated with why, and the fixture still carries only the nine legacy headers so it doubles as the AC-3 legacy-header case.
 
 One thing the next stage needs: this worktree has no `node_modules`. I symlinked both from the main checkout to run the suites; the symlinks are untracked and were never staged. Note that root `.gitignore` says `node_modules/` (directory-only), so a *symlinked* `functions/node_modules` shows up as untracked and a `git add -A` here would commit it — `app/.gitignore` catches its own via `/node_modules`. Run `npm install` in `app/` and `functions/`, or re-symlink, before running the tests.
+
+## Stage Report: verify
+
+**verdict: REJECTED** — one acceptance criterion fails: AC-5.
+
+- DONE: Re-run the full test suite fresh in this worktree and confirm the reported counts independently
+  Deleted both symlinks, ran real `npm install` (functions 266 pkgs, app 216). Counts confirmed: **functions 131 pass / 0 fail, app 63 pass / 0 fail**. `git status` clean afterwards — neither `node_modules` is tracked or untracked-visible.
+- DONE: Spot-check 3-4 of the build's mutation-tested claims directly against the actual code and test files
+  Re-ran four mutations myself; every count reproduced exactly. UTC date derivation → 3 fail (AC-8, AC-9, AC-13). `start_date`/`end_date` moved to `required` → 78 fail, spanning backfill/scheduler/insights, confirming Design Decision 1's deploy-time breakage is measured, not argued. Scheduler `&& !s.end_date` → 1 fail (AC-22). `start_date` appended to the insights `subSummary` → 1 fail (AC-23). All reverted; `git status` clean.
+- DONE: Confirm the cut scope was actually honored
+  `handleCancelConfirm` (app/app/subscriptions/page.tsx:236-259) closes the modal and stops — no add-form pre-fill, no modal chaining. Diff grep for replace/successor/parent/chain/prefill matches only the *date* pre-fill of AC-8/AC-13. No link column: `SUBSCRIPTIONS_SPEC` gains only the two date fields.
+- FAILED: Confirm AC-4's on-demand column creation preserves every pre-existing column and cell exactly (AC-5)
+  Holds for a *labelled* unknown column (AC-5's own test). Destroys data under a **trailing blank header cell** — see below.
+- DONE: Live evidence
+  `curl` GET, read-only, nothing seeded: `https://expense-sheet-b2db8.web.app` → **200**, 10702B, `<title>Expense Tracker</title>`; `https://expense-sheet-staging.web.app` → **200**, 11140B, same title. Both still serve the pre-053 build (this branch is unmerged and undeployed by design).
+- DONE: Mandatory PII/secrets check per workflow/README.md
+  No `.env`, credential, `.pem` or service-account file in the diff. No key/token/secret/password match in any added line. Only address is `ijac@example.com`. The ideation's real data — the phone number `0981811423`, YouTube's 497/399, Netflix's logged 560, the 850→499 change — appears nowhere. Fixtures use `Netflix`/`Insurance` with synthetic amounts, matching long-standing convention already on `origin/main` (`functions/test/scheduler.test.js:23`). `functions/backfill-reports/` is empty and untracked, so 051's failure mode has not recurred.
+
+### AC-5 failure — detail
+
+`ensureSubscriptionColumns` places new headers at `const first = map.width` (functions/src/index.ts:105). `map.width` is `header.length` (functions/src/sheetSchema.ts:125) — row 1's length *after* Sheets trims trailing blanks. A column holding data under a blank row-1 cell therefore goes uncounted, and the new header is written on top of it.
+
+Reproduction (in-memory `sheetsStub`, which models the trimming at test/sheetsStub.js:98): Subscriptions row 1 = the nine legacy headers, J1 blank; data rows carry a 10th cell (`KEEP-ME-1`, `KEEP-ME-2`). `PATCH {id: "sub-1", is_active: false, end_date: "2026-08-19"}` →
+
+- observed: `J1` becomes `end_date`; the patched row's `KEEP-ME-1` is overwritten with `2026-08-19`; `GET /api/subscriptions` then reports the untouched row's `KEEP-ME-2` as sub-2's `end_date`, so it renders as an end date and dies on that row's next PATCH.
+- expected (AC-5): the pre-existing column's header and every data cell byte-identical, new headers to its right.
+
+Boundary: a blank header *followed by* a labelled column is safe (width counts it, new header lands beyond). Only a **trailing** blank header with data beneath is affected.
+
+Not hypothetical on this repo's sheets: `CATEGORIES_SPEC`'s own comment (functions/src/sheetSchema.ts:27-31) records that production has `note` data under a blank `H1`. This is the header-mutation surface entity 042 is already blocked on.
+
+Fix direction: derive `first` from the widest occupied row, not row 1's length. The PATCH path already holds the full `rows` where it calls the helper (index.ts:447); the POST path reads only `A1:Z1` via `readColumnMap` (index.ts:383) and needs a full-tab read to compute it. Worth an AC-5 test at the trailing-blank shape, since the current one only covers the labelled case.
+
+### Summary
+
+Everything else verified strongly. Both suites reproduce their counts on a genuinely fresh install, and all four of the build's mutation claims hold exactly as reported — the 78-failure `required` mutation in particular makes the spec's central design decision falsifiable rather than asserted. Cut scope was honored, and the PII sweep is clean, including the specific real figures named in the ideation.
+
+Rejecting on AC-5 alone. `ensureSubscriptionColumns` positions new headers by row 1's trimmed length, so a column with data under a blank header cell gets claimed and its cells destroyed — silent, irreversible loss of captain-typed data in the live sheet, and the same surface entity 042 is blocked on. The fix is small and local to `ensureSubscriptionColumns`; the rest of the build looks sound and should not need rework.
