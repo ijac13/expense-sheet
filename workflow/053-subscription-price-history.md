@@ -249,3 +249,35 @@ The ensign that did this fix hit its session's usage limit right after finishing
 ### Summary
 
 AC-5 is fixed at its root cause: header placement now looks at where data actually is, not at row 1's length after Sheets trims trailing blanks. The reproduction verify used is now a permanent regression test. Nothing else in the entity changed.
+
+## Stage Report: verify (cycle 2)
+
+**verdict: PASSED** — the AC-5 data-loss bug is fixed at its root, and nothing else moved.
+
+- DONE: Re-run the full test suite fresh (npm install, not symlinks) and confirm 132/132 in functions (131 + the new AC-5 trailing-blank-header test) and 63/63 in app
+  Deleted both `node_modules` and ran real `npm ci` (lockfiles present, registry reachable). Both are real directories, no symlinks. **functions 132 pass / 0 fail, app 63 pass / 0 fail.** `git status` clean throughout.
+- DONE: Independently reproduce the AC-5 fix's falsifiability: revert only functions/src/index.ts and confirm the new trailing-blank-header test fails while everything else stays green, then restore and confirm 132/132 again
+  Reverted `functions/src/index.ts` to `d06fb59^` keeping the new test, ran the **full** suite (not just the one file): 131 pass / 1 fail, the single failure being `AC-5: a column with data under a BLANK trailing header is not claimed or overwritten`. The firing assertion is the data-loss one itself — `J1 was blank but its column holds data — it must not be claimed` (old code writes `end_date` into J). Restored via `git checkout HEAD --`, tree clean, 132/132 again. The test catches the reported root cause, not something incidental.
+- DONE: Confirm this cycle touched only the two files it claims and nothing from cycle 1's already-verified scope regressed
+  `git diff --stat 7fc58c9 HEAD` (the branch state cycle 1 verified) = exactly `functions/src/index.ts`, `functions/test/subscriptionDates.api.test.js`, and the entity file. Excluding `workflow/`, only the two claimed files differ. The two `origin/main` merges in the range contributed **zero** code changes, so everything cycle 1 verified is byte-identical and its verification still stands.
+- DONE: Re-confirm the mandatory PII/secrets check still holds on the new diff
+  No key/token/secret/password/credential/`.env`/private-key/email match in any added line. The ideation's real figures — `[REDACTED-PHONE]`, 497, 399, 560, 850, 499 — appear nowhere in branch code (the sole regex hit is a coincidental base64 fragment inside a `package-lock.json` integrity hash). `Netflix`, `ijac`, `wei` are long-standing fixture conventions already on `origin/main` (`functions/test/backfill.test.js:51`, `app/test/users-env.test.js:27`). `380` is not new this cycle — it already appeared 7× in the cycle-1-verified copy of that same test file. New data is synthetic `KEEP-ME-1`/`KEEP-ME-2`. The three `.env*.example` files are pre-existing on main, untouched by this branch, and hold only `TODO_` placeholders.
+- DONE: Live evidence
+  Read-only `curl`, nothing seeded, no writes. Production `https://expense-sheet-b2db8.web.app` → **200**, 10702B, `<title>Expense Tracker</title>`; staging `https://expense-sheet-staging.web.app` → **200**, 11140B. Also hit the API same-origin: staging `/api/subscriptions` → **200**, JSON array of 3; production `/api/subscriptions` → **200**, JSON array of 33. Neither response carries an `end_date` key, confirming both still serve the pre-053 build — this branch is unmerged and undeployed by design. Bodies were deliberately not dumped (real captain data); only status, size and shape recorded.
+
+### Went beyond the checklist: the POST path
+
+The committed AC-5 regression test covers the PATCH path only, so I probed the other write path independently — cycle 2 changed POST too (`readColumnMap` → full-tab `readTab`), and an untested behavioural change is exactly where a second bug would hide. Two throwaway probes against the same trailing-blank shape, both pass:
+
+- POST with a blank `J1` over live data: `J1` stays blank, `start_date`/`end_date` land at K/L, and `sub-1`/`sub-2` rows are byte-identical (`deepEqual` on the whole row). The created row leaves its own J cell `""` and writes `start_date` at K, `end_date` `""` at L — AC-14/AC-15 hold under this shape too.
+- Placement bounded by a row *other* than the one being written: archiving the narrow `sub-1` while the wider `sub-2` carries the extra cell still spares `KEEP-ME-2`. The `reduce` looks at every row, not just the target.
+
+One caution worth recording: my first probe run reported a false failure because POST **inserts** the new row at the top rather than appending, so a position-indexed assertion compared the wrong row. Dumping the grid before concluding is what caught it — the code was right, the probe was wrong.
+
+### Summary
+
+Cycle 1's rejection is resolved at the root cause, and I confirmed that by mutation rather than by reading the fix: reverting `functions/src/index.ts` alone drops exactly one test, and the assertion that fires is the "J1 must not be claimed" one — so the new test is load-bearing and specific. Placement now derives from the widest occupied row, which I verified holds on both write paths and when the widest row is not the row being written.
+
+The rest of the entity needed no re-verification and got none beyond the full suite, because the diff since the cycle-1-verified state is provably just those two files — the merges brought in no code. PII sweep clean, with `380` and the fixture names confirmed pre-existing rather than newly introduced.
+
+One thing the gate needs: the feature is **not on staging** — both live APIs still return payloads with no `end_date`, as expected for an unmerged branch. Every AC here is proven against the in-memory sheet stub and jsdom, so the captain's own manual test has to happen after a deploy, not before it. Nothing in this entity was ever exercised against a real Google Sheet.
