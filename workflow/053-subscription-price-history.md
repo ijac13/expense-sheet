@@ -1,7 +1,7 @@
 ---
 id: 053
 title: Add Start/End Dates to Subscriptions
-status: ideation
+status: spec
 source: captain
 started:
 completed:
