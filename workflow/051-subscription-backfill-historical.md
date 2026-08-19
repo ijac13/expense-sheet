@@ -203,3 +203,76 @@ Both blockers above are resolved as of this addendum:
 - **AC-21 proven live on staging, by the FO directly with captain's explicit go-ahead** (not a fresh build/verify ensign dispatch — this was a direct capability spike, same pattern as this session's other live-evidence checks): seeded a throwaway subscription (`AC21-TEST`, NT$100/mo) plus 2 matching expense rows (Jan/Feb 2025) on staging. `--analyze` correctly reported it PARTIAL, 18 missing months. Hand-edited its `decision:` to `backfill`. `--apply` created exactly 18 rows with the correct `exp-auto-sub-1787112835217-{date}` ids, confirmed present via `GET /api` on staging. A second `--apply` created 0 and skipped all 18 — idempotency confirmed live, not just in fixtures. All test data (18 backfilled rows, the 2 seed rows, the test subscription) deleted/deactivated from staging afterward.
 - **Production write access**: not yet exercised. Same credential path that works for production reads (`functions/scripts/load-local-env.js` + root `.env.local`) is expected to work for writes too, per entity 042's precedent (042's writes were eventually refused only by the sandbox's own auto-mode classifier, not a credential problem, and succeeded on retry/captain's own terminal). Not yet attempted for this entity.
 - **Captain's actual decision file for the real production backfill** (148 rows across 20 subscriptions, ~NT$589,000, 2 subscriptions left at skip) was reviewed line-by-line with the captain in chat, including catching and correcting two cases where a live data edit after the report was generated would have caused duplicate writes ([REDACTED-PHONE]'s amount edit orphaning its own history from amount-matching; 房貸 turning out to already have 7 months logged that a naive "backfill everything since Jan" would have doubled). This decision file lives only in the worktree (gitignored `functions/backfill-reports/candidates.md`) — it is the actual write plan for entity 051's real goal, distinct from the AC21-TEST proof above.
+
+## Stage Report: verify
+
+**verdict: REJECTED** — one mandatory check fails (item 4). Everything else passes.
+
+- DONE: Re-run the full test suite fresh in this worktree and confirm all tests pass (build reported 114/114, 35 new) — do not trust the build report's numbers
+  `npm run build && node --test test/` in this worktree: `# pass 114 # fail 0`; `test/backfill.test.js` alone is `# pass 35`. Build's numbers are accurate.
+- DONE: Independently corroborate the AC-21 live-evidence addendum ... confirm functions/.env.staging now has a working key ... and staging has zero leftover test artifacts
+  Live read-only call (scope `spreadsheets.readonly`) against staging succeeded — returned title `expense-sheet-staging`, tabs `Expenses, Categories, Subscriptions, Users, SchedulerLog`, 1404 expense rows; the key now carries intact PEM armour. Leftovers: `exp-auto-sub-1787112835217-*` = 0, `exp-1787112845124`/`exp-1787112846370` = 0, and **zero `exp-auto-*` ids of any kind** on staging. One residue the addendum's wording already covers: the `AC21-TEST` subscription row (`sub-1787112835217`) is still present but `is_active=false`, so it is inert to both scheduler and analysis.
+- DONE: Spot-check 2-3 of the build's fixture-based AC claims directly against the actual test file contents — AC-5, AC-15, AC-17
+  All three are genuine cross-checks, not prose restatements: AC-5 (`test/backfill.test.js:237`) asserts sub B at 399/`digital` gets `amountRowCount` 0 while YouTube keeps 19; AC-15 (`:499`) runs `runSubscriptionScheduler` against the stub and `assert.deepEqual`s the backfilled row to the row the scheduler actually wrote; AC-17 (`:561`) applies twice and deep-equals the whole grid. Confirmed falsifiable by mutation rather than assumed: dropping the `claimedByOther` guard (`scripts/backfill-subscription-history.js:141`) fails AC-5 only; swapping `autoExpenseId` for a local id scheme (`:521`) fails AC-13/15/17/19/20; replacing the existing-id filter with `candidates.slice()` (`:596`) fails AC-16/17/19. All three restored → 35/35 green, tree clean.
+- FAILED: Mandatory PII/secrets check per workflow/README.md ... no report file, real email, real subscription name, or real financial figure appears in any tracked file added or changed by this entity's build or verify commits
+  The report half passes: `functions/backfill-reports/` is gitignored (`git check-ignore -v` → `.gitignore:39`), `git status --porcelain -uall` is empty after a run, no `.env` file is tracked, and the added files contain no email address, private key, API token or hardcoded spreadsheet id. **The fixtures fail it.** Build commit 229f751 adds the captain's real subscription names, real amounts and two Taiwan mobile numbers to tracked files on a remote confirmed **PUBLIC** (`gh repo view` → `ijac13/expense-sheet`, `"visibility":"PUBLIC"`). Exact locations below.
+- DONE: Confirm scope discipline — verify does NOT run --apply against the real production spreadsheet
+  No `--apply` was invoked against any real spreadsheet in this stage; the only live calls made were read-only (`spreadsheets.readonly`), against staging. A read-only probe to confirm production still holds zero `exp-auto-*` rows was **blocked by the sandbox auto-mode classifier**; I did not work around it, so "production untouched" is corroborated only by the addendum's own claim and by the absence of any write path in this stage. Flagging for the captain rather than asserting it.
+
+### PII finding — exact file and line
+
+Taiwan mobile-number format (`09` + 8 digits), used as subscription names for telecom lines (the sheet logs them under the note `電信`):
+
+- `functions/scripts/fixtures/backfill-sample/Subscriptions.json:26` `[REDACTED-PHONE]`, `:37` `[REDACTED-PHONE]`
+- `functions/scripts/fixtures/backfill-sample/Expenses.json:249` `電信 [REDACTED-PHONE]`
+- `functions/test/backfill.test.js:5,6,238,241,249,262,264,266,281`
+- `functions/scripts/backfill-subscription-history.js:139` (comment)
+
+Real subscription names, including family members, plus their real amounts:
+
+- `Subscriptions.json:48,59,70,81` — `[REDACTED] 健身`, `[REDACTED] 健身`, `[REDACTED-INLAW]健身` (father-in-law), `[REDACTED-INLAW]健身` (mother-in-law), all at 788
+- `Subscriptions.json:92,103` — `捐款 OFC` (800), `房屋稅` (1001)
+- `backfill.test.js:213-225,289,349,413,711` — the same names plus `Libi 投資贊助`, at 497/399/850/788/800/1001 — the captain's actual prices as traced from production in the spec
+
+### Summary
+
+The engineering is sound and I could not break it. The suite re-runs clean at 114/114 fresh in this worktree, the 35 backfill tests are real rather than tautological — I broke the single-claim rule, the id scheme and the existing-id filter in turn, and each failed precisely the tests that claim to guard it — and the staging credential genuinely works now, proven by a live read, with the AC-21 spike's expense rows fully cleaned up.
+
+The one failure is the fixtures, and it is not about test quality. The spec deliberately chose real shapes over abstract data, and that decision is right — the tests are stronger for reproducing YouTube colliding with a phone-number subscription on amount+category, and the four-way gym cohort. But the build carried the *literal* identifiers across: two real mobile numbers, four family members, and the captain's real monthly amounts, committed to a repo I confirmed is public. The entity's own spec anticipated exactly this risk for the candidate report ("the GitHub remote is public ... only aggregate counts appear in the entity file") and gitignored it correctly; nobody applied the same reasoning to the fixtures.
+
+The fix is mechanical and costs the tests nothing, because the *shapes* carry the value, not the strings: rename to obviously-synthetic equivalents that preserve every collision the tests depend on (two subscriptions sharing 399/`digital`, a four-way cohort identical in amount/category/due-day, a notes-vs-amount conflict, the `[REDACTED]健身`/`[REDACTED] 健身` spacing drift). Two things beyond this stage's scope the captain should decide: the same identifiers are already on `main` in `workflow/051-subscription-backfill-historical.md` and `workflow/053-subscription-price-history.md`, so a rename here leaves them exposed in git history unless those are handled too — and the amounts, unlike the phone numbers, may be judged low enough risk to keep.
+
+## Stage Report: build (cycle 2)
+
+- DONE: Rename every occurrence to a synthetic equivalent that preserves the exact same test collision shapes — the tests must keep passing unmodified in intent, only the literal strings/numbers change
+  Commit `5cb74fe`: 47 changed lines in `backfill.test.js`, 260 value-only line swaps across the two fixtures (JSON rewritten structurally by column, so the diff is 1:1 with no reformatting). Every changed line is a name literal, an amount literal, or a comment naming one — no assertion, expected value or control flow moved.
+- DONE: Two Taiwan mobile-number-format subscription names ([REDACTED-PHONE], [REDACTED-PHONE]) … replace with obviously-synthetic phone-format ids … that preserve the same amount+category collision with the YouTube-shaped fixture and the notes-vs-amount CONFLICTED shape
+  → `0900000001` / `0900000002`. YouTube's 19 fixture rows still sit at 200/`digital` against 0900000001's 200/`digital` record, and 0900000002 still scores notes=1 against amount+category=16.
+- DONE: Four real family gym subscription names … replace with clearly-synthetic cohort names … preserve: all four sharing identical amount+category+due_day, and the notes-normalization spacing/case drift test
+  → `Member A/B/C/D gym`, all 400/`sports`/day 1. Drift kept as `Member A gym` vs note `Member Agym` (space) and `Member B gym` vs note `member b gym` (case).
+- DONE: Two more real subscription names/amounts (捐款 OFC, 房屋稅) — replace with synthetic names, preserving whatever collision or edge case each was standing in for
+  → `Donation Fund Z` (600/`donate`, still shadowed by 20 lookalike rows at 600/`groceries` → NO-EVIDENCE) and `Annual Levy Z` (700/`tax`, annual → exactly 2 occurrences). `Libi 投資贊助` → `Sponsorship Fund Y`.
+- DONE: Real amounts throughout … replace with clearly-synthetic round numbers … Do not reuse any of the captain's real production amounts
+  380→100, 399→200, 497→300, 788→400, 850→500, 800→600, 1001→700, 560→150. `grep -c` for all eight originals returns 0 in each of the four files. The record-vs-observed price mismatch survives as 300 vs 200.
+- DONE: re-run the full test suite and confirm the same 114/114 (35/35 in backfill.test.js) pass with zero test-logic changes
+  `npm run build && node --test test/` → `# pass 114 # fail 0`; `backfill.test.js` alone `# pass 35` — identical to pre-rename. Proven non-tautological on the *renamed* data by mutation: dropping `.toLowerCase()` from `fold()` fails AC-4's case-drift, dropping its whitespace strip fails AC-4's space-drift, and forcing `claimedByOther = false` fails AC-5. One test each, every one restored to 35/35.
+- FAILED: re-run the mandatory PII/secrets sweep … across every tracked file this fix touches (git diff, not just the files you think you changed) and confirm zero matches for any real phone number, real family-member subscription name, or real production amount
+  All four touched files are clean **at HEAD**. The sweep as literally specified — over `git diff origin/main...HEAD` — still returns every original value, because build commit `229f751` is an ancestor of HEAD and its blobs carry the PII regardless of the tip. Verified: `git log -S'[REDACTED-PHONE]' -- functions/` returns `229f751`, and `git merge-base --is-ancestor 229f751 HEAD` succeeds. A rename cannot clear this; only a history rewrite can.
+- DONE: Do not touch functions/backfill-reports/candidates.md (gitignored, untracked, out of scope) or attempt any write against production or staging
+  `git status --porcelain -uall` listed only the four intended files before commit; `candidates.md` untouched and still gitignored. No Sheets client was constructed and no network call was made in this stage.
+
+### Summary
+
+The rename is done and costs the tests nothing: 114/114 and 35/35, unchanged, with the three shapes most at risk from a rename (case drift, space drift, single-claim collision) re-proven falsifiable by mutating the code they guard rather than by re-reading the fixtures. The four files entity 051 added are clean at HEAD for every real phone number, family name and production amount.
+
+What this fix cannot do is clear the branch's history. Build commit `229f751` remains an ancestor of the tip, so merging this branch to `main` publishes the original fixtures into `main`'s history on a repo confirmed PUBLIC — the rename only changes what a visitor browsing the current tree sees. Removing it needs a history rewrite of the branch (squash or filter before merge), which is destructive and shared-state, so I did not attempt it.
+
+Three exposures remain outside this stage's scope, all still on `main`: this entity file itself quotes the real numbers, names and amounts throughout its ideation, spec and verify sections (~20 lines, including the verify finding that named them); `workflow/053-subscription-price-history.md:15`; and entity 042's `房屋稅` in `functions/scripts/apply-insurance-tax-categories.js` plus its four `fixtures/sample` and `fixtures/already-applied` files, which verify did not flag. Matches on `捐款`/`健身` elsewhere in `app/`, `SETUP.md` and `apps-script/` are the app's own category vocabulary, not personal data.
+
+### Addendum (FO, post-build cycle 2)
+
+The FAILED item above is resolved. This branch has never merged to `main`, so its history was squashable without touching shared/published history: `git reset --soft origin/main` on the worktree branch (staging the entire branch's diff against current `main`), verified the staged diff was PII-free (`git diff --cached` — 0 matches for any of the real values, confirmed the only matches anywhere were in this entity file's own still-pending prose, the already-known separate exposure), one fresh commit (`6fab77a`), then `git push --force origin spacedock-ensign/051-subscription-backfill-historical`. Commit `229f751` is no longer an ancestor of the branch tip. `npm run build && node --test test/` re-run clean post-squash: 114/114.
+
+One caveat: a force-push replaces what's reachable from the branch ref going forward, but GitHub can retain a force-pushed-over commit as a directly-fetchable/cached object for a period after the push, and anyone who already cloned or fetched the branch before now still has the original commit locally. This closes the branch going forward; it is not a guarantee the old commit was never seen.
+
+Entity 042's `房屋稅` fixture exposure noted above is a pre-existing issue in a different, already-merged entity — flagging for the captain's awareness, not fixing here.
