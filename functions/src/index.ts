@@ -91,18 +91,23 @@ function endsBeforeStart(start: string, end: string): boolean {
 // Creates a missing `start_date` / `end_date` header on demand, following
 // ensureSchedulerLog: the captain never has to touch the sheet by hand, and a
 // production-sheet precondition is exactly the thing that blocks a deploy.
-// New headers land in the first free columns to the right of row 1's last
-// header, so an unknown column the resolver ignores is never written over.
+//
+// New headers land past the widest OCCUPIED row, not past row 1's last header.
+// Sheets trims trailing blanks, so a column holding data under a blank header
+// cell is invisible in row 1's length — placing by that length would claim the
+// column and destroy its cells. Production already has this shape: CATEGORIES
+// carries `note` data under a blank H1 (see sheetSchema.ts).
 async function ensureSubscriptionColumns(
   sheets: ReturnType<typeof google.sheets>,
   spreadsheetId: string,
   map: ColumnMap,
+  rows: Row[],
   fields: string[]
 ): Promise<ColumnMap> {
   const missing = fields.filter((f) => map.index[f] === undefined);
   if (missing.length === 0) return map;
 
-  const first = map.width;
+  const first = rows.reduce((widest, r) => Math.max(widest, r.length), map.width);
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${SUBSCRIPTIONS_TAB}!${columnLetter(first)}1:${columnLetter(first + missing.length - 1)}1`,
@@ -380,8 +385,12 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         const body = req.body as Record<string, unknown>;
         const id = `sub-${Date.now()}`;
 
-        let map = await readColumnMap(sheets, spreadsheetId, SUBSCRIPTIONS_SPEC);
-        map = await ensureSubscriptionColumns(sheets, spreadsheetId, map, ["start_date", "end_date"]);
+        // A full-tab read, not just row 1: the header placement below has to see
+        // data sitting under a blank header cell, which row 1 alone cannot show.
+        const { rows: subRows, map: readMap } = await readTab(sheets, spreadsheetId, SUBSCRIPTIONS_SPEC);
+        const map = await ensureSubscriptionColumns(
+          sheets, spreadsheetId, readMap, subRows, ["start_date", "end_date"]
+        );
 
         const paidById = String(body.paid_by ?? "");
         const nameMap = await resolveUserDisplayNames(sheets, spreadsheetId, [paidById]);
@@ -445,7 +454,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         }
 
         const writeMap = await ensureSubscriptionColumns(
-          sheets, spreadsheetId, map, Object.keys(updates)
+          sheets, spreadsheetId, map, rows, Object.keys(updates)
         );
         const updated = buildWriteRow(rows[rowIndex], writeMap, updates);
 
