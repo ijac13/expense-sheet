@@ -1,11 +1,11 @@
 ---
 id: 051
 title: Backfill Missing Historical Subscription Expense Entries
-status: verify
+status: build
 source: captain (found while scoping entity 050)
 started:
 completed:
-verdict:
+verdict: REJECTED
 score:
 worktree: .worktrees/spacedock-ensign-051-subscription-backfill-historical
 issue:
