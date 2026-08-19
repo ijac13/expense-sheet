@@ -23,6 +23,7 @@ Captain's direct instruction: add a start date and end date to each subscription
 
 - As the captain, I want to change a subscription's price without erasing what it used to cost, so entity 051-style historical analysis stays accurate after a price change.
 - As the captain, I want an archived subscription to record when it actually ended, not just that it's inactive, so history isn't ambiguous about which months it was really running.
+- As the user, I'll end the subscription if the price change and create a new subscription with the new price. 
 
 ## Success
 
