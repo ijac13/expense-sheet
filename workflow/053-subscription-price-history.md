@@ -1,11 +1,11 @@
 ---
 id: 053
 title: Add Start/End Dates to Subscriptions
-status: verify
+status: build
 source: captain
 started:
 completed:
-verdict:
+verdict: REJECTED
 score:
 worktree: .worktrees/spacedock-ensign-053-subscription-price-history
 issue:
