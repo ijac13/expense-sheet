@@ -212,3 +212,21 @@ The spec is written against what the code actually does, and the survey changed 
 One decision is left open for the gate rather than settled unilaterally: Reports' monthly and annual navigation select a *period*, not a date, so the day-grid picker does not fit them and the spec puts them out of scope. That is defensible but it is narrower than the ideation's wording implies, so the captain should confirm it — the alternative is a follow-up entity adding a month-only mode of the same component.
 
 Subscriptions is excluded on evidence, not preference: entity 053's shipped suite drives both of its date inputs through `setValue()` on the native input at twelve call sites, so converting them would break seven just-verified tests for a screen the ideation never named.
+
+## Build Plan
+
+Written before coding, per the stage definition.
+
+**Component.** `app/app/components/DatePickerModal.tsx`, props `{ value, onPick, onClose }`. Internal state is `view: "days" | "years"` plus a `cursor` of `{ year, month }` where month is 1-12 — never a `Date`. Seeded from `value` when it matches `/^\d{4}-\d{2}-\d{2}$/`, else from `todayLocalIso()`. Stepping is `month === 12 ? {year+1, month:1} : {year, month:month+1}` and its mirror, so `setMonth` never runs (Decision 5). Month length is `new Date(y, m, 0).getDate()` — day 0 of the following month, which the local constructor resolves, giving 29 for Feb 2028 and 28 for Feb 2027 with no leap branch of my own. First column is `new Date(y, m-1, 1).getDay()`.
+
+**Stacking (AC-3).** One choke point: the picker's portal wrapper `onClick` calls `e.stopPropagation()` unconditionally, then closes only when `e.target === e.currentTarget`. React bubbles portal events up the *React* tree, not the DOM tree, so the picker rendered from inside `FilterSheet` would otherwise reach that sheet's own `onClick={onClose}`. Stopping at the wrapper covers day cells, chevrons, the title and the backdrop in one place. `z-[70]` clears the hosts' `z-[60]`.
+
+**Test-visible surface.** `data-testid`: `date-picker`, `picker-title`, `picker-close`, `picker-prev`, `picker-next`, `year-view`, `day-YYYY-MM-DD`, `year-YYYY`. Day cells carry `aria-selected`, `data-today`, and `data-col` (the weekday column), so AC-6's column claim is assertable in jsdom, which computes no grid layout.
+
+**Entry points.** Home gets a `<button>` around the existing label, keeping both chevrons (Decision 6). `ExpenseEditSheet` and both History custom-range fields swap `<input type="date">` for a button plus picker state. Reports' period navigation and both Subscriptions inputs are untouched.
+
+**i18n.** Five new keys under a `picker` block in both locale files: `previous_month`, `next_month`, `select_year`, `close`, `choose_date`. Chevrons are lucide SVGs, so the only picker text is the locale-formatted title and weekday headers plus these five.
+
+**Tests.** One new file `app/test/date-picker.render.test.js`, added to the `test` script. `reports/page.tsx` joins `test:compile` for AC-21 — verified it compiles clean and emits `reports/page.js` and `reports/DrillDown.js`. AC-24 needs two languages in one process, so that file stubs `react-i18next` through `require.cache` with a flippable `i18n.language`, keeping `t()` key-echoing as the rest of the suite assumes.
+
+**Facts measured first, not assumed** (all under `TZ=Asia/Taipei`, Node 20 full ICU): `new Date(2026,2,7).toISOString()` → `2026-03-06`; clock `2026-08-31T16:30:00Z` → local `2026-09-01` / UTC `2026-08-31`; 1 Mar 2026 and 1 Jan 2023 are both Sundays; `new Date(2028,2,0).getDate()` → 29; `zh-TW` renders `2026年3月` against `en-US`'s `March 2026`. The `Date` constructor with arguments still behaves normally under `mock.timers`, which the grid math depends on.
