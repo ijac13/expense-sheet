@@ -90,6 +90,7 @@
     "cancel_title": "Cancel Subscription",
     "confirm_cancel": "Confirm Cancel",
     "end_before_start": "End date cannot be earlier than the start date.",
+    "started": "Started",
     "ended": "Ended"
   },
   "settings": { "title": "Settings", "signed_in_as": "Signed in as", "sign_out": "Sign out", "font_size": "Font Size", "small": "Small", "medium": "Medium", "large": "Large", "language": "Language", "category_management": "Category Management", "user_management": "User Management", "open_sheet": "Open Google Sheet" },

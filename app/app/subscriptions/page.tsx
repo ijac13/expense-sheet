@@ -339,6 +339,15 @@ export default function SubscriptionsPage() {
                           <div className="text-xs text-base-content/40">
                             {t("subscriptions.paid_by")} {USERS.find(u => u.id === sub.paid_by)?.name ?? sub.paid_by}
                           </div>
+                          {/* Every subscription active before this feature has an
+                              empty start_date, so absent must stay absent rather
+                              than becoming a blank or a fabricated date. Shown
+                              verbatim for the same reason as end_date below. */}
+                          {sub.start_date && (
+                            <div data-testid="start-date" className="text-xs text-base-content/40">
+                              {t("subscriptions.started")} {sub.start_date}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-1.5 shrink-0">
@@ -384,11 +393,18 @@ export default function SubscriptionsPage() {
                             <span className="mx-1.5">·</span>
                             {cat.name}
                           </div>
-                          {/* Every subscription cancelled before this feature has
-                              an empty end_date. Those render no line at all rather
-                              than a blank one or a fabricated date. Shown verbatim:
-                              a hand-typed cell comes back locale-formatted, and
-                              reformatting it would misread it. */}
+                          {/* Start and end are independent: a card cancelled through
+                              this feature but never backfilled has an end date and no
+                              start date, and the reverse is equally real. Every
+                              subscription that predates this feature has neither, and
+                              those render no line at all rather than a blank one or a
+                              fabricated date. Shown verbatim: a hand-typed cell comes
+                              back locale-formatted, and reformatting it would misread it. */}
+                          {sub.start_date && (
+                            <div data-testid="start-date" className="text-xs text-base-content/40">
+                              {t("subscriptions.started")} {sub.start_date}
+                            </div>
+                          )}
                           {sub.end_date && (
                             <div data-testid="end-date" className="text-xs text-base-content/40">
                               {t("subscriptions.ended")} {sub.end_date}
