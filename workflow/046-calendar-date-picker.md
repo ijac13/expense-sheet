@@ -230,3 +230,42 @@ Written before coding, per the stage definition.
 **Tests.** One new file `app/test/date-picker.render.test.js`, added to the `test` script. `reports/page.tsx` joins `test:compile` for AC-21 — verified it compiles clean and emits `reports/page.js` and `reports/DrillDown.js`. AC-24 needs two languages in one process, so that file stubs `react-i18next` through `require.cache` with a flippable `i18n.language`, keeping `t()` key-echoing as the rest of the suite assumes.
 
 **Facts measured first, not assumed** (all under `TZ=Asia/Taipei`, Node 20 full ICU): `new Date(2026,2,7).toISOString()` → `2026-03-06`; clock `2026-08-31T16:30:00Z` → local `2026-09-01` / UTC `2026-08-31`; 1 Mar 2026 and 1 Jan 2023 are both Sundays; `new Date(2028,2,0).getDate()` → 29; `zh-TW` renders `2026年3月` against `en-US`'s `March 2026`. The `Date` constructor with arguments still behaves normally under `mock.timers`, which the grid math depends on.
+
+## Stage Report: build
+
+- DONE: Build the single shared component: `app/app/components/DatePickerModal.tsx`, interface `{value, onPick, onClose}` — ISO strings only at the boundary, month grid with correct weekday columns, leap handling, `(year, month)` stepping, year view, portals above `z-[60]` and stops click propagation
+  `aa0d33c`. Cursor state is `{year, month}` numbers; month length is `new Date(y, m, 0).getDate()`, so leap years need no branch of my own.
+- DONE: Wire it into the 4 in-scope entry points … Do NOT touch Reports' month/year period navigation or Subscriptions' start/end date inputs
+  `aa0d33c`. Home's `<span>` became a `<button>` keeping both chevrons; the edit sheet and both History range fields swapped their inputs. `reports/page.tsx` and `subscriptions/page.tsx` have no diff in this branch.
+- DONE: All date math must use local calendar parts, never `toISOString()` — reuse `todayLocalIso()`; parse existing ISO strings with `new Date(iso + "T00:00:00")`, never bare `new Date(iso)`
+  `todayLocalIso()` supplies today; cell ids are assembled from the cursor integers. The component never parses a date string at all — it splits on `-` into numbers — so the unsafe form has no site to appear at. The one string parse on the path is `ExpenseEditSheet.formatFullDate`, already the safe idiom.
+- DONE: Implement all 27 ACs … pay particular attention to AC-3, AC-7, AC-14/AC-15, AC-21 (add `reports/page.tsx` to `test:compile`), AC-26
+  34 tests covering AC-1..AC-26; AC-27 is the suite run below. `reports/page.tsx` added to `test:compile`, which is what makes the AC-21 drill-down mount possible at all. AC-26 re-checked by walking `app/app/` in-test: two hits, both `subscriptions/page.tsx`.
+- DONE: Add tests for every AC at the same rigor as entity 053 … add the new test file(s) to the `test` script and any new compiled sources to `test:compile`
+  `app/test/date-picker.render.test.js`, `TZ=Asia/Taipei`, `mock.timers` on the six clock-dependent tests, added to both scripts in `app/package.json`.
+- DONE: Add every new user-facing string to both locale files with matching keys, zh genuinely translated not copied
+  Five keys under a new `picker` block, one line added per file. AC-25 asserts both key sets match, every zh value differs from its en value, and each control's `aria-label` equals its key (hardcoded English would render as prose and fail).
+- DONE: Self-check every AC against a fixture/stub … falsifiability proven by mutation on at least the highest-risk ACs … confirm the existing suite still passes unmodified. Do not attempt any write against production or staging.
+  Five mutations run; see below. Full suite 104/104 from a clean `npm install`; `subscription-dates.render.test.js` has no diff and its 26 tests pass. `npm run build` succeeds. No network writes — the only remote call was `npm install`.
+
+### Falsifiability
+
+Each mutation reintroduces one measured defect; the listed tests are the ones that flipped to failing.
+
+- `todayLocalIso()` → `toISOString()` for today AND for cell ids: caught by 8 tests, including AC-14 (title reads "August 2026" instead of September under the 2026-08-31T16:30Z clock) and AC-15 (the cell labelled "7" hands back `2026-03-06`).
+- `(year, month)` arithmetic → `setMonth`: caught by AC-7 (stepping from 31 January reads March 2026, not February), plus AC-6 and AC-8.
+- First-of-month column forced to 0: caught by AC-6's April 2026 case, whose 1st is a Wednesday.
+- Year window −20 → −10: caught by AC-10.
+- Picker's `e.stopPropagation()` removed: caught by AC-3's unguarded-host test — **only after that test was added.** See below.
+
+### AC-3 was a tautology, and the spec's stacking premise is half wrong
+
+The mutation that removes the picker's `stopPropagation` initially changed **nothing**: 33/33 still passed. The spec's Stacking note is right that React bubbles portal events up the React tree — measured, `["DAY","PICKER","SHEET"]` — but both host sheets already carry an inner `onClick={e => e.stopPropagation()}` (`ExpenseEditSheet.tsx:124`, `history/page.tsx:190`) sitting between the picker and the wrapper whose `onClick` is `onClose`. The hosts were never exposed, so the end-to-end AC-3 test could not fail.
+
+The guard is still correct and still worth keeping — it makes the picker safe in a host that lacks that inner panel — so I kept it and added a test that mounts the picker directly under a bare `onClose` wrapper, which does fail without it. I also corrected the component comment, which had asserted the hosts would otherwise dismiss.
+
+### Summary
+
+One component behind all four day-granularity fields, with the two defects this repo has actually shipped — the UTC off-by-one and the `setMonth` skip — each pinned by a test that produces a different *string*, not just a different code path. All 27 ACs are met and the suite went 70 → 104 with no existing test touched.
+
+The one thing worth the reviewer's attention is AC-3. Its integration test passes, but it passed before the feature was correct too, because the host sheets were already self-defending. That is a finding about the spec's premise rather than a defect in the code, and the added unit test now makes the picker's own guarantee falsifiable. Two smaller notes: the spec says "all seven of `subscription-dates.render.test.js`" — that file actually holds 26 tests, all passing and unmodified; and `test:compile` now compiles `reports/page.tsx`, which had no `.test-build-ui/` output before, so the AC-21 drill-down path was previously untestable rather than merely untested.
