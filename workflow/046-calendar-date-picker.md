@@ -1,7 +1,7 @@
 ---
 id: 046
 title: Calendar-Style Date Picker (Home, History, Reports)
-status: ideation
+status: spec
 source: captain
 started:
 completed:
