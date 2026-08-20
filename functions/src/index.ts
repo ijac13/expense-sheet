@@ -78,6 +78,48 @@ async function readColumnMap(
   return buildColumnMap((response.data.values ?? []) as Row[], spec);
 }
 
+// A cell the captain typed as a real Sheets date comes back FORMATTED_VALUE —
+// `2026/8/19`, not ISO — so only two genuine ISO dates are ever compared. Any
+// other shape skips the guard rather than 400ing on a value the sheet owns.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function endsBeforeStart(start: string, end: string): boolean {
+  if (!ISO_DATE.test(start) || !ISO_DATE.test(end)) return false;
+  return end < start;
+}
+
+// Creates a missing `start_date` / `end_date` header on demand, following
+// ensureSchedulerLog: the captain never has to touch the sheet by hand, and a
+// production-sheet precondition is exactly the thing that blocks a deploy.
+//
+// New headers land past the widest OCCUPIED row, not past row 1's last header.
+// Sheets trims trailing blanks, so a column holding data under a blank header
+// cell is invisible in row 1's length — placing by that length would claim the
+// column and destroy its cells. Production already has this shape: CATEGORIES
+// carries `note` data under a blank H1 (see sheetSchema.ts).
+async function ensureSubscriptionColumns(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  map: ColumnMap,
+  rows: Row[],
+  fields: string[]
+): Promise<ColumnMap> {
+  const missing = fields.filter((f) => map.index[f] === undefined);
+  if (missing.length === 0) return map;
+
+  const first = rows.reduce((widest, r) => Math.max(widest, r.length), map.width);
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${SUBSCRIPTIONS_TAB}!${columnLetter(first)}1:${columnLetter(first + missing.length - 1)}1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [missing] },
+  });
+
+  const index = { ...map.index };
+  missing.forEach((f, i) => { index[f] = first + i; });
+  return { tab: map.tab, index, width: first + missing.length };
+}
+
 function rowToExpense(row: Row, map: ColumnMap): Record<string, unknown> {
   return {
     id: cell(row, map, "id") ?? "",
@@ -343,7 +385,12 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         const body = req.body as Record<string, unknown>;
         const id = `sub-${Date.now()}`;
 
-        const map = await readColumnMap(sheets, spreadsheetId, SUBSCRIPTIONS_SPEC);
+        // A full-tab read, not just row 1: the header placement below has to see
+        // data sitting under a blank header cell, which row 1 alone cannot show.
+        const { rows: subRows, map: readMap } = await readTab(sheets, spreadsheetId, SUBSCRIPTIONS_SPEC);
+        const map = await ensureSubscriptionColumns(
+          sheets, spreadsheetId, readMap, subRows, ["start_date", "end_date"]
+        );
 
         const paidById = String(body.paid_by ?? "");
         const nameMap = await resolveUserDisplayNames(sheets, spreadsheetId, [paidById]);
@@ -358,6 +405,11 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           due_month: String(body.due_month ?? ""),
           paid_by: nameMap.get(paidById) ?? paidById,
           is_active: "true",
+          // Whatever the form submitted, never a server-side "today": the browser
+          // is the only side that knows the captain's local date. A new
+          // subscription is active, so it has no end date.
+          start_date: String(body.start_date ?? ""),
+          end_date: "",
         });
 
         await insertRowAtTop(sheets, spreadsheetId, SUBSCRIPTIONS_TAB, row);
@@ -380,12 +432,31 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         }
 
         // frequency and paid_by are not patchable; leaving them out of `updates`
-        // carries their existing cells forward untouched.
+        // carries their existing cells forward untouched. The same rule is what
+        // keeps an unrelated edit from blanking a date.
         const updates: Record<string, string> = {};
-        for (const field of ["name", "amount", "category_id", "due_day", "due_month", "is_active"]) {
+        for (const field of ["name", "amount", "category_id", "due_day", "due_month", "is_active", "start_date", "end_date"]) {
           if (body[field] !== undefined) updates[field] = String(body[field]);
         }
-        const updated = buildWriteRow(rows[rowIndex], map, updates);
+
+        // Rejected independently of the modal, because the modal is not the only
+        // caller. A start date arriving in the same PATCH wins over the stored one.
+        if (updates.end_date !== undefined) {
+          const start = updates.start_date !== undefined
+            ? updates.start_date
+            : String(cell(rows[rowIndex], map, "start_date") ?? "");
+          if (endsBeforeStart(start, updates.end_date)) {
+            res.status(400).json({
+              error: `end_date "${updates.end_date}" is earlier than start_date "${start}".`,
+            });
+            return;
+          }
+        }
+
+        const writeMap = await ensureSubscriptionColumns(
+          sheets, spreadsheetId, map, rows, Object.keys(updates)
+        );
+        const updated = buildWriteRow(rows[rowIndex], writeMap, updates);
 
         await sheets.spreadsheets.values.update({
           spreadsheetId,
@@ -394,7 +465,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           requestBody: { values: [updated] },
         });
 
-        res.status(200).json(rowToSubscription(updated, map));
+        res.status(200).json(rowToSubscription(updated, writeMap));
         return;
       }
 

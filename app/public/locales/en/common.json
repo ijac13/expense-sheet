@@ -84,7 +84,14 @@
     "due_month_label": "Due Month (1–12)",
     "due_day_label": "Due Day (1–31)",
     "auto_add_last_ran": "Auto-add last ran",
-    "auto_add_not_running": "Auto-add has not run"
+    "auto_add_not_running": "Auto-add has not run",
+    "start_date_label": "Start Date",
+    "end_date_label": "End Date",
+    "cancel_title": "Cancel Subscription",
+    "confirm_cancel": "Confirm Cancel",
+    "end_before_start": "End date cannot be earlier than the start date.",
+    "started": "Started",
+    "ended": "Ended"
   },
   "settings": { "title": "Settings", "signed_in_as": "Signed in as", "sign_out": "Sign out", "font_size": "Font Size", "small": "Small", "medium": "Medium", "large": "Large", "language": "Language", "category_management": "Category Management", "user_management": "User Management", "open_sheet": "Open Google Sheet" },
   "users": { "title": "User Management", "description": "Add or remove users by editing the Users tab in Google Sheets.", "loading": "Loading users…", "no_email": "No email set", "empty": "No users found in the Users tab." },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Subscription, getNextDueDate } from "../lib/subscriptions";
+import { Subscription, getNextDueDate, todayLocalIso, endsBeforeStart } from "../lib/subscriptions";
 import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription, getSchedulerStatus, SchedulerStatus } from "../lib/subscriptionService";
 import { Category, DEFAULT_CATEGORIES, categoryIcon, resolveCategory } from "../lib/categories";
 import { getCategories } from "../lib/categoryService";
@@ -36,6 +36,7 @@ interface AddFormState {
   frequency: "monthly" | "annual";
   due_day: string;
   due_month: string;
+  start_date: string;
 }
 
 interface EditFormState {
@@ -53,6 +54,7 @@ const defaultAddForm: AddFormState = {
   frequency: "monthly",
   due_day: "1",
   due_month: "1",
+  start_date: "",
 };
 
 export default function SubscriptionsPage() {
@@ -115,6 +117,10 @@ export default function SubscriptionsPage() {
   });
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<Subscription | null>(null);
+  const [cancelDate, setCancelDate] = useState("");
+  const [cancelInvalid, setCancelInvalid] = useState(false);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
   // Sort newest first (IDs are timestamp-based: sub-{ms})
   const active = subscriptions.filter((s) => s.is_active).sort((a, b) => b.id.localeCompare(a.id));
@@ -123,7 +129,13 @@ export default function SubscriptionsPage() {
   function openAdd() {
     // The options are live categories now, so the initial value has to be a live
     // id — a legacy slug default would show one category and submit another.
-    setAddForm({ ...defaultAddForm, category_id: activeCategories[0]?.id ?? defaultAddForm.category_id });
+    // The start date is filled in at open time, not at module load, so a session
+    // left open overnight does not offer yesterday.
+    setAddForm({
+      ...defaultAddForm,
+      category_id: activeCategories[0]?.id ?? defaultAddForm.category_id,
+      start_date: todayLocalIso(),
+    });
     setModalMode("add");
   }
 
@@ -162,6 +174,8 @@ export default function SubscriptionsPage() {
         due_day,
         due_month,
         paid_by: USERS.find(u => u.id === currentUserId)?.name ?? currentUserId,
+        start_date: addForm.start_date,
+        end_date: "",
       });
       setSubscriptions((prev) => [...prev, newSub]);
       closeModal();
@@ -205,14 +219,42 @@ export default function SubscriptionsPage() {
     }
   }
 
-  async function handleCancel(id: string) {
+  // Archiving asks when the subscription actually ended before it writes
+  // anything. Cancel used to PATCH straight through, which recorded only THAT it
+  // ended, never when.
+  function openCancel(sub: Subscription) {
+    setCancelTarget(sub);
+    setCancelDate(todayLocalIso());
+    setCancelInvalid(false);
+    setCancelSubmitting(false);
+  }
+
+  function closeCancel() {
+    setCancelTarget(null);
+  }
+
+  async function handleCancelConfirm() {
+    if (!cancelTarget || cancelSubmitting) return;
+    // Blocked here as well as on the server, because the modal is not the only
+    // caller and the server is not the only place the captain sees an error.
+    if (endsBeforeStart(cancelTarget.start_date, cancelDate)) {
+      setCancelInvalid(true);
+      return;
+    }
+    setCancelInvalid(false);
+    setCancelSubmitting(true);
     try {
-      await cancelSubscription(id);
+      await cancelSubscription(cancelTarget.id, cancelDate);
       setSubscriptions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, is_active: false } : s))
+        prev.map((s) => (s.id === cancelTarget.id ? { ...s, is_active: false, end_date: cancelDate } : s))
       );
+      closeCancel();
     } catch (err) {
+      // The modal stays open and the card stays in Active: nothing local is
+      // mutated on a write that did not land.
       alert(err instanceof Error ? err.message : "Failed to cancel subscription");
+    } finally {
+      setCancelSubmitting(false);
     }
   }
 
@@ -297,6 +339,15 @@ export default function SubscriptionsPage() {
                           <div className="text-xs text-base-content/40">
                             {t("subscriptions.paid_by")} {USERS.find(u => u.id === sub.paid_by)?.name ?? sub.paid_by}
                           </div>
+                          {/* Every subscription active before this feature has an
+                              empty start_date, so absent must stay absent rather
+                              than becoming a blank or a fabricated date. Shown
+                              verbatim for the same reason as end_date below. */}
+                          {sub.start_date && (
+                            <div data-testid="start-date" className="text-xs text-base-content/40">
+                              {t("subscriptions.started")} {sub.start_date}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-1.5 shrink-0">
@@ -308,7 +359,7 @@ export default function SubscriptionsPage() {
                         </button>
                         <button
                           className="btn btn-ghost btn-xs text-error"
-                          onClick={() => handleCancel(sub.id)}
+                          onClick={() => openCancel(sub)}
                         >
                           {t("subscriptions.cancel")}
                         </button>
@@ -342,6 +393,23 @@ export default function SubscriptionsPage() {
                             <span className="mx-1.5">·</span>
                             {cat.name}
                           </div>
+                          {/* Start and end are independent: a card cancelled through
+                              this feature but never backfilled has an end date and no
+                              start date, and the reverse is equally real. Every
+                              subscription that predates this feature has neither, and
+                              those render no line at all rather than a blank one or a
+                              fabricated date. Shown verbatim: a hand-typed cell comes
+                              back locale-formatted, and reformatting it would misread it. */}
+                          {sub.start_date && (
+                            <div data-testid="start-date" className="text-xs text-base-content/40">
+                              {t("subscriptions.started")} {sub.start_date}
+                            </div>
+                          )}
+                          {sub.end_date && (
+                            <div data-testid="end-date" className="text-xs text-base-content/40">
+                              {t("subscriptions.ended")} {sub.end_date}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <span className="badge badge-ghost badge-sm shrink-0">{t("subscriptions.cancelled")}</span>
@@ -442,6 +510,16 @@ export default function SubscriptionsPage() {
                   onChange={(e) => setAddForm((f) => ({ ...f, due_day: e.target.value }))}
                 />
               </div>
+              <div>
+                <label className="label label-text text-xs">{t("subscriptions.start_date_label")}</label>
+                <input
+                  type="date"
+                  data-testid="add-start-date"
+                  className="input input-bordered w-full"
+                  value={addForm.start_date}
+                  onChange={(e) => setAddForm((f) => ({ ...f, start_date: e.target.value }))}
+                />
+              </div>
             </div>
             <div className="modal-action mt-4">
               <button className="btn btn-ghost" onClick={closeModal}>
@@ -534,6 +612,43 @@ export default function SubscriptionsPage() {
             </div>
           </div>
           <div className="modal-backdrop" onClick={closeModal} />
+        </div>
+      )}
+
+      {/* Cancel confirmation — asks WHEN it ended, not just that it did */}
+      {cancelTarget && (
+        <div className="modal modal-open">
+          <div className="modal-box w-full max-w-sm">
+            <h3 className="font-bold text-lg mb-1">{t("subscriptions.cancel_title")}</h3>
+            <p className="text-sm text-base-content/60 mb-4">{cancelTarget.name}</p>
+            <div>
+              <label className="label label-text text-xs">{t("subscriptions.end_date_label")}</label>
+              <input
+                type="date"
+                data-testid="cancel-end-date"
+                className="input input-bordered w-full"
+                value={cancelDate}
+                onChange={(e) => {
+                  setCancelDate(e.target.value);
+                  setCancelInvalid(false);
+                }}
+              />
+              {cancelInvalid && (
+                <div data-testid="cancel-end-date-error" className="text-error text-xs mt-1">
+                  {t("subscriptions.end_before_start")}
+                </div>
+              )}
+            </div>
+            <div className="modal-action mt-4">
+              <button className="btn btn-ghost" onClick={closeCancel}>
+                {t("common.cancel")}
+              </button>
+              <button className="btn btn-error" onClick={handleCancelConfirm} disabled={cancelSubmitting}>
+                {cancelSubmitting ? <span className="loading loading-spinner loading-xs" /> : t("subscriptions.confirm_cancel")}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={closeCancel} />
         </div>
       )}
     </main>

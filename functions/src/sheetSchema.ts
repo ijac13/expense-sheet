@@ -33,8 +33,13 @@ export const CATEGORIES_SPEC: TabSpec = {
 
 export const SUBSCRIPTIONS_SPEC: TabSpec = {
   tab: "Subscriptions",
+  // start_date and end_date are optional for the same reason gov_category is on
+  // Categories: neither header exists on the live tabs yet, and a required one
+  // absent from row 1 throws below — 500ing every subscriptions request, every
+  // insights request and the daily scheduler the instant this deploys. The write
+  // paths create the headers on demand instead.
   required: ["id", "name", "amount", "category_id", "frequency", "due_day", "due_month", "paid_by", "is_active"],
-  optional: [],
+  optional: ["start_date", "end_date"],
 };
 
 // A type alias rather than an interface so it keeps an implicit index signature
@@ -49,6 +54,8 @@ export type Subscription = {
   due_month: number | undefined;
   paid_by: string;
   is_active: boolean;
+  start_date: string;
+  end_date: string;
 };
 
 export class SheetSchemaError extends Error {
@@ -147,6 +154,11 @@ export function rowToSubscription(row: Row, map: ColumnMap): Subscription {
     due_month: dueMonth ? Number(dueMonth) : undefined,
     paid_by: String(cell(row, map, "paid_by") ?? ""),
     is_active: cell(row, map, "is_active") !== "false",
+    // "" for all three unset shapes — column absent, cell blank, row truncated
+    // by Sheets' trailing-blank trimming — so "has this ended?" never has to
+    // distinguish null from undefined from empty.
+    start_date: String(cell(row, map, "start_date") ?? ""),
+    end_date: String(cell(row, map, "end_date") ?? ""),
   };
 }
 
