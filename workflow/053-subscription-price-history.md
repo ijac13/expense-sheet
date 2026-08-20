@@ -320,3 +320,38 @@ Restored from a byte-copy backup after each, confirmed 2 guards present and 70/7
 `start_date` was captured since cycle 1 but never rendered, which is what the captain hit on staging. Both card types now show it under the same absent-not-placeholder rule `end_date` already followed, and the cancelled card shows the two independently rather than as a pair — the end-without-start case is real data this very feature produces, and start-without-end is what hand-archiving in the sheet produces.
 
 The one judgement call worth flagging to verify: the start date renders as the last line of the active card and above the end date on the cancelled card. Nothing in the ACs pins position or wording, so if the captain wants it elsewhere or labelled differently, that is a locale-string and line-order change, not a logic one.
+
+## Stage Report: verify (cycle 3)
+
+**Verdict: PASSED** — with one deploy-state flag the gate must act on before the captain's manual test (below).
+
+- DONE: Re-run the full test suite fresh (npm install/ci, not symlinks) and confirm app 70/70 (63 + 7 new) and functions 132/132 unchanged
+  Confirmed both `node_modules` were real directories, not symlinks, then ran a genuine `npm ci` in each (216 / 266 packages). app **70/70**, functions **132/132**, both exit 0.
+- DONE: Independently reproduce both mutations the build report claims
+  Reproduced from a byte-verified backup (sha256 `e3cc9145…`), not taken on trust. Mutation 1 (`git checkout d9ff56d -- page.tsx`, new tests kept) → exactly 4 fail: tests 59, 62, 64, 65 (active+start, cancelled+both, cancelled+start-only, archive-preserves-start). Mutation 2 (both guards `{sub.start_date && (` → `{true && (`) → exactly the other 3 fail: 60, 61, 63 (active+no-start, neither-renders-neither, cancelled+end-only). The two sets **partition tests 59–65 with no overlap and no gap**, so no new test passes vacuously in either direction. Restored, sha re-matched, 70/70 green, and the index unstaged so the branch is byte-identical to `aa5b9d2`.
+- DONE: Confirm the two new ACs (AC-26, AC-27) are implemented exactly as specced
+  AC-26: `page.tsx:346` (active card) and `page.tsx:403` (cancelled card), both gated `{sub.start_date && (…)}` — the same falsy-`""` guard AC-21 already used, so absent stays absent rather than blank. AC-27: two **sibling** conditionals, not one combined branch, so each date follows its own presence rule. Both one-sided cases are covered by real tests, not just both-present/both-absent — test 63 (end-only → no start element) and test 64 (start-only → no end element). Mutation 1 kills 64 and mutation 2 kills 63, so both one-sided cases are genuinely load-bearing.
+- DONE: Confirm the new locale key (subscriptions.started) exists in both en and zh, zh is actually translated not copied, and the AC-25 key-set-parity test still passes
+  `en.subscriptions.started` = `"Started"`, `zh` = `"開始於"`; both blocks hold 26 keys. The AC-25 test asserts `notEqual(EN[k], ZH[k])` per key — a zh value copied from en fails it — plus `deepEqual` on the sorted key sets.
+- DONE: Confirm scope discipline
+  `git diff d9ff56d..HEAD` outside `workflow/` is exactly the four claimed files (`page.tsx`, `subscription-dates.render.test.js`, the two `common.json`) — 137 insertions, 6 deletions, nothing else. The test file is in `app/package.json`'s hand-enumerated `test` list, so it actually runs (AC-24). No cycle-1/2 file is touched, so nothing already verified regressed.
+- DONE: Live evidence
+  `https://expense-sheet-staging.web.app/` → **200** (11136 bytes); `https://expense-sheet-b2db8.web.app/` → **200** (10702 bytes). Staging `GET /api/subscriptions` → **200** returning `start_date`/`end_date` on every record, including one archived through this feature on 2026-08-20 — the cycle-1/2 backend is live and working. Production returns records with neither field, as expected for an unmerged branch.
+- DONE: Mandatory PII/secrets check on the new diff
+  Clean. No keys, tokens, passwords, emails, URLs, or phone numbers in any added line. Only `.env.*.example` files are tracked and they hold empty or `TODO_` placeholders. The one fixture name (`paid_by: "Karen"`) is pre-existing at `d9ff56d` in `app/test/helpers/dom.js`, not newly introduced here.
+
+### Flag for the gate: staging is one build stale
+
+AC-26/AC-27 are proven in jsdom but are **not on staging**. The deployed staging bundle inlines its locale table ending `…end_before_start:"…",ended:"Ended"}` with **no `started` key**, and `/locales/en/common.json` on staging serves 25 subscription keys against this branch's 26. Since commit `01756a0` added the key and the render in the same commit, its absence proves staging predates cycle 3.
+
+This matters concretely: **if the captain repeats the staging manual test right now, no start date will appear and the fix will look like it failed** — the same surface that produced the cycle-2 gate amendment. Staging needs a redeploy from this branch before the manual test, and the stage definition's "deployed chunk matches built output" gate check is currently a mismatch.
+
+### Out-of-scope observation, not a gate on this entity
+
+`GET /api/subscriptions` returned **200 with real household financial data** (subscription names, amounts, payer) to a plain unauthenticated `curl` from this shell, on **both** staging and production — no cookie, no token. This is pre-existing and untouched by this entity's diff, so it does not affect this verdict, but it is worth its own entity.
+
+### Summary
+
+Everything the checklist asked for holds: fresh installs give 70/70 and 132/132, both mutations reproduce exactly and between them partition all 7 new tests, AC-26/27 are implemented with independent sibling guards including both one-sided cases, locale parity holds with a genuinely translated zh value, and the diff is exactly four files with a clean PII sweep.
+
+Two things the gate should carry forward rather than the captain discovering them live: staging still runs the cycle-2 build so the new start-date line is not yet testable there, and the subscriptions API is publicly readable — the latter being a pre-existing exposure this entity neither caused nor worsened.
