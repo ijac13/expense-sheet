@@ -1,16 +1,18 @@
 ---
 id: 053
 title: Add Start/End Dates to Subscriptions
-status: verify
+status: done
 source: captain
 started:
 completed:
-verdict: REJECTED
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-053-subscription-price-history
 issue:
-pr:
+pr: "#24"
 ---
+
+**Production deploy:** `firebase deploy --only functions,hosting --project production` run 2026-08-20. Confirmed live via `firebase hosting:channel:list` (release 2026-08-20 15:23:51) and directly: `GET /api/subscriptions` now returns `start_date`/`end_date` on every record, and `/locales/en/common.json` carries the new `subscriptions.started` key. Captain manually tested archiving and date display live on staging before merge (three verify cycles: AC-5 header-placement data-loss bug found and fixed, then a gate amendment adding start-date display after the captain caught it missing from the UI, both confirmed working).
 
 Subscriptions currently store one amount, one category, one due day — but real subscriptions change price over time (YouTube's record says NT$497 today, but 17 months of actual logged payments were NT$399; Netflix's record says NT$380, actual logged history is NT$560). Editing a subscription's amount to reflect today's real price silently overwrites the only record of what it used to cost, and — found live while working entity 051 — breaks history-matching tools that key off the current amount: changing [REDACTED-PHONE]'s amount from 850 to 499 today made its own 16 months of NT$850 history invisible to matching by amount, because there's only ever one amount on file.
 
