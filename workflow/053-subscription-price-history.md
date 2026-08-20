@@ -1,7 +1,7 @@
 ---
 id: 053
 title: Add Start/End Dates to Subscriptions
-status: verify
+status: build
 source: captain
 started:
 completed:
@@ -97,6 +97,11 @@ Display
 
 - [ ] AC-20 — A cancelled subscription's card shows its end date when `end_date` is non-empty.
 - [ ] AC-21 — A cancelled subscription whose `end_date` is `""` renders **no** end-date element at all — absent from the DOM, not an empty span and not a placeholder date. This is the state of all 10 subscriptions already cancelled today.
+
+**Gate amendment (captain, live-testing staging post-verify-cycle-2):** `start_date` is captured but was never displayed anywhere. Add:
+
+- [ ] AC-26 — Every subscription card (active and cancelled) shows its start date when `start_date` is non-empty, and renders no start-date element at all when it is `""` — same absent-not-placeholder rule as AC-21, since every subscription active before this entity has no start_date on record.
+- [ ] AC-27 — A cancelled card shows both its start date and its end date together (not end date alone as AC-20 originally specced). Each still follows its own independent presence rule — a cancelled subscription with an end_date but no start_date (e.g. cancelled via this feature but never had a start_date backfilled) shows only the end date, and vice versa.
 
 Non-regression
 
