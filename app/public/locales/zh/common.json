@@ -90,6 +90,7 @@
     "cancel_title": "取消訂閱",
     "confirm_cancel": "確認取消",
     "end_before_start": "結束日期不能早於開始日期。",
+    "started": "開始於",
     "ended": "結束於"
   },
   "settings": { "title": "設定", "signed_in_as": "目前登入", "sign_out": "登出", "font_size": "字體大小", "small": "小", "medium": "中", "large": "大", "language": "語言", "category_management": "分類管理", "user_management": "使用者管理", "open_sheet": "開啟 Google 試算表" },

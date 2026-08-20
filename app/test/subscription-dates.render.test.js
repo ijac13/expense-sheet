@@ -371,6 +371,119 @@ test("AC-20: the end date appears on the card as soon as an archive succeeds", a
 });
 
 // ---------------------------------------------------------------------------
+// AC-26 / AC-27 — the start date on the card, and the two dates together.
+//
+// The captain caught this live on staging: start_date was captured but never
+// shown anywhere. Both fields follow the SAME absent-not-placeholder rule, and
+// they follow it independently — every subscription that predates this entity
+// has no start_date, and a subscription archived through this feature has an
+// end_date with no start_date behind it. So the four combinations are all real
+// data, and each is asserted on its own rather than inferred from the others.
+// ---------------------------------------------------------------------------
+
+const startDateLine = (container, name) =>
+  cardFor(container, name).querySelector('[data-testid="start-date"]');
+const endDateLine = (container, name) =>
+  cardFor(container, name).querySelector('[data-testid="end-date"]');
+
+test("AC-26: an ACTIVE subscription with a start date shows it", async () => {
+  install();
+  const container = await mount(loadPage());
+
+  assert.equal(sectionOf(container, "Netflix"), "subscriptions.active", "fixture check");
+  const line = startDateLine(container, "Netflix");
+  assert.ok(line, "the start date is on the active card");
+  assert.ok(line.textContent.includes("2026-03-01"), line.textContent);
+  assert.ok(line.textContent.includes("subscriptions.started"), "labelled from a translation key");
+});
+
+test("AC-26: an ACTIVE subscription with no start date renders no start-date element at all", async () => {
+  install();
+  const container = await mount(loadPage());
+
+  // Spotify is the shape of all 21 subscriptions already active today: no
+  // start_date on record. Absent from the DOM — not an empty span, not a
+  // placeholder, and above all not a fabricated date.
+  assert.equal(sectionOf(container, "Spotify"), "subscriptions.active", "fixture check");
+  assert.equal(startDateLine(container, "Spotify"), null);
+  assert.ok(!cardFor(container, "Spotify").textContent.includes("subscriptions.started"));
+});
+
+test("AC-26/AC-21: a card with neither date renders neither element", async () => {
+  install();
+  const container = await mount(loadPage());
+
+  // iCloud: cancelled before this feature existed, so both fields are "".
+  const card = cardFor(container, "iCloud");
+  assert.equal(card.querySelector('[data-testid="start-date"]'), null);
+  assert.equal(card.querySelector('[data-testid="end-date"]'), null);
+});
+
+test("AC-27: a CANCELLED subscription with both dates shows both", async () => {
+  install();
+  const container = await mount(loadPage());
+
+  assert.equal(sectionOf(container, "Disney+"), "subscriptions.cancelled", "fixture check");
+  const start = startDateLine(container, "Disney+");
+  const end = endDateLine(container, "Disney+");
+  assert.ok(start, "the start date is on the cancelled card, not just the end date");
+  assert.ok(start.textContent.includes("2025-01-15"), start.textContent);
+  assert.ok(end, "the end date is still there");
+  assert.ok(end.textContent.includes("2026-06-30"), end.textContent);
+});
+
+test("AC-27: a CANCELLED subscription with an end date and no start date shows only the end date", async () => {
+  // The shape produced by this very feature: archived through the modal, but
+  // nobody ever backfilled when it began.
+  install({
+    subscriptions: [
+      { id: "sub-9", name: "HBO", amount: 200, category_id: "cat_003", frequency: "monthly", due_day: 3, paid_by: "Karen", is_active: false, start_date: "", end_date: "2026-05-31" },
+    ],
+  });
+  const container = await mount(loadPage());
+
+  assert.equal(startDateLine(container, "HBO"), null, "no start-date element is rendered");
+  const end = endDateLine(container, "HBO");
+  assert.ok(end, "the end date still shows on its own");
+  assert.ok(end.textContent.includes("2026-05-31"), end.textContent);
+});
+
+test("AC-27: a CANCELLED subscription with a start date and no end date shows only the start date", async () => {
+  // The reverse: a start date was recorded, then the captain archived it by
+  // hand in the sheet without typing an end date.
+  install({
+    subscriptions: [
+      { id: "sub-9", name: "HBO", amount: 200, category_id: "cat_003", frequency: "monthly", due_day: 3, paid_by: "Karen", is_active: false, start_date: "2025-02-14", end_date: "" },
+    ],
+  });
+  const container = await mount(loadPage());
+
+  assert.equal(endDateLine(container, "HBO"), null, "no end-date element is rendered");
+  const start = startDateLine(container, "HBO");
+  assert.ok(start, "the start date shows on its own");
+  assert.ok(start.textContent.includes("2025-02-14"), start.textContent);
+});
+
+test("AC-27: archiving keeps the start date and adds the end date beside it", async () => {
+  // Guards the local state update as much as the render: it rewrites the
+  // subscription on archive, and dropping start_date there would empty the
+  // line the captain was just looking at, with no reload to reveal it.
+  await atClock(EARLY_MORNING, async () => {
+    install();
+    const container = await mount(loadPage());
+    await openCancelModal(container, "Netflix");
+    await setValue(endDateInput(container), "2026-07-01");
+    await click(buttonByKey(container, "subscriptions.confirm_cancel"));
+
+    assert.equal(sectionOf(container, "Netflix"), "subscriptions.cancelled", "it moved");
+    const start = startDateLine(container, "Netflix");
+    assert.ok(start, "the start date survived the archive");
+    assert.ok(start.textContent.includes("2026-03-01"), start.textContent);
+    assert.ok(endDateLine(container, "Netflix").textContent.includes("2026-07-01"));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // AC-25 — every new string is a translation key present in both locales.
 // ---------------------------------------------------------------------------
 
@@ -386,7 +499,7 @@ test("AC-25: the new strings come from keys present in en and zh with identical 
   assert.ok(modal.includes("subscriptions.end_date_label"), modal);
   assert.ok(modal.includes("subscriptions.confirm_cancel"), modal);
 
-  for (const key of ["start_date_label", "end_date_label", "cancel_title", "confirm_cancel", "end_before_start", "ended"]) {
+  for (const key of ["start_date_label", "end_date_label", "cancel_title", "confirm_cancel", "end_before_start", "started", "ended"]) {
     assert.equal(typeof EN.subscriptions[key], "string", `en ${key}`);
     assert.equal(typeof ZH.subscriptions[key], "string", `zh ${key}`);
     assert.notEqual(EN.subscriptions[key], ZH.subscriptions[key], `zh ${key} is translated, not copied`);
