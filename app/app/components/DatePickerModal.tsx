@@ -109,10 +109,12 @@ export default function DatePickerModal({ value, onPick, onClose }: Props) {
       data-testid="date-picker"
       className="fixed inset-0 z-[70] bg-black/45 grid place-items-center px-4"
       onClick={(e) => {
-        // Both host sheets portal to document.body inside a wrapper whose own
-        // onClick is onClose, and React bubbles portal events up the REACT tree
-        // rather than the DOM tree — so every click in here, day cells included,
-        // would otherwise dismiss the sheet that opened the picker.
+        // React bubbles portal events up the REACT tree, not the DOM tree, so a
+        // click in here reaches the ancestors of wherever the picker was
+        // rendered — including a host sheet wrapper whose own onClick is
+        // onClose. Both current hosts happen to sit behind their own inner
+        // stopPropagation guard, so this is what keeps the picker safe to drop
+        // into a host that does not.
         e.stopPropagation();
         if (e.target === e.currentTarget) onClose();
       }}
