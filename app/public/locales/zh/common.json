@@ -99,5 +99,6 @@
   "gov_category": { "food_beverage_tobacco": "食品飲料及菸草", "clothing_footwear": "衣著鞋襪類", "housing_utilities": "住宅服務水電瓦斯及其他燃料", "furnishings_household": "家具設備及家務服務", "health": "醫療保健", "transport_communication": "交通及資通訊", "recreation_culture_education": "休閒、運動、文化及教育", "restaurants_accommodation": "餐廳及住宿", "insurance_financial": "保險及金融服務", "miscellaneous": "其他" },
   "categories": { "eating-out": "外食", "daily-necessities": "日用品", "groceries": "食材", "medical": "醫療", "travel": "旅遊", "transportation": "交通", "digital": "數位", "babies": "寶貝", "clothing": "衣服", "sports": "運動", "gifts": "禮物", "tuition": "學費", "tolls": "過路", "equipment": "設備", "fuel": "加油", "entertainment": "娛樂", "rent": "房租", "shopping": "購物", "car-repair": "修車", "donate": "捐款", "mortgage": "房貸", "other": "其他" },
   "errors": { "load_failed": "載入失敗", "retry": "重試", "no_longer_exists": "此筆支出已不存在。" },
+  "picker": { "previous_month": "上個月", "next_month": "下個月", "select_year": "選擇年份", "close": "關閉", "choose_date": "選擇日期" },
   "common": { "cancel": "取消", "delete": "刪除", "edit": "編輯", "save": "儲存", "back": "返回", "twd": "台幣", "category": "分類", "reset": "重設", "apply": "套用", "payer": "付款人" }
 }

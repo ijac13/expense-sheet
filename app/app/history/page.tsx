@@ -10,6 +10,7 @@ import { getCategories } from "../lib/categoryService";
 import { Expense } from "../lib/expenses";
 import { USERS } from "../lib/users";
 import ExpenseEditSheet from "../components/ExpenseEditSheet";
+import DatePickerModal from "../components/DatePickerModal";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,7 @@ function FilterSheet({
 }) {
   const { t, i18n } = useTranslation();
   const [draft, setDraft] = useState<Filters>(filters);
+  const [picking, setPicking] = useState<"from" | "to" | null>(null);
   const activeCategories = categories.filter(c => c.is_active);
 
   function toggleCategory(id: string) {
@@ -238,22 +240,33 @@ function FilterSheet({
               <div className="flex gap-2 mt-3">
                 <div className="flex-1">
                   <div className="text-xs text-base-content/50 mb-1">{t("history.date_from")}</div>
-                  <input
-                    type="date"
-                    className="input input-bordered input-sm w-full"
-                    value={draft.dateFrom}
-                    onChange={e => setDraft(f => ({ ...f, dateFrom: e.target.value }))}
-                  />
+                  <button
+                    type="button"
+                    data-testid="filter-date-from"
+                    onClick={() => setPicking("from")}
+                    className="input input-bordered input-sm w-full flex items-center justify-start"
+                  >
+                    {draft.dateFrom || t("picker.choose_date")}
+                  </button>
                 </div>
                 <div className="flex-1">
                   <div className="text-xs text-base-content/50 mb-1">{t("history.date_to")}</div>
-                  <input
-                    type="date"
-                    className="input input-bordered input-sm w-full"
-                    value={draft.dateTo}
-                    onChange={e => setDraft(f => ({ ...f, dateTo: e.target.value }))}
-                  />
+                  <button
+                    type="button"
+                    data-testid="filter-date-to"
+                    onClick={() => setPicking("to")}
+                    className="input input-bordered input-sm w-full flex items-center justify-start"
+                  >
+                    {draft.dateTo || t("picker.choose_date")}
+                  </button>
                 </div>
+                {picking && (
+                  <DatePickerModal
+                    value={picking === "from" ? draft.dateFrom : draft.dateTo}
+                    onPick={iso => setDraft(f => picking === "from" ? { ...f, dateFrom: iso } : { ...f, dateTo: iso })}
+                    onClose={() => setPicking(null)}
+                  />
+                )}
               </div>
             )}
           </div>

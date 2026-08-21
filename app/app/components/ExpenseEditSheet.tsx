@@ -9,6 +9,7 @@ import { Expense } from "../lib/expenses";
 import { USERS } from "../lib/users";
 import { updateExpense, deleteExpense } from "../lib/expenseService";
 import CategoryPicker from "./CategoryPicker";
+import DatePickerModal from "./DatePickerModal";
 
 interface EditForm {
   amount: string;
@@ -53,6 +54,7 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [actionError, setActionError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const cat = resolveCategory(expense.category_id, allCategories);
   const paidByUser = USERS.find(u => u.id === expense.paid_by || u.name === expense.paid_by);
@@ -220,12 +222,21 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
               {/* Date */}
               <div>
                 <div className="text-xs uppercase tracking-wider text-base-content/40 mb-1">{t("history.date_range")}</div>
-                <input
-                  type="date"
-                  className="input input-bordered w-full"
-                  value={editForm.date}
-                  onChange={e => setEditForm(f => f ? { ...f, date: e.target.value } : f)}
-                />
+                <button
+                  type="button"
+                  data-testid="edit-date-button"
+                  onClick={() => setDatePickerOpen(true)}
+                  className="input input-bordered w-full flex items-center justify-start"
+                >
+                  {editForm.date ? formatFullDate(editForm.date, lang) : t("picker.choose_date")}
+                </button>
+                {datePickerOpen && (
+                  <DatePickerModal
+                    value={editForm.date}
+                    onPick={iso => setEditForm(f => f ? { ...f, date: iso } : f)}
+                    onClose={() => setDatePickerOpen(false)}
+                  />
+                )}
               </div>
 
               {/* Paid by */}

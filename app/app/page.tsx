@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, PenLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
+import DatePickerModal from "./components/DatePickerModal";
 import { Category, DEFAULT_CATEGORIES, categoryIcon, getDefaultCategory, resolveCategory, saveLastCategory } from "./lib/categories";
 import { getCategories } from "./lib/categoryService";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
@@ -34,6 +35,7 @@ export default function HomePage() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [paidBy, setPaidBy] = useState<UserId>(DEFAULT_USER);
   const [date, setDate] = useState(() => localDateStr(new Date()));
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -174,7 +176,14 @@ export default function HomePage() {
           <button onClick={() => stepDate(-1)} className="w-6 h-6 grid place-items-center rounded-full bg-base-200 active:bg-base-300">
             <ChevronLeft size={14} />
           </button>
-          <span className="text-xs font-medium text-base-content/70">{formatDateLabel(date)}</span>
+          <button
+            type="button"
+            data-testid="home-date-button"
+            onClick={() => setDatePickerOpen(true)}
+            className="text-xs font-medium text-base-content/70 px-2 py-1 rounded-lg active:bg-base-200"
+          >
+            {formatDateLabel(date)}
+          </button>
           <button onClick={() => stepDate(1)} className="w-6 h-6 grid place-items-center rounded-full bg-base-200 active:bg-base-300">
             <ChevronRight size={14} />
           </button>
@@ -219,6 +228,14 @@ export default function HomePage() {
           </button>
         </div>
       </div>
+
+      {datePickerOpen && (
+        <DatePickerModal
+          value={date}
+          onPick={setDate}
+          onClose={() => setDatePickerOpen(false)}
+        />
+      )}
 
       {/* Notes modal */}
       {noteOpen && (
