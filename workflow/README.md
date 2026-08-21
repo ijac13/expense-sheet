@@ -109,7 +109,7 @@ When verify passes, the FO:
 1. Confirms the verify report contains live evidence (HTTP calls or observed staging behaviour) — rejects immediately if not
 2. Checks that the deployed chunk hashes on staging match the built output — if they differ, the deploy didn't go through
 3. Presents the gate summary **with concrete manual-test steps for the captain, unprompted — not only when asked.** Numbered, plain-language, no jargon: the URL to open (staging pre-merge, production post-deploy), exactly what to tap, and what should happen at each step. Pull these from the verify report's own ACs and any browser-only items it flagged as unconfirmed — don't make the captain ask for this every time.
-4. Waits for captain approval before merging
+4. Waits for captain approval before merging. **Every time the FO asks "approve to merge" — not just the first time — that ask carries its own manual-test steps or an explicit pointer to steps already given for this exact deploy.** A captain who tested once and reported success, then asked for something else, then comes back to "approve to merge" still gets a self-contained approval ask: either fresh steps (if anything changed — a redeploy, a new build) or "same as above, still current" — never a bare "approve?" that assumes the captain remembers what to check. This applies to every approval point in a merge/deploy flow, not only the gate summary immediately after verify passes.
 
 #### Rejection Protocol
 
