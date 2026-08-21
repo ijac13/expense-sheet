@@ -1,16 +1,18 @@
 ---
 id: 046
 title: Calendar-Style Date Picker (Home, History, Reports)
-status: verify
+status: done
 source: captain
 started:
 completed:
-verdict:
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-046-calendar-date-picker
 issue:
-pr:
+pr: "#25"
 ---
+
+**Production deploy:** `firebase deploy --only hosting --project production` run 2026-08-21 (frontend-only change, no functions). Confirmed live via `firebase hosting:channel:list` (release 2026-08-21 17:36:09) and `/locales/en/common.json` carrying the new `picker` keys. Captain manually tested Home, the expense edit sheet, and History's custom date range on staging before merge — all confirmed working, including month-stepping and the year-jump view.
 
 Tapping a date field on Home, History, or Reports today uses whatever basic date input each screen currently has. Replace it with a calendar-style picker modal — like Google Calendar's — so picking a date is visual: see the month grid, step left/right between months, and jump to a year view for fast long-distance navigation.
 
