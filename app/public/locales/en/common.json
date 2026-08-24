@@ -100,5 +100,5 @@
   "categories": { "eating-out": "Eating Out", "daily-necessities": "Daily Necessities", "groceries": "Groceries", "medical": "Medical", "travel": "Travel", "transportation": "Transportation", "digital": "Digital", "babies": "Babies", "clothing": "Clothing", "sports": "Sports", "gifts": "Gifts", "tuition": "Tuition", "tolls": "Tolls", "equipment": "Equipment", "fuel": "Fuel", "entertainment": "Entertainment", "rent": "Rent", "shopping": "Shopping", "car-repair": "Car Repair", "donate": "Donate", "mortgage": "Mortgage", "other": "Other" },
   "errors": { "load_failed": "Failed to load", "retry": "Retry", "no_longer_exists": "This expense no longer exists." },
   "picker": { "previous_month": "Previous month", "next_month": "Next month", "select_year": "Select year", "close": "Close", "choose_date": "Choose a date" },
-  "common": { "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "save": "Save", "back": "Back", "twd": "TWD", "category": "Category", "reset": "Reset", "apply": "Apply", "payer": "Payer" }
+  "common": { "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "save": "Save", "back": "Back", "twd": "TWD", "category": "Category", "reset": "Reset", "apply": "Apply", "payer": "Payer", "retry": "Retry", "categories_loading": "Loading categories…", "categories_unavailable": "Category list unavailable — cannot save yet." }
 }

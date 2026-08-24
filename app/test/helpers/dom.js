@@ -94,9 +94,21 @@ const SCHEDULER_OK = {
  *   below-the-fold cases).
  *   schedulerStatus is the GET /api/scheduler-status body; null makes that
  *   endpoint fail, the shape an un-deployed or broken scheduler produces.
+ *   deferCategories holds GET /api/categories open until releaseCategories() is
+ *   called — the sub-second window before the live list resolves, which is
+ *   otherwise unobservable because mount() flushes it away.
  */
-function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK, subscriptions: subFixture = SUBSCRIPTIONS, failSubscriptionWrites = false, expenses: expFixture = EXPENSES } = {}) {
+function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK, subscriptions: subFixture = SUBSCRIPTIONS, failSubscriptionWrites = false, expenses: expFixture = EXPENSES, deferCategories = false } = {}) {
   const dom = installDom();
+
+  // Mutable so a test can fail the categories fetch, then let a retry succeed
+  // without remounting — the recovery-without-reload case.
+  let categoriesOffline = offline;
+  const setOffline = (v) => { categoriesOffline = v; };
+
+  let release = null;
+  const gate = deferCategories ? new Promise((r) => { release = r; }) : null;
+  const releaseCategories = () => release?.();
 
   // jsdom implements neither API, so these records are the only way to observe a
   // page trying to move the viewport. A fix that keeps the captain's place must
@@ -120,6 +132,7 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
   const writes = [];
   const subscriptions = subFixture.map((s) => ({ ...s }));
   const subWrites = [];
+  const expWrites = [];
 
   global.fetch = async (url, init = {}) => {
     const href = String(url);
@@ -127,7 +140,8 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
     requests.push(href);
 
     if (href === "/api/categories" && method === "GET") {
-      if (offline) return { ok: false, status: 503, statusText: "Service Unavailable" };
+      if (gate) await gate;
+      if (categoriesOffline) return { ok: false, status: 503, statusText: "Service Unavailable" };
       // Fresh objects per request, as JSON parsing would give — returning the same
       // array reference would let React bail out of the re-render.
       return { ok: true, status: 200, json: async () => categories.map((c) => ({ ...c })) };
@@ -174,9 +188,17 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
       Object.assign(target, body);
       return { ok: true, status: 200, json: async () => ({ ...target }) };
     }
+    // addExpense POSTs to bare "/api". Recorded rather than served by the
+    // fall-through, so a test can assert on the category_id that was actually
+    // SENT — the whole question this entity turns on.
+    if (href === "/api" && method !== "GET") {
+      const body = JSON.parse(init.body);
+      expWrites.push({ method, body });
+      return { ok: true, status: 201, json: async () => ({ id: `exp-${expWrites.length}`, created_at: "2026-08-24T00:00:00.000Z", ...body }) };
+    }
     return { ok: true, status: 200, json: async () => expFixture.map((e) => ({ ...e })) };
   };
-  return { dom, requests, writes, categories, setCategoryIcon, scrolls, subscriptions, subWrites };
+  return { dom, requests, writes, categories, setCategoryIcon, scrolls, subscriptions, subWrites, expWrites, setOffline, releaseCategories };
 }
 
 /**

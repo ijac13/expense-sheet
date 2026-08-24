@@ -211,7 +211,7 @@ test("AC-12: a new expense on a swapped sheet still lands under its own headers"
   });
   const api = loadApi(sheets);
 
-  await call(api, "POST", "/api", { date: "2026-08-13", amount: 42, notes: "coffee" });
+  await call(api, "POST", "/api", { date: "2026-08-13", amount: 42, notes: "coffee", category_id: "cat_001" });
   const row = grids.Expenses[1];
   assert.equal(row[6], "2026-08-13", "date followed its header to column G");
   assert.equal(row[1], "coffee", "notes followed its header to column B");
@@ -245,7 +245,7 @@ test("AC-12: row insertion never rewrites the header row, even when A1 is not `i
   const api = loadApi(sheets);
   const headerBefore = grids.Expenses[0].slice();
 
-  await call(api, "POST", "/api", { amount: 10 });
+  await call(api, "POST", "/api", { amount: 10, category_id: "cat_001" });
   assert.deepEqual(grids.Expenses[0], headerBefore, "the captain's column order survived the insert");
   assert.equal(requests.filter((r) => /^UPDATE Expenses!A1/.test(r)).length, 0, "no write targeted row 1");
   // Header is [date, amount, id, ...] here.

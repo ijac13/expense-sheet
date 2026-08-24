@@ -159,11 +159,32 @@ export function resolveCategoryIcon(
 
 export const LAST_CATEGORY_KEY = "expense_last_category_id";
 
+/**
+ * The stored last-used id, verbatim, or "" when nothing is stored.
+ *
+ * This deliberately validates nothing. It used to gate the stored value through
+ * `DEFAULT_CATEGORIES.find`, which rejected every live `cat_NNN` id — so a
+ * captain's choice was written to localStorage and thrown away on the next load,
+ * reverting to the `eating-out` slug. Deciding whether the stored id is still
+ * usable needs the live Categories list, which only the caller has: that is
+ * `pickCategoryId`'s job.
+ */
 export function getDefaultCategory(): string {
-  if (typeof window === "undefined") return DEFAULT_CATEGORIES[0].id;
-  const stored = localStorage.getItem(LAST_CATEGORY_KEY);
-  if (stored && DEFAULT_CATEGORIES.find((c) => c.id === stored)) return stored;
-  return DEFAULT_CATEGORIES[0].id;
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(LAST_CATEGORY_KEY) ?? "";
+}
+
+/**
+ * The id a picker should start on, given the stored preference and the live
+ * ACTIVE categories. Returns "" only when the live list is empty — there is no
+ * slug fallback, because a slug is not a value any write path may submit.
+ *
+ * Pass the is_active-filtered list: an id that is stored but archived has to
+ * fall back, since the picker renders no tile for it to highlight.
+ */
+export function pickCategoryId(stored: string, activeCategories: Category[]): string {
+  if (stored && activeCategories.some((c) => c.id === stored)) return stored;
+  return activeCategories[0]?.id ?? "";
 }
 
 export function saveLastCategory(categoryId: string): void {
