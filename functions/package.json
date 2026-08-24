@@ -19,7 +19,9 @@
     "migrate:insurance-tax:dry-run": "node -r ./scripts/load-local-env.js scripts/apply-insurance-tax-categories.js --dry-run",
     "backfill:analyze": "npm run build && node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --analyze",
     "backfill:apply:dry-run": "npm run build && node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --apply --dry-run",
-    "backfill:apply": "npm run build && node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --apply"
+    "backfill:apply": "npm run build && node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --apply",
+    "migrate:category-ids:dry-run": "npm run build && npm --prefix ../app run build:lib && node -r ./scripts/load-local-env.js scripts/normalize-category-ids.js --dry-run",
+    "migrate:category-ids": "npm run build && npm --prefix ../app run build:lib && node -r ./scripts/load-local-env.js scripts/normalize-category-ids.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

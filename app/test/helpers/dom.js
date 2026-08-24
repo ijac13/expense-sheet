@@ -95,7 +95,7 @@ const SCHEDULER_OK = {
  *   schedulerStatus is the GET /api/scheduler-status body; null makes that
  *   endpoint fail, the shape an un-deployed or broken scheduler produces.
  */
-function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK, subscriptions: subFixture = SUBSCRIPTIONS, failSubscriptionWrites = false } = {}) {
+function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK, subscriptions: subFixture = SUBSCRIPTIONS, failSubscriptionWrites = false, expenses: expFixture = EXPENSES } = {}) {
   const dom = installDom();
 
   // jsdom implements neither API, so these records are the only way to observe a
@@ -174,7 +174,7 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
       Object.assign(target, body);
       return { ok: true, status: 200, json: async () => ({ ...target }) };
     }
-    return { ok: true, status: 200, json: async () => EXPENSES };
+    return { ok: true, status: 200, json: async () => expFixture.map((e) => ({ ...e })) };
   };
   return { dom, requests, writes, categories, setCategoryIcon, scrolls, subscriptions, subWrites };
 }
@@ -229,4 +229,4 @@ function iconForRow(container, marker) {
   return icon.textContent;
 }
 
-module.exports = { CATEGORIES, EXPENSES, SUBSCRIPTIONS, SCHEDULER_OK, installGlobals, mockAuth, mount, iconForRow };
+module.exports = { CATEGORIES, EXPENSES, SUBSCRIPTIONS, SCHEDULER_OK, expense, installGlobals, mockAuth, mount, iconForRow };

@@ -40,6 +40,27 @@ function makeSheets(tabs) {
     return grids[tab];
   };
 
+  const writeRange = (range, values) => {
+    const { tab, from, to } = parseRange(range);
+    const grid = gridFor(tab);
+    // Sheets 400s on "tried writing to column X" rather than silently
+    // widening the range. Without this, a write range one column short of
+    // the payload would look like it worked.
+    const width = to.col - from.col + 1;
+    const widest = Math.max(...values.map((v) => v.length));
+    if (widest > width) {
+      throw new Error(`Requested writing within range ${range}, but tried writing ${widest} columns`);
+    }
+    const firstRow = (from.row ?? 1) - 1;
+    values.forEach((cells, r) => {
+      const rowIdx = firstRow + r;
+      while (grid.length <= rowIdx) grid.push([]);
+      cells.forEach((v, i) => {
+        grid[rowIdx][from.col + i] = v;
+      });
+    });
+  };
+
   const sheets = {
     spreadsheets: {
       get: async () => ({
@@ -102,24 +123,16 @@ function makeSheets(tabs) {
         },
         update: async ({ range, requestBody }) => {
           requests.push(`UPDATE ${range}`);
-          const { tab, from, to } = parseRange(range);
-          const grid = gridFor(tab);
-          // Sheets 400s on "tried writing to column X" rather than silently
-          // widening the range. Without this, a write range one column short of
-          // the payload would look like it worked.
-          const width = to.col - from.col + 1;
-          const widest = Math.max(...requestBody.values.map((v) => v.length));
-          if (widest > width) {
-            throw new Error(`Requested writing within range ${range}, but tried writing ${widest} columns`);
+          writeRange(range, requestBody.values);
+          return {};
+        },
+        // values.batchUpdate is one HTTP call carrying many ranges; each lands
+        // exactly as the single-range update would, including the over-wide 400.
+        batchUpdate: async ({ requestBody }) => {
+          for (const entry of requestBody.data) {
+            requests.push(`BATCHUPDATE ${entry.range}`);
+            writeRange(entry.range, entry.values);
           }
-          const firstRow = (from.row ?? 1) - 1;
-          requestBody.values.forEach((values, r) => {
-            const rowIdx = firstRow + r;
-            while (grid.length <= rowIdx) grid.push([]);
-            values.forEach((v, i) => {
-              grid[rowIdx][from.col + i] = v;
-            });
-          });
           return {};
         },
         append: async ({ range, requestBody }) => {
