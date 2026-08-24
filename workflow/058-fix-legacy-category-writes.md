@@ -1,7 +1,7 @@
 ---
 id: 058
 title: Stop the App Writing Legacy Category Slugs
-status: ideation
+status: spec
 source: captain (surfaced by entity 054's spec)
 started:
 completed:
