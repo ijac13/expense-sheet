@@ -1,7 +1,7 @@
 ---
 id: 054
 title: Normalize category_id to Live cat_NNN Scheme
-status: build
+status: verify
 source: captain
 started:
 completed:
