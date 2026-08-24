@@ -158,3 +158,46 @@ The ideation puts the write path out of scope *"unless the migration surfaces a 
 Traced the mapping live against the production sheet rather than inferring it, which confirmed the ideation's counts exactly and established that zero values are unmappable today — so the migration's halt path is a guard against drift, not an expected branch. The spec's ACs are pinned to concrete observed numbers (2133/37 rows, exact per-category post-run totals) so a partial or double run is detectable rather than a matter of judgment.
 
 Two pre-existing defects surfaced that the migration would expose rather than cause, and both need a captain call at this gate: the write path still emits the `eating-out` slug on every fresh page load (`getDefaultCategory()` actively rejects a stored live id), so migrated data starts re-dirtying immediately; and `TodayExpenseList.tsx` never adopted `resolveCategory()`, so post-migration it renders every home-screen row as the raw text `cat_001` with a placeholder icon. I recommend folding the second into this entity and tracking the first separately.
+
+## Stage Report: build
+
+**Attribution.** AC-1 through AC-11 were built by a prior build ensign that died mid-response; its work is commit `6be0730`, independently verified by the FO before commit. I re-ran its suite and read the script, but did not re-derive its live-sheet trace — those lines are reported, not re-earned. AC-12's display proof and all of AC-13 are mine (commit `e0450b4`).
+
+- DONE: AC-1 / AC-2 — every non-empty `category_id` in both tabs equals a live Categories id after a run
+  `functions/scripts/normalize-category-ids.js` (`6be0730`). Test "AC-1/AC-2: after a live run no non-empty category_id is a slug" fails if any slug row is left out of the write set.
+- DONE: AC-3 — each new value equals `resolveCategory(old, live).id`, derived at run time, not from a second table
+  The script calls the app's own compiled `resolveCategory` (hence the `npm --prefix ../app run build:lib` precondition). Test "AC-3: every rewritten value equals resolveCategory(old, live).id" fails if a hand-maintained mapping table is substituted.
+- DONE: AC-4 — row counts unchanged; each target's post-run total is slug rows plus its live twin's rows
+  Test "AC-4: row counts are unchanged and each target's total is slug rows + live twin rows" fails if a merge case (`donate`+`cat_020`) drops either side.
+- DONE: AC-5 — local admin script under `functions/scripts/`, no app route, endpoint, scheduled function, or UI
+  `git show --stat 6be0730` touches only `functions/scripts/`, `functions/test/`, and two `package.json` script entries.
+- DONE: AC-6 — `--dry-run` performs zero writes and prints the full per-tab plan
+  `--dry-run` mints a `spreadsheets.readonly` token, so a write is impossible for the credential rather than merely skipped. Tests "AC-6: --dry-run leaves both grids byte-identical and issues no write call", "…names each old value, its target and its row count, per tab", and "…mints a readonly token; a live run mints a write token" fail if the scope is widened.
+- DONE: AC-7 — any unmappable value halts non-zero having written nothing, naming every one
+  Ten tests cover the four unmappable shapes (renamed twin, absent `cat_NNN`, untrimmed whitespace, in neither list) in both dry-run and live mode, plus the both-tabs-in-one-halt case. Each fails if the script skips the row and continues instead of halting.
+- DONE: AC-8 — an immediate re-run reports zero changes and writes nothing
+  Test "AC-8: an immediate re-run changes nothing and writes nothing" fails if already-live rows re-enter the write set.
+- DONE: AC-9 / AC-10 — only `category_id` changes; no row, column, or reorder, and Categories is never written
+  Full pre/post snapshot diff. Tests "AC-9: every column other than category_id is byte-identical after the run", "AC-10: no row or column is added, removed or reordered…", "the post-run verification fails loudly when a neighbouring cell moves", and "a run whose write lands in the wrong column throws VerificationError" fail if a write drifts one column.
+- DONE: AC-11 — the `category_id` column is located by header name via `buildColumnMap`, not a hardcoded letter
+  Test "AC-11: a reordered tab is written at the header's column, not at D" fails if the column index is hardcoded.
+- DONE: AC-12 — History, Reports (breakdown and drill-down), Subscriptions, and the edit sheet render live names and icons post-migration
+  New `app/test/post-migration.render.test.js` — 7 tests mounting the real surfaces against a 100%-`cat_NNN` fixture. The script's own tests never covered this; the existing render tests use a mostly-slug fixture, which exercises the bridge branch instead of the live-id branch this migration bets on.
+- DONE: AC-13 — `TodayExpenseList` switches to `resolveCategory()` and renders the real name and icon
+  `app/app/components/TodayExpenseList.tsx` (`e0450b4`), plus `app/test/today-list.render.test.js` (7 tests). The icon source moved from the `CATEGORY_ICONS` Lucide map to the live category's `icon` field: that map is keyed by legacy slug, so swapping only the lookup would still have rendered `Package` for every migrated row. `CATEGORY_ICONS` is left in place — entity 049 scoped its removal elsewhere.
+- DONE: Edge cases from the spec
+  Already-live rows reported apart from blanks and excluded from the write set; a Sheets-truncated row read as blank rather than crashing; duplicate live `name_en` halting rather than letting `find()` pick one; whitespace routed to the halt rather than trimmed. AC-13's tests add the display side: archived category, blank icon cell, orphan id, and the offline degradation the spec documents as an accepted cost.
+- DONE: Self-check by mutation on the highest-risk ACs
+  Reverting `TodayExpenseList.tsx` to `HEAD` fails 6 of 7 AC-13 tests with the exact bug symptom — label `cat_001` where `Eating Out` is expected. Stubbing `resolveCategory`'s live-id branch to `undefined` fails 9 of the 14 new tests; the 5 survivors are exactly those that do not depend on that branch (fixture guard, orphan fallback, slug bridge, offline, empty state).
+- DONE: Full suite re-run fresh, no regressions
+  app 118/118 (104 pre-existing, unchanged, plus 14 new), functions 160/160, `npm run build` clean. The app suite could not run at all before this commit: `6be0730` wired two test filenames into the test script without writing them.
+- SKIPPED: Any write against production or staging
+  Out of bounds for this stage — the production run is a separate captain-gated action after verify.
+
+### Summary
+
+AC-13 turned out to be more than a lookup swap. `CATEGORY_ICONS` is keyed by legacy slug, so pointing `resolveCategory()` at the live list while leaving the icon lookup alone would have satisfied the letter of "use resolveCategory" and still rendered the generic `Package` glyph on every migrated row — the exact symptom AC-13 exists to remove. The icon now comes from the live category's own `icon` field, matching every other surface since entity 049.
+
+I also wrote the AC-12 display proof, which nothing had covered: the migration script's tests stop at the sheet, and the existing render tests run on a mostly-slug fixture that travels `resolveCategory`'s bridge branch rather than the direct live-id branch the migrated data will use. Both new test files were already named in `app/package.json` by the prior commit but never written, so `npm test` in `app/` was failing outright until now.
+
+**One spec claim is wrong and the captain should see it before verify.** AC-13 and Surfaced Gap 2 both describe `TodayExpenseList` as the Home screen's today-list, "visible on the home screen immediately after the run". It is not rendered anywhere — a repo-wide grep finds no import of it, and `app/page.tsx` shows only a logged-today count. Entity 049 reached the same conclusion independently and recorded the component as dead code, also noting that entity 042's citation of it as a live surface was already stale. The fix is correct and worth keeping, but it repairs a component no user currently sees, so it does not by itself protect the Home screen. Whether to wire it up or delete it is a call for the captain, not something I should decide inside a migration entity.
