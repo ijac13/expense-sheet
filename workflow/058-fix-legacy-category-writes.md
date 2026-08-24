@@ -1,13 +1,13 @@
 ---
 id: 058
 title: Stop the App Writing Legacy Category Slugs
-status: spec
+status: build
 source: captain (surfaced by entity 054's spec)
 started:
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-058-fix-legacy-category-writes
 issue:
 pr:
 ---
