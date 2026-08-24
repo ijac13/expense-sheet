@@ -1,13 +1,13 @@
 ---
 id: 054
 title: Normalize category_id to Live cat_NNN Scheme
-status: spec
+status: build
 source: captain
 started:
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-054-normalize-category-ids
 issue:
 pr:
 ---
