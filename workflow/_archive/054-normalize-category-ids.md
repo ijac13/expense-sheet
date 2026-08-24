@@ -1,16 +1,18 @@
 ---
 id: 054
 title: Normalize category_id to Live cat_NNN Scheme
-status: verify
+status: done
 source: captain
 started:
 completed:
-verdict:
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-054-normalize-category-ids
 issue:
-pr:
+pr: "#26"
 ---
+
+**Production migration applied:** `npm run migrate:category-ids` (functions/) run 2026-08-24 against production, after a `--dry-run` confirmed the exact plan (2,063 rows, zero unmappable). Real run: 2,032 Expenses rows + 31 Subscriptions rows changed; the script's own post-run verification confirmed every other cell, header row, row count, and the Categories tab byte-identical. Independently confirmed live via `GET /api` and `GET /api/subscriptions`: zero non-`cat_NNN` values remain in either tab (25 distinct ids, matching the live Categories tab exactly). `TodayExpenseList.tsx`'s fix (AC-13) deployed to production hosting the same day; the component itself remains unwired to any page per captain's decision (leave as-is for now). Entity 058 (write-path fix) not yet built — captain explicitly chose to run this migration first and accept some legacy-slug re-drift until 058 lands.
 
 Production's Expenses (and Subscriptions) `category_id` column is a genuine mix: 12 distinct values are live `cat_NNN` ids from the Categories tab, and 23 are legacy slugs (`groceries`, `eating-out`, `tax`, ...) left over from before the app had a live category system. The app still displays these correctly today only because of a bridge function (`resolveCategory()` in `app/app/lib/categories.ts`, added for entity 044): a slug id is matched against a hardcoded `DEFAULT_CATEGORIES` list by id, then bridged to the live category of the same `name_en`. It works, but it's a two-hop, name-matching workaround standing in for a direct id match — if a category is ever renamed in the sheet, or the hardcoded list drifts from it, every row still using the old slug for that category silently loses its live icon/data with no error.
 
