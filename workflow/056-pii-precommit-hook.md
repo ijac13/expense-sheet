@@ -1,11 +1,11 @@
 ---
 id: 056
 title: Pre-Commit PII Scanner
-status: verify
+status: build
 source: captain
 started:
 completed:
-verdict:
+verdict: REJECTED
 score:
 worktree: .worktrees/spacedock-ensign-056-pii-precommit-hook
 issue:
@@ -125,7 +125,7 @@ Detection
 - [ ] AC-12 — `0900000001` and `0900000002` are not blocked; `0900010001` (outside the reserved block) is blocked.
 - [ ] AC-13 — Scanning every tracked text file (excluding `package-lock.json`, `.next/`, `node_modules/`) reports no match anywhere under `app/`, `functions/`, `docs/`, or the repo root.
 - [ ] AC-14 — A blocked commit prints, to stderr, the file path, the line number, the match kind, and the matched value, and exits 1.
-- [ ] AC-15 — A commit with no matches exits 0 and prints nothing to stderr.
+- [ ] AC-15 — **(Gate amendment, verify cycle 1)** A commit with no matches **and no skipped binaries** exits 0 and prints nothing to stderr. Originally written without the "no skipped binaries" qualifier; verify proved that qualifier is required because git redirects a hook's stdout into stderr, so a binary-skip report cannot reach stdout under any real `git commit` regardless of where the hook writes it — the write destination doesn't decide the stream, git does. AC-19 below still requires the report to be user-visible; it is just necessarily on stderr, alongside a real match report, not distinguishable from one by stream alone.
 
 Override
 
@@ -135,7 +135,7 @@ Override
 Edge cases
 
 - [ ] AC-18 — A staged change that only *deletes* lines containing a real phone number or email exits 0.
-- [ ] AC-19 — A commit staging only a binary file whose bytes contain `0912345678` and `real.person@gmail.com` exits 0, and the hook reports the count of binary files it skipped.
+- [ ] AC-19 — A commit staging only a binary file whose bytes contain `0912345678` and `real.person@gmail.com` exits 0, and the hook reports the count of binary files it skipped. **(Gate amendment, verify cycle 1)** The test for this AC must drive a real `git commit`, not call the hook function directly — verify found the build's test asserted `stderr === ''` by invoking the hook in isolation, which hid the fact that `git commit` itself relays the hook's entire stdout onto stderr. Assert the skip-count report is visible to the user (wherever git actually puts it), not on a specific stream captured outside git's own process.
 - [ ] AC-20 — A staged diff of 60,000 added lines completes in under 2 seconds.
 - [ ] AC-21 — The scan skips exactly these and nothing else: `package-lock.json`, any path under `scripts/hooks/test/`, and any file git reports as binary.
 
