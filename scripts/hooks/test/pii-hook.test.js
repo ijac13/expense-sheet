@@ -263,12 +263,17 @@ test('AC-14 a blocked commit reports path, line, kind and value on stderr and ex
   assert.match(res.stderr, /0912345678/, 'expected matched value');
 });
 
-test('AC-15 a clean commit exits 0 and writes nothing to stderr', () => {
+test('AC-15 a clean commit with no skipped binaries exits 0 and stays silent on stderr', () => {
   const dir = H.makeRepo();
+  const before = H.headCount(dir);
   H.stage(dir, 'clean.md', 'nothing to see here\ncontact test@example.com\n');
-  const res = H.runHook(dir);
-  assert.strictEqual(res.status, 0);
-  assert.strictEqual(res.stderr, '', 'stderr must be empty on a clean run');
+
+  // Driven through real `git commit`, not the hook alone: git redirects a hook's
+  // stdout into stderr, so only the real path can prove the user sees nothing.
+  const res = H.commit(dir, 'clean');
+  assert.strictEqual(res.status, 0, `a clean commit must succeed: ${res.stderr}`);
+  assert.strictEqual(res.stderr, '', 'stderr must be empty on a clean, binary-free commit');
+  assert.strictEqual(H.headCount(dir), before + 1);
 });
 
 // ------------------------------------------------------------------- Override
@@ -304,21 +309,41 @@ test('AC-18 a deletion-only change exits 0', () => {
   assert.strictEqual(H.runHook(dir).status, 0, 'removing PII must never be blocked');
 });
 
-test('AC-19 a binary file with PII bytes exits 0 and the skip count is reported', () => {
-  const dir = H.makeRepo();
-  const payload = Buffer.concat([
-    Buffer.from([0x00, 0x01, 0x02, 0x00]),
-    Buffer.from('0912345678 real.person@gmail.com'),
-    Buffer.alloc(1024, 0),
-  ]);
-  fs.writeFileSync(path.join(dir, 'blob.bin'), payload);
-  H.git(dir, 'add', '--', 'blob.bin');
+test('AC-19 a binary file with PII bytes commits, and git shows the user the skip count', () => {
+  const binaryWithPii = () =>
+    Buffer.concat([
+      Buffer.from([0x00, 0x01, 0x02, 0x00]),
+      Buffer.from('0912345678 real.person@gmail.com'),
+      Buffer.alloc(1024, 0),
+    ]);
 
+  const dir = H.makeRepo();
+  const before = H.headCount(dir);
+  H.write(dir, 'blob.bin', binaryWithPii());
+  H.git(dir, 'add', '--', 'blob.bin');
   assert.match(H.git(dir, 'diff', '--cached', '--numstat').stdout, /^-\t-\t/m, 'git must see it as binary');
-  const res = H.runHook(dir);
-  assert.strictEqual(res.status, 0, 'binary content is an accepted, documented gap');
-  assert.strictEqual(res.stderr, '');
-  assert.match(res.stdout, /skipped 1 binary file/, 'the skip must be reported, not silent');
+
+  // Real `git commit`, not the hook in isolation. Git runs hooks with stdout
+  // redirected into stderr, so where the hook writes does not decide the stream
+  // the user reads — asserting on an isolated run measures the wrong process.
+  const res = H.commit(dir, 'add binary');
+  assert.strictEqual(res.status, 0, `binary content is an accepted, documented gap: ${res.stderr}`);
+  assert.strictEqual(H.headCount(dir), before + 1, 'the binary commit must actually land');
+  assert.match(
+    res.stdout + res.stderr,
+    /skipped 1 binary file/,
+    'the skip must reach the user somewhere, not be silent'
+  );
+  assert.match(res.stderr, /skipped 1 binary file/, 'measured on git 2.40.1: that stream is stderr');
+
+  // The count is counted, not a constant.
+  H.write(dir, 'second.bin', binaryWithPii());
+  H.write(dir, 'third.bin', binaryWithPii());
+  H.git(dir, 'add', '--', 'second.bin');
+  H.git(dir, 'add', '--', 'third.bin');
+  const two = H.commit(dir, 'add two binaries');
+  assert.strictEqual(two.status, 0, `two binaries must also commit: ${two.stderr}`);
+  assert.match(two.stderr, /skipped 2 binary files/, 'the reported count must track how many were skipped');
 });
 
 test('AC-20 a 60,000-line added diff scans in under 2 seconds', () => {

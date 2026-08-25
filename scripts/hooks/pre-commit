@@ -10,7 +10,8 @@ if (error) {
   process.exit(1);
 }
 
-// stdout, not stderr: a commit with no findings must leave stderr empty.
+// Stays on stdout, but git runs hooks with stdout redirected into stderr, so
+// under a real `git commit` the user reads this on stderr either way.
 if (binarySkipped > 0) {
   const noun = binarySkipped === 1 ? 'binary file' : 'binary files';
   process.stdout.write(
