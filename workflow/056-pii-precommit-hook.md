@@ -255,3 +255,157 @@ every worktree — with ~10 ensigns committing concurrently, this build delibera
 it. Running `npm install` at the repo root after merge activates it. Second, the spec's Findings
 item is already resolved: `workflow/_archive/` is clean on both HEAD and `main`, redacted in commit
 "051: redact a phone number missed during the earlier history rewrite", so no captain action remains.
+
+## Stage Report: verify
+
+**Verdict: REJECTED** — 23 of 24 ACs verified independently; the AC-15/AC-19 stream contract fails in
+the real `git commit` path. Details under the FAILED item.
+
+- DONE: Re-run the full test suite fresh and confirm 26/26 for this entity's own suite, plus functions 173/173 and app 142/142 unchanged
+  Fresh runs: entity 26/26, functions 173/173, app 142/142. **0 skipped** in the entity suite, so the
+  real-`npm install` ACs genuinely executed rather than skipping on a missing npm. Both existing suites'
+  `test` scripts are byte-identical to `main` (compared via `git show main:`); the only manifest change
+  is the added `prepare` line.
+- DONE: IMPORTANT SAFETY CONSTRAINT — all installation/activation testing isolated from the shared checkout
+  Held, and checked rather than assumed. `core.hooksPath` in the shared checkout was read before and
+  after every experiment and never moved off `/Users/ijac/Claude-ijac/expense-sheet/.git/hooks`. No
+  `npm install` ran anywhere in the shared checkout: the app/functions suites used `node_modules`
+  symlinked read-only from the primary checkout, removed afterwards with `git status` clean. All
+  install/activation testing ran in `mktemp` repos. Note for the FO: `npm install` in *any* worktree
+  would have mutated the shared config, because `prepare` calls `git config core.hooksPath` and that key
+  is repo-wide — the constraint was load-bearing, not theoretical.
+- DONE: Independently reproduce at least 3 of the build's mutation claims, including the AC-5 no-npm-install-worktree case and the reserved-range boundary in AC-12
+  Six mutations, each caught by the AC claiming to cover it: widening the reserved range → AC-12 fails on
+  the out-of-block value; deleting the carve-out → AC-12 fails on the reserved fixtures; dropping the
+  phone lookbehind → the D2 test fails; widening the exemption to the whole hooks tree → AC-21 fails on
+  `scripts/hooks/pre-commit`; scanning `-` lines → AC-18 fails; routing the skip report to stderr → AC-19
+  fails. Each mutation was reverted and the tree re-checked clean.
+  AC-5 was verified as a two-arm experiment rather than a source mutation, which is stronger: with the
+  hook directory **tracked**, a zero-setup worktree (no `node_modules`) blocked the commit at exit 1 and
+  HEAD did not move; with a **Husky layout** (`.husky/_` gitignored, config inherited), the same commit
+  in the same situation exited 0, printed nothing, and the phone number landed in history. The Husky
+  primary checkout was still protected — confirming the failure is specific to worktrees, this repo's
+  dominant case. The rejection of Husky is justified.
+- DONE: Independently verify AC-13 against the live tracked tree, including workflow/_archive/051-subscription-backfill-historical.md
+  Scanned every tracked text file at HEAD, `main`, and `origin/main` with the shipped scanner — wider
+  than the AC-13 test, which scopes to app/functions/docs/root. 183 text files at HEAD: zero findings
+  anywhere under `app/`, `functions/`, `docs/`, or the root. All 51 `workflow/_archive/` files clean at
+  all three refs, including 051; the redaction is intact, with line 20 now reading `[REDACTED-PHONE]`.
+  Counterfactual confirmed: scanning the pre-redaction blob (`e7c25b4^`) yields exactly 1 phone-local
+  finding at line 20, and 0 after — the scanner would have caught it. Replaying the real redaction with
+  the hook active commits at exit 0, so cleanup is never blocked. The only findings in the whole tree are
+  the 18 constructed literals in this spec's own AC section, exactly what D4 predicts and accepts.
+- FAILED: Confirm the AC-15/AC-19 conflict resolution holds — a clean commit prints nothing to stderr, a binary-file commit's skip-count report goes to stdout instead, and does not leak into stderr under any tested condition
+  **The skip report reaches stderr on every binary commit.** Git runs hooks with stdout redirected to
+  stderr, so the `process.stdout.write` at `scripts/hooks/pre-commit:16` cannot land on stdout. Measured
+  in one repo with identical staged state: invoking the hook directly gives stdout=report/stderr=empty;
+  `git commit` gives stdout=empty/stderr=report. A three-line `/bin/sh` hook echoing to stdout behaves
+  identically, so this is git's redirect, not node's. Reproduced across binary-only, binary+clean-text,
+  two-binaries, and binary+PII commits — the report was on stderr in all four.
+  Consequence: AC-15 ("a commit with no matches ... prints nothing to stderr") fails whenever the commit
+  stages a binary file, since that is a commit with no matches. The build report's claim that "both hold
+  only if the report goes elsewhere, so it goes to stdout" is not achievable under git.
+  The suite stays green because AC-19's assertion at `scripts/hooks/test/pii-hook.test.js:320`
+  (`assert.strictEqual(res.stderr, '')`) invokes the hook directly and never goes through `git commit` —
+  a test-fidelity gap that hides the real behaviour. A clean commit with no binary *is* silent on stderr,
+  so only the binary case fails.
+  Recommended fix, cheapest first: amend AC-15 to "a commit with no matches **and no skipped binaries**
+  prints nothing to stderr", leave the write where it is (git decides the stream regardless), and change
+  the AC-19 test to drive a real `git commit`, asserting the report is visible to the user and that a
+  clean no-binary commit stays silent. Writing to `/dev/tty` would technically reach stdout but breaks in
+  CI and non-tty contexts; suppressing the report defeats AC-19's point of making the gap visible.
+- DONE: Confirm AC-24 for real by checking the actual commit history, not just trusting the claim
+  Checked, and the claim needs a caveat the build did not state: the hook was **not active** when
+  `803a655` was made — the live `core.hooksPath` points at `.git/hooks`, which holds only `.sample`
+  files, so no scanner ran and "needed no override" was trivially true. The meaningful test is the
+  counterfactual, which I ran: replaying `803a655`'s exact 8-file tree into an isolated repo with the
+  hook genuinely active (`hooksPath=scripts/hooks`, executable present) and committing **without**
+  `--no-verify` exits 0. The build report commit `a33d640` also replays clean. AC-24 holds.
+- DONE: Mandatory PII/secrets check on the full diff
+  Clean. No `.env`, key, cert, or credential files in the diff; zero hits for Google/OpenAI/GitHub/Slack/
+  AWS key shapes, JWTs, PEM blocks, or `secret|password|token = "..."` assignments; no URLs at all in
+  added lines. All 22 distinct phone/email literals across the 8 changed files classify as declared
+  stand-ins, RFC 2606 reserved domains, `.gserviceaccount.com` machine identities, or `your-`/`TODO_`
+  placeholders. The two initially-unclassified values are the reserved-block endpoints quoted in a code
+  comment describing the range, and the shipped scanner allowlists both.
+- DONE: Live evidence — demonstrate the hook working end-to-end in an isolated scratch environment
+  Full journey driven by real `npm install` and real `git commit` in an isolated fixture: unprotected
+  before install → `npm install` in `app/` alone sets repo-wide `core.hooksPath=scripts/hooks` (AC-3) →
+  a phone number is blocked at exit 1 with path, line, kind and value on stderr and HEAD unmoved
+  (AC-4, AC-14) → an inline `// pii-allow` comment is still blocked (AC-17) → a commit run from inside
+  `app/` is blocked too (AC-6) → `--no-verify` lets it through (AC-16) → a clean commit exits 0 and
+  silent (AC-15). The `prepare` lines were lifted from the real manifests, so weakening one would change
+  what this demo installs.
+- FAILED: If everything holds, set verdict PASSED
+  Everything else holds; the AC-15/AC-19 item does not, so the verdict is REJECTED per the stage
+  definition's rejection protocol.
+
+### Summary
+
+The hook is well built and its load-bearing claims survive independent challenge. The Husky rejection is
+the one most worth trusting: reproduced from both sides, a gitignored hooks directory really does let a
+zero-setup worktree commit a phone number silently, and the tracked-directory design really does block it
+with no `node_modules` present. Detection, the reserved-range boundary, the narrow D4 exemption,
+deletion-only commits and the large-diff path all resisted mutation.
+
+One AC fails, and it fails only in the real `git commit` path the unit tests never exercise: git redirects
+hook stdout into stderr, so the binary skip-count report the build deliberately moved to stdout arrives on
+stderr anyway, breaking AC-15 for any commit that stages a binary file. The fix is small and mostly a spec
+amendment — AC-15 as written is unachievable alongside AC-19 under git — but it needs a build cycle, and
+the AC-19 test should drive `git commit` so the suite stops asserting something the real path contradicts.
+
+Two things the captain should know regardless of the fix. **The hook is still inactive in the primary
+checkout** — `core.hooksPath` points at `.git/hooks`, which contains only sample files; someone must run
+`npm install` at the repo root after merge to switch it on, and until then nothing is being scanned. And
+the 051 archive redaction is confirmed intact at HEAD, `main`, and `origin/main`, with the scanner proven
+to catch the pre-redaction content, so no captain action remains on that Findings item.
+
+## Stage Report: build (cycle 2)
+
+Scoped to the AC-15/AC-19 test-fidelity fix. AC-1..14, 16..18, 20..24 untouched.
+
+- DONE: Fix the verify-stage (cycle 1) REJECTED finding: AC-15 and AC-19 as originally written are jointly unachievable under real git
+  Fixed as a test-fidelity change, not a behaviour change. Commit `051b633`.
+- DONE: Update the AC-19 test to spawn a real `git commit` and assert the skip-count report is visible in whatever stream git actually delivers it on — confirm this yourself rather than trusting the prior measurement
+  Re-measured independently before touching the test, in `mktemp` repos, on git 2.40.1. Across all four
+  shapes verify named — binary-only, binary+clean-text, two-binaries, binary+PII — the report arrives on
+  **stderr** under `git commit` and never on stdout, while the same hook invoked directly puts it on
+  stdout with stderr empty. A three-line `/bin/sh` hook echoing to stdout behaves identically, so the
+  redirect is git's, not node's. Verify's measurement reproduced exactly. AC-19's test now drives
+  `H.commit()` and asserts on that measured stream.
+- DONE: Do not weaken AC-19's actual guarantee (the skip count must still be reported and visible) — only fix how/where the test observes it
+  The guarantee is asserted two ways: visibility across `stdout + stderr` (stream-agnostic, the thing the
+  user actually experiences) and the measured stream specifically. Strengthened rather than weakened —
+  the test now also asserts the commit lands (`headCount` moves) and adds a two-binary case so the count
+  is load-bearing. Proven by mutation: deleting the report block fails AC-19; hardcoding the count to a
+  constant `1` fails AC-19 on the two-binary case. Both mutations passed the cycle-1 test shape's intent
+  but are now caught through the real commit path.
+  One assertion deliberately no longer discriminates: routing the write to stderr (a cycle-1 mutation)
+  now passes. That is correct — under git the stream choice is unobservable, so the old assertion was
+  measuring git's behaviour rather than the hook's, which is precisely what hid this gap.
+- DONE: Re-verify AC-15 still holds for its now-narrower claim: a commit with no matches AND no skipped binaries prints nothing to stderr and exits 0
+  Holds, with no code change, and now confirmed through a real `git commit`: exit 0, `stderr === ''`,
+  HEAD advances. Falsifiable — making the hook emit one line on a clean commit fails AC-15.
+- DONE: Re-run the full suite fresh and confirm nothing else regressed: entity suite, functions 173/173, app 142/142
+  Fresh runs after cleanup: entity 26/26 (0 skipped), functions 173/173, app 142/142. Test counts
+  unchanged from cycle 1 — the two rewritten tests are rewrites, not additions.
+- DONE: Continue observing the safety constraint from cycle 1 — no npm install in the shared checkout, no mutation of the live core.hooksPath
+  Held and checked, not assumed. `core.hooksPath` read before and after every experiment, both times
+  `/Users/ijac/Claude-ijac/expense-sheet/.git/hooks` — never moved. No `npm install` ran anywhere: the
+  app/functions suites used `node_modules` symlinked read-only from the primary checkout, removed
+  afterwards with the primary's directories intact and `git status` showing only the two intended files.
+  All hook testing ran in `mktemp` repos.
+
+### Summary
+
+Verify's diagnosis was right and I reproduced it from scratch rather than taking it on trust: git runs
+hooks with stdout redirected into stderr, so the cycle-1 test asserting `stderr === ''` on a directly
+invoked hook was measuring a process git never runs. AC-15 and AC-19 now both drive real `git commit`s.
+
+The hook's behaviour is unchanged — the only source edit is a comment that had asserted the now-disproven
+rationale for writing to stdout. AC-19's guarantee is stricter than before, not looser: visibility plus a
+real count plus the commit actually landing, each confirmed falsifiable by mutation.
+
+Worth the gate's attention: AC-19's report is no longer distinguishable from a real PII failure by stream
+alone, since both land on stderr. That is inherent to git and accepted by the AC-15 amendment, but it
+means a user seeing the skip line reads it in the same channel as a block message.
