@@ -162,3 +162,30 @@ This is the highest-impact deploy of the session: a misconfigured check locks bo
 - Rate limiting, abuse prevention, or anything beyond "is this one of the two authorized people."
 - Rotating or restricting the Firebase Web API key, tightening Firestore/Sheets IAM, or any other hardening not on the token-check path.
 - Adding a client-side pre-check before API calls — `authContext` already blocks unauthorized emails at render time (D2).
+
+## Stage Report: spec
+
+- DONE: Write the formal spec using the Spec Template (Goal, User Stories, Acceptance Criteria, Edge Cases, Out of Scope) from the ideation body
+  All five template sections present, plus Current State / Design Decisions / Rollout Plan; commit a8ac903.
+- DONE: Trace the exact current frontend auth flow — does the app obtain a Firebase ID token anywhere, does any fetch send an Authorization header at all
+  `grep -rn Authorization` over `app/app`, `functions/src`, `app/test`, `functions/test` returned **zero** matches; all 16 `fetch` call sites across 8 files send `Content-Type` only. Recorded as an explicit "the frontend needs a real change" row.
+- DONE: Trace exactly how the backend would verify a token — is firebase-admin a dependency, what's the minimal verifyIdToken() shape against existing Admin init
+  `firebase-admin ^13.0.0` is declared and installed, but `grep -rn "firebase-admin\|initializeApp\|admin\."` over `functions/src` returned **zero** — there is no existing init to reuse. Confirmed by loading the package that `firebase-admin/app` exports `initializeApp`/`getApps` and `firebase-admin/auth` exports `getAuth`.
+- DONE: Decide and specify precisely where the two authorized emails live server-side; confirm whether functions/ can read NEXT_PUBLIC_-prefixed vars or needs its own
+  **It cannot.** `firebase-tools/lib/functions/env.js:149-156` resolves only `.env`, `.env.<projectId>`, `.env.<alias>` relative to `functions/`; `functions/.env` holds `SPREADSHEET_ID` alone, while the emails live in `app/.env.local`. Decision D1: a new server-side `AUTHORIZED_EMAILS` (comma-separated) in `functions/.env` and `functions/.env.staging`.
+- DONE: Confirm CORS implications — Allow-Headers update, and whether preflight OPTIONS must bypass the new auth check
+  `setCors()` at index.ts:39-43 sends `Allow-Headers: Content-Type` only, so `Authorization` must be added (AC-13). OPTIONS already returns 204 at index.ts:269-272 before any other work, so the check goes after that early return — AC-12 asserts `verifyIdToken` is never invoked on that path via a spy.
+- DONE: Acceptance criteria binary/independently testable, covering no-token reject, wrong-email reject, authorized accept with behavior unchanged, and entity 050 scheduler confirmed unaffected
+  22 numbered ACs over 14 enumerated method+path combinations. Scheduler confirmed by reading index.ts:822-831 — `subscriptionScheduler` is a separate `onSchedule` export calling `getSheetsClient()`/`runSubscriptionScheduler()` directly, never entering the `api` handler.
+- DONE: The spec MUST address rollout safety explicitly — how build/verify prove this against real tokens before production, and the exact recovery path
+  Rollout Plan orders hosting before functions (a functions-first deploy would run the enforcing backend against the still-tokenless bundle = instant outage). AC-21 requires a real staging Google sign-in token, not fixtures. Recovery is `git revert` + `firebase deploy --only functions` (~1-3 min; Functions has no one-click rollback), captain standing by, unattended step 4 forbidden. AC-11 adds a preflight env-match check as the single guard against lockout.
+- DONE: Confirm scope boundary per the ideation — no new sign-in UI/flow, no multi-user/role support, no rate limiting
+  All three carried into Out of Scope verbatim, plus two boundaries the tracing surfaced: no unrelated hardening (API key rotation, IAM), and no client-side pre-check since `authContext` already blocks unauthorized emails at render time.
+
+### Summary
+
+Traced every claim against the code rather than carrying the ideation's assumptions forward, which changed three things. The frontend genuinely sends no token today, so this is a two-sided change; `functions/` provably cannot read the `NEXT_PUBLIC_` emails, settling the env-var question as "needs its own var"; and `app/app/lib/auth.ts` has zero importers, so the whole file goes, not just the stub.
+
+The load-bearing find for build is that `call()` in `functions/test/sheetsStub.js:171-190` builds requests with no `headers` key. Exercised it directly against a stand-in handler: reading `req.headers.authorization` throws `TypeError: Cannot read properties of undefined`, so all 81 `call()` invocations across 5 files break unless the stub supplies headers and a default authorized token. Baseline confirmed green first — `npm --prefix functions test` passes 173/173 today, which is what AC-6 measures non-regression against.
+
+Rollout safety is specified rather than left to build: hosting-before-functions ordering, a preflight env-match check, real-token staging evidence, and a redeploy recovery path with the captain standing by.
