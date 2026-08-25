@@ -1,13 +1,13 @@
 ---
 id: 057
 title: Use Shared Calendar Date Picker on Subscriptions
-status: spec
+status: build
 source: captain
 started:
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-057-subscriptions-date-picker
 issue:
 pr:
 ---
