@@ -175,3 +175,45 @@ This is the "genuine gap" the ideation's Out of Scope clause anticipated, so it 
 The spec swaps two controls and nothing else, with 15 binary ACs and a hard floor under entity 053's 26 tests — only 8 assertions across 3 tests may change, each replaced by the equivalent claim rather than dropped. Two of the ideation's inherited facts turned out to be wrong and are corrected in the body: the line numbers are ~33 lines stale, and the "twelve call sites" figure is 11.
 
 The one thing needing a decision at the gate is the z-index. Reusing `DatePickerModal` untouched is impossible here — it would ship a calendar that renders behind the dialog that opened it, and no test in this repo can catch that, because jsdom computes no layout. The spec asks for one token's worth of change to the shared component, pinned statically by AC-11 and by a human tap-through on staging at AC-12. Entity 046's verify stage named this exact assumption as the picker's one untested claim; this is where it comes due.
+
+## Stage Report: build
+
+- DONE: Implement AC-1 through AC-5 (the swap)
+  `grep -rn 'type="date"' app/app/` → zero hits. Both fields are now `<button type="button">` triggers showing raw ISO / `picker.choose_date`, opening the picker at their own value (commit `83d3098`).
+- DONE: Implement AC-6 through AC-10 (entity 053's guarantees, unweakened)
+  All 26 original test names still present verbatim (`comm` against `HEAD:` shows none missing), none skipped, 35 total now. 7 of the 8 tabulated assertions changed (`.disabled === false` needed no change); `readOnly === false` became a click that asserts the picker opens on the pre-filled day.
+- DONE: Implement AC-11 (the one authorized DatePickerModal change)
+  `z-[70]` → `z-[1000]`, a one-line diff — `git diff` on that file shows exactly 1 insertion, 1 deletion. The test reads `z-index:999` out of `app/node_modules/daisyui/daisyui.css` rather than hardcoding it, so a daisyUI bump that moves the constant fails loudly.
+- DONE: Implement AC-13 through AC-15 (regression and scope)
+  `npm test` after `npm ci` → **151 pass, 0 fail** (baseline was 142; 26 → 35 in the swapped suite). No new locale strings — AC-25's key-set-parity test passes untouched.
+- FLAGGED: AC-14's three-file confinement — the diff touches a **fourth** file. See below.
+- DONE: Implement the Edge Cases section as tests
+  Picker backdrop dismiss, the picker's own close button, and Escape each close only the picker and leave the host dialog open with its date intact and nothing archived. Pre-fill survival and the error-clears-on-pick wire are covered by AC-7/AC-8 and mutation-proven below.
+- DONE: Do NOT adjust DatePickerModal's year-jump range
+  Untouched. `YEARS_BACK`/`YEARS_FORWARD` (`DatePickerModal.tsx:12-13`) are outside the one-line diff.
+- DONE: Self-check every AC with falsifiability proven by mutation
+  Four mutations run, each reverted after measuring:
+  1. `z-[1000]` → `z-[70]`: AC-11's test fails alone (1 fail).
+  2. Drop `setCancelInvalid(false)` from `onPick`: "correcting the date clears the message" fails (1 fail) — the exact wire the spec flagged as easy to drop.
+  3. Remove the end-date trigger's `onClick`: 13 tests fail, including AC-8's "tapping it opens the picker — still editable", proving the editability claim was kept rather than dropped.
+  4. Re-derive both pre-fills with `toISOString()`: 8 tests fail, so the local-Taipei pre-fill genuinely survives the swap.
+- SKIPPED: AC-12 (manual staging tap-through)
+  Reserved for verify by the dispatch. Build performed no write against staging or production.
+
+### The fourth file in the diff
+
+`app/test/date-picker.render.test.js` had to change. Entity 046's AC-26 test asserts the app-wide list of remaining native date inputs equals **`["subscriptions/page.tsx", "subscriptions/page.tsx"]`** — the two hits entity 057 exists to remove. AC-1 (zero hits) and AC-13 (zero failures) cannot both hold while that expectation stands, so this is forced rather than discretionary.
+
+The change is minimal and confined to that one test: the expectation becomes `[]` and the title is updated to match. Its coverage of the original four fields is untouched. I also removed the duplicate walker I had first written into `subscription-dates.render.test.js`, so the invariant keeps a single home — 046's walker, where it belongs.
+
+### Notable
+
+- **The picker is driven, not typed into.** The replacement for `setValue()` is a `pickDate()` helper that opens the trigger, uses the year view for a different year, steps months, then clicks the day — reading the grid's current position off its first day cell rather than assuming it. A picker that opened on the wrong month fails there instead of being bypassed.
+- **The empty-value fallback is reachable only by emptying the pre-fill.** Both fields are always pre-filled at open, so `""` never occurs through the UI. The test swaps `todayLocalIso` on the compiled lib module — the page calls it late-bound through the module object (`page.js:128, :218`) — which drives the real page down the real fallback branch rather than asserting against a replica of the markup. Mutation 4 independently confirms the test is not vacuous: bypassing `todayLocalIso` makes it fail.
+- **No i18next stub added**, as the spec measured.
+
+### Summary
+
+Both Subscriptions date fields now open the shared calendar, and the picker was raised to `z-[1000]` so it paints above daisyUI's `.modal` rather than behind it. Entity 053's suite kept all 26 tests and gained 9; the full suite went 142 → 151 with zero failures, and four mutations confirm the highest-risk claims fail when the behaviour they name is removed.
+
+The one thing for the gate is the fourth file: entity 046's AC-26 test hardcoded the two native inputs this entity removes, so it had to be updated. AC-12 remains the untestable half — whether the calendar actually paints above the dialog needs a human on staging, which is exactly what verify is for.
