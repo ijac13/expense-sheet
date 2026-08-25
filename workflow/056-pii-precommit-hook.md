@@ -1,13 +1,13 @@
 ---
 id: 056
 title: Pre-Commit PII Scanner
-status: spec
+status: build
 source: captain
 started:
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-056-pii-precommit-hook
 issue:
 pr:
 ---
