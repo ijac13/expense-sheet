@@ -17,7 +17,7 @@ pr: "#23"
 Entity 050 fixes subscription auto-add going forward, but explicitly excludes backfilling — the scheduler never ran successfully, so every month since Jan 2025 that should have generated an expense entry never did. An approximate check (matching by amount within the due month, ±2%) against the 21 currently-active subscriptions found the picture is mixed, not uniformly missing:
 
 - Several subscriptions (the gym payments, a couple of others) are already ~100% covered — the captain has been logging these by hand consistently, so there's likely nothing to backfill there.
-- Several others have real, substantial gaps: Libi 投資贊助 (7/20 months covered), 網路 中華電信 (8/20), Netflix (11/20), 0975379852 (12/20).
+- Several others have real, substantial gaps: Libi 投資贊助 (7/20 months covered), 網路 中華電信 (8/20), Netflix (11/20), [REDACTED-PHONE] (12/20).
 
 The amount-matching check is approximate — a price change, a bundled charge, or an unrelated expense of the same amount could produce a false positive or false negative. This needs a careful, subscription-by-subscription review before writing anything, not an automated blanket fill.
 
