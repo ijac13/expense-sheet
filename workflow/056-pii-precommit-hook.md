@@ -194,3 +194,64 @@ The spec is settled by experiment rather than assumption on all three load-beari
 One process note worth recording: the first draft of this spec quoted the real 051 numbers and the captain's real email as AC test values, and the prototype scanner caught them when run over the draft before commit. That is a third instance of the same mistake, made while specifying the fix for it, and it is the strongest available argument that this hook needs to exist. All such values are now constructed stand-ins.
 
 Two items need the captain's attention. First, `workflow/_archive/051-subscription-backfill-historical.md:20` still carries a real phone number on `main` today — the 051 rewrite missed it, and it was the prototype's sole true positive. Second, a fresh clone is unprotected until someone runs `npm install`; that gap is inherent to git not copying local config on clone and cannot be closed from inside the repo, so the spec accepts it explicitly rather than papering over it.
+
+## Stage Report: build
+
+Implementation plan (written before coding): tracked `scripts/hooks/pre-commit` as a thin
+dependency-free node entry point over `scripts/hooks/pii-scan.js` (detection + staged-diff
+parsing, requireable so tests exercise the real logic); `scripts/install-hooks.js` for the
+relative `core.hooksPath`; `prepare` in all three manifests; AC suite under the D4-exempt
+`scripts/hooks/test/`. Commit: `803a655`.
+
+- DONE: Implement AC-1 through AC-7 (installation)
+  Hook tracked at mode `100755` (`git ls-files -s`). AC-2/AC-3 run a *real* `npm install` at
+  root, `app/` and `functions/` against a no-dep fixture and read the resulting config; the
+  fixture's prepare lines are read out of the real manifests, so editing one to skip the
+  installer fails the test. AC-5 passes with no `node_modules` in the worktree — making the
+  hook directory untracked (reproducing the Husky failure mode) is the change that fails it.
+- DONE: Implement AC-8 through AC-15 (detection)
+  All 13 must-block shapes blocked, all 8 allowlisted addresses and the reserved-block
+  fixtures clean. AC-13 scanned the live tracked tree for real (180 text files): zero matches
+  under `app/`, `functions/`, `docs/`, root. Widening or deleting the reserved-range carve-out
+  each fail AC-12, so that boundary is genuinely pinned rather than incidentally true.
+- DONE: Implement AC-16/AC-17 (override)
+  `--no-verify` commits blocked content and advances HEAD; a line carrying `// pii-allow` is
+  still blocked. Honouring any inline comment convention would fail AC-17.
+- DONE: Implement AC-18 through AC-21 (edge cases)
+  Deletion-only exits 0 (scanning `-` lines too fails AC-18). Binary staged file exits 0 with
+  the skip counted. 60k added lines scan in ~0.2s against a 2s budget, and a leak planted on
+  line 60,001 is still caught, so the pass is not a scanner that gave up. AC-21 pins the skip
+  set both as a predicate and end to end; widening the exemption to the whole hooks tree fails
+  AC-21 and AC-23.
+- DONE: Implement AC-22 through AC-24 (self-test)
+  AC-24 was verified twice: in a scratch repo built from empty, and for real — the hook was run
+  against this build's actual staged index (hook plus full test suite, containing must-block
+  literals) and exited 0. This commit needed no override.
+- DONE: Self-check every AC ... with falsifiability proven by mutation ... Confirm the existing
+  test suites in app/ and functions/ are unaffected
+  26 tests, all passing. Eight mutations run, each caught by the AC claiming to cover it. Existing
+  suites re-run unchanged: functions 173/173, app 142/142 (their `test` scripts are byte-identical
+  to `main`; the only manifest change is the added `prepare` line). No production or staging
+  write was attempted — this entity is entirely local tooling.
+
+### Summary
+
+All 24 ACs are met and the suite is falsifiable: the mutation run turned up one test that proved
+nothing. AC-20's fixture (`sub-17000000000NN` row IDs) contains no `9`, so it can never match the
+phone pattern and dropping the digit lookarounds left the suite green — contradicting the spec's
+D2 rationale for those lookarounds. The lookarounds are still load-bearing for other inputs, so a
+discriminating test was added (a 14-digit run embedding a phone shape) rather than trusting the
+spec's example.
+
+One spec conflict had to be resolved to satisfy both sides: AC-15 requires a clean commit to print
+nothing to stderr, AC-19 requires a binary-file commit to report its skip count. Both hold only if
+the report goes elsewhere, so it goes to stdout. Separately, `prepare` in `app/` and `functions/`
+is `test -f`-guarded, because a Firebase functions-only deploy uploads `functions/` without the
+repo root and would otherwise fail on the missing installer.
+
+Two things the captain should know. **The hook is not yet active in the primary checkout.** Its
+`core.hooksPath` is still the old absolute `.git/hooks`, and that config is shared repo-wide across
+every worktree — with ~10 ensigns committing concurrently, this build deliberately did not mutate
+it. Running `npm install` at the repo root after merge activates it. Second, the spec's Findings
+item is already resolved: `workflow/_archive/` is clean on both HEAD and `main`, redacted in commit
+"051: redact a phone number missed during the earlier history rewrite", so no captain action remains.
