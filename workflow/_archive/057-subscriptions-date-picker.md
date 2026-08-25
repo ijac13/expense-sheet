@@ -1,16 +1,18 @@
 ---
 id: 057
 title: Use Shared Calendar Date Picker on Subscriptions
-status: verify
+status: done
 source: captain
 started:
 completed:
-verdict:
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-057-subscriptions-date-picker
 issue:
-pr:
+pr: "#29"
 ---
+
+**Production deploy:** `firebase deploy --only hosting --project production` run 2026-08-25 (frontend-only, no functions changed). Confirmed live via `firebase hosting:channel:list` and by fetching the deployed stylesheet directly: `z-index:1000` present, `z-index:70`'s old rule absent. Captain manually tested both fields (Add's Start Date, Cancel's end date) live on staging before merge — pass, calendar renders correctly above both dialogs.
 
 Entity 046 built one shared calendar-style date picker (`app/app/components/DatePickerModal.tsx`) and swapped it into Home, the expense edit sheet, and History's custom date range. It deliberately left Subscriptions' two date fields (Add's Start Date, Cancel's end-date prompt) on the native `<input type="date">`, because entity 053's shipped test suite drives both fields directly through `setValue()` on the native input at twelve call sites — swapping the control would break that suite, and 046 was scoped to the four fields it could change without touching a different, already-verified entity's tests.
 
