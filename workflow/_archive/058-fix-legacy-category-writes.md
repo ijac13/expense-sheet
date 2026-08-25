@@ -1,16 +1,18 @@
 ---
 id: 058
 title: Stop the App Writing Legacy Category Slugs
-status: verify
+status: done
 source: captain (surfaced by entity 054's spec)
 started:
 completed:
-verdict:
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-058-fix-legacy-category-writes
 issue:
-pr:
+pr: "#27"
 ---
+
+**Production deploy:** `firebase deploy --only functions --project production` then `firebase deploy --only hosting --project production` run separately 2026-08-25 (verify flagged a real Firebase CLI trap: a combined `functions,hosting` deploy can report success while silently leaving hosting on stale code — deployed in two steps specifically to avoid it). Confirmed live: `POST /api` with `category_id: "eating-out"` returns `400` naming the rejected value (was `201` before); `/locales/en/common.json` carries the new `categories_loading` key; `firebase hosting:channel:list` shows the fresh release. Final end-to-end check: `npm run migrate:category-ids:dry-run` against production reports **0 rows to change** — entity 054's cleanup and this entity's write-path fix both holding together live.
 
 Surfaced while writing entity 054's spec (normalizing existing `category_id` data to live `cat_NNN` ids): the app's write path never stopped creating the old legacy-slug style ids in the first place, so entity 054's migration would not stay done — new slug rows start accumulating again the moment someone logs an expense after the migration runs.
 
