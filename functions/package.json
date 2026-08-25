@@ -7,6 +7,7 @@
   },
   "main": "lib/index.js",
   "scripts": {
+    "prepare": "test -f ../scripts/install-hooks.js && node ../scripts/install-hooks.js || true",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "test": "npm run build && node --test test/",

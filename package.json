@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "prepare": "node scripts/install-hooks.js"
+  },
   "dependencies": {
     "recharts": "^3.8.1"
   }

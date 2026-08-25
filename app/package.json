@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prepare": "test -f ../scripts/install-hooks.js && node ../scripts/install-hooks.js || true",
     "dev": "next dev",
     "prebuild": "node scripts/set-manifest.js",
     "build": "next build",
