@@ -8,6 +8,7 @@ import { getCategories } from "../lib/categoryService";
 import { USERS, DEFAULT_USER } from "../lib/users";
 import { useAuth } from "../lib/authContext";
 import { useTranslation } from "react-i18next";
+import DatePickerModal from "../components/DatePickerModal";
 
 type ModalMode = "add" | "edit" | null;
 
@@ -135,6 +136,8 @@ export default function SubscriptionsPage() {
   const [cancelDate, setCancelDate] = useState("");
   const [cancelInvalid, setCancelInvalid] = useState(false);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [startPickerOpen, setStartPickerOpen] = useState(false);
+  const [endPickerOpen, setEndPickerOpen] = useState(false);
 
   // Sort newest first (IDs are timestamp-based: sub-{ms})
   const active = subscriptions.filter((s) => s.is_active).sort((a, b) => b.id.localeCompare(a.id));
@@ -150,6 +153,7 @@ export default function SubscriptionsPage() {
       category_id: activeCategories[0]?.id ?? "",
       start_date: todayLocalIso(),
     });
+    setStartPickerOpen(false);
     setModalMode("add");
   }
 
@@ -241,6 +245,7 @@ export default function SubscriptionsPage() {
     setCancelDate(todayLocalIso());
     setCancelInvalid(false);
     setCancelSubmitting(false);
+    setEndPickerOpen(false);
   }
 
   function closeCancel() {
@@ -546,13 +551,23 @@ export default function SubscriptionsPage() {
               </div>
               <div>
                 <label className="label label-text text-xs">{t("subscriptions.start_date_label")}</label>
-                <input
-                  type="date"
+                {/* Raw ISO, matching the History filter's triggers and the card
+                    line directly beneath — prose here would disagree with it. */}
+                <button
+                  type="button"
                   data-testid="add-start-date"
-                  className="input input-bordered w-full"
-                  value={addForm.start_date}
-                  onChange={(e) => setAddForm((f) => ({ ...f, start_date: e.target.value }))}
-                />
+                  onClick={() => setStartPickerOpen(true)}
+                  className="input input-bordered w-full flex items-center justify-start"
+                >
+                  {addForm.start_date || t("picker.choose_date")}
+                </button>
+                {startPickerOpen && (
+                  <DatePickerModal
+                    value={addForm.start_date}
+                    onPick={(iso) => setAddForm((f) => ({ ...f, start_date: iso }))}
+                    onClose={() => setStartPickerOpen(false)}
+                  />
+                )}
               </div>
             </div>
             {categoryStatus}
@@ -659,16 +674,27 @@ export default function SubscriptionsPage() {
             <p className="text-sm text-base-content/60 mb-4">{cancelTarget.name}</p>
             <div>
               <label className="label label-text text-xs">{t("subscriptions.end_date_label")}</label>
-              <input
-                type="date"
+              <button
+                type="button"
                 data-testid="cancel-end-date"
-                className="input input-bordered w-full"
-                value={cancelDate}
-                onChange={(e) => {
-                  setCancelDate(e.target.value);
-                  setCancelInvalid(false);
-                }}
-              />
+                onClick={() => setEndPickerOpen(true)}
+                className="input input-bordered w-full flex items-center justify-start"
+              >
+                {cancelDate || t("picker.choose_date")}
+              </button>
+              {endPickerOpen && (
+                <DatePickerModal
+                  value={cancelDate}
+                  onPick={(iso) => {
+                    setCancelDate(iso);
+                    // onPick is now the only write path, so it carries the reset
+                    // the old input's onChange did — without it a corrected date
+                    // still sits under a stale red error.
+                    setCancelInvalid(false);
+                  }}
+                  onClose={() => setEndPickerOpen(false)}
+                />
+              )}
               {cancelInvalid && (
                 <div data-testid="cancel-end-date-error" className="text-error text-xs mt-1">
                   {t("subscriptions.end_before_start")}

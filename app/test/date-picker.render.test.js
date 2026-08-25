@@ -822,7 +822,11 @@ test("AC-25: every new string is a key present in both locales, zh translated", 
   assert.deepEqual(Object.keys(EN).sort(), Object.keys(ZH).sort(), "and so do the files");
 });
 
-test("AC-26: only the two Subscriptions inputs still use a native date input", () => {
+// Entity 057 swapped the last two holdouts (Subscriptions' Add start date and
+// Cancel end date), so the expected remainder is now empty. This walker stays
+// the single app-wide guard that every day-granularity date comes from the
+// shared calendar; entity 057's own suite covers how those two fields behave.
+test("AC-26: no native date input is left anywhere in the app", () => {
   const root = path.join(__dirname, "../app");
   const hits = [];
   (function walk(dir) {
@@ -839,9 +843,5 @@ test("AC-26: only the two Subscriptions inputs still use a native date input", (
     }
   })(root);
 
-  assert.deepEqual(
-    hits.map((h) => h.split(":")[0]),
-    ["subscriptions/page.tsx", "subscriptions/page.tsx"],
-    `native date inputs remain at ${hits.join(", ")}`
-  );
+  assert.deepEqual(hits, [], `native date inputs remain at ${hits.join(", ")}`);
 });
