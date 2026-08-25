@@ -107,7 +107,7 @@ export default function DatePickerModal({ value, onPick, onClose }: Props) {
   return createPortal(
     <div
       data-testid="date-picker"
-      className="fixed inset-0 z-[70] bg-black/45 grid place-items-center px-4"
+      className="fixed inset-0 z-[1000] bg-black/45 grid place-items-center px-4"
       onClick={(e) => {
         // React bubbles portal events up the REACT tree, not the DOM tree, so a
         // click in here reaches the ancestors of wherever the picker was

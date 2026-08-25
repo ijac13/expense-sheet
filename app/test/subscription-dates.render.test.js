@@ -13,6 +13,8 @@ process.env.TZ = "Asia/Taipei";
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { mock } = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
 const React = require("react");
 const { installGlobals, mockAuth, mount, SUBSCRIPTIONS } = require("./helpers/dom.js");
 
@@ -34,6 +36,62 @@ const setValue = (input, value) =>
     setter.call(input, value);
     input.dispatchEvent(new global.window.Event("input", { bubbles: true }));
   });
+
+const pressEscape = () =>
+  React.act(async () => {
+    global.document.dispatchEvent(
+      new global.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+    );
+  });
+
+// ─── Picker helpers (entity 057) ─────────────────────────────────────────────
+// Both date fields are now triggers that open the shared DatePickerModal. It
+// portals to document.body as a SIBLING of the mounted container, so
+// container.querySelector cannot see it — picker queries run against the
+// document, exactly as date-picker.render.test.js:70-71 documents.
+
+const $ = (sel) => global.document.querySelector(sel);
+
+const picker = () => $('[data-testid="date-picker"]');
+const dayCell = (iso) => $(`[data-testid="day-${iso}"]`);
+
+/** The year and month the grid is showing, read off its first day cell, so
+ *  navigation is computed from what is on screen rather than assumed. */
+function cursor() {
+  const firstDay = $('[data-testid="day-grid"] button[data-testid^="day-"]');
+  assert.ok(firstDay, "the picker's day grid is on screen");
+  const [year, month] = firstDay.dataset.testid.slice(4).split("-").map(Number);
+  return { year, index: year * 12 + month };
+}
+
+/** Open `trigger`'s picker and pick `iso` the way the captain does — year view
+ *  for a different year, then month stepping. This is the replacement for the
+ *  old setValue() on the native input: same intent, driven through the real
+ *  control, so a picker that opened on the wrong month fails here rather than
+ *  being bypassed by typing a string straight into the field. */
+async function pickDate(trigger, iso) {
+  await click(trigger);
+  assert.ok(picker(), "the trigger opened the picker");
+
+  const [year, month] = iso.split("-").map(Number);
+  if (cursor().year !== year) {
+    await click($('[data-testid="picker-title"]'));
+    const yearCell = $(`[data-testid="year-${year}"]`);
+    assert.ok(yearCell, `${year} is outside the picker's year range`);
+    await click(yearCell);
+  }
+
+  const target = year * 12 + month;
+  for (let steps = 0; cursor().index !== target; steps++) {
+    assert.ok(steps < 12, `could not step the grid to ${iso}`);
+    await click($(cursor().index < target ? '[data-testid="picker-next"]' : '[data-testid="picker-prev"]'));
+  }
+
+  const cell = dayCell(iso);
+  assert.ok(cell, `${iso} is not on the grid the picker settled on`);
+  await click(cell);
+  assert.equal(picker(), null, "picking a day closed the picker");
+}
 
 /** 00:30 on the 19th in Taipei — 16:30 on the 18th in UTC. */
 const EARLY_MORNING = Date.parse("2026-08-18T16:30:00Z");
@@ -58,10 +116,14 @@ const sectionOf = (container, name) => {
   return section.querySelector("div.uppercase").textContent;
 };
 
-const endDateInput = (container) => container.querySelector('[data-testid="cancel-end-date"]');
+const endDateTrigger = (container) => container.querySelector('[data-testid="cancel-end-date"]');
 const endDateError = (container) => container.querySelector('[data-testid="cancel-end-date-error"]');
-const startDateInput = (container) => container.querySelector('[data-testid="add-start-date"]');
+const startDateTrigger = (container) => container.querySelector('[data-testid="add-start-date"]');
 const modalBox = (container) => container.querySelector(".modal-open");
+
+/** The header's "+ Add" button — the only btn-primary before a modal opens. */
+const openAddModal = (container) =>
+  click([...container.querySelectorAll("button")].find((b) => b.className.includes("btn-primary")));
 
 const cancelButtonFor = (container, name) =>
   [...cardFor(container, name).querySelectorAll("button")]
@@ -95,7 +157,7 @@ test("AC-7: clicking Cancel opens a modal and issues no request", async () => {
   const before = await openCancelModal(container, "Netflix");
 
   assert.ok(modalBox(container), "the confirmation modal is in the DOM");
-  assert.ok(endDateInput(container), "and it holds an end-date field");
+  assert.ok(endDateTrigger(container), "and it holds an end-date field");
   // The whole point: the old handler PATCHed here, recording only THAT it ended.
   assert.equal(g.requests.length, before, `no request was issued, got ${g.requests.slice(before)}`);
   assert.equal(g.subWrites.length, 0);
@@ -141,10 +203,22 @@ test("AC-8: at 00:30 Taipei the field is pre-filled with today, not yesterday", 
     const container = await mount(loadPage());
     await openCancelModal(container, "Netflix");
 
-    assert.equal(endDateInput(container).value, "2026-08-19");
-    assert.equal(endDateInput(container).type, "date", "an editable date input, not text");
-    assert.equal(endDateInput(container).disabled, false);
-    assert.equal(endDateInput(container).readOnly, false);
+    // Entity 057 swapped the native input for a picker trigger, so the four
+    // assertions here are the same claims re-aimed at the new control: the
+    // shown date is textContent rather than .value, and "not read-only" is
+    // proved by the tap actually opening the picker rather than by a property
+    // a <button> does not have.
+    assert.equal(endDateTrigger(container).textContent.trim(), "2026-08-19");
+    assert.equal(endDateTrigger(container).type, "button", "a tappable trigger, not a typed-into field");
+    assert.equal(endDateTrigger(container).disabled, false);
+
+    await click(endDateTrigger(container));
+    assert.ok(picker(), "tapping it opens the picker — still editable");
+    assert.equal(
+      dayCell("2026-08-19").getAttribute("aria-selected"),
+      "true",
+      "and the picker opens ON the pre-filled local day, not the UTC 18th"
+    );
   });
 });
 
@@ -154,9 +228,9 @@ test("AC-8: the pre-filled date is editable", async () => {
     const container = await mount(loadPage());
     await openCancelModal(container, "Netflix");
 
-    await setValue(endDateInput(container), "2026-07-01");
-    // A controlled input that ignored the edit would still read 2026-08-19.
-    assert.equal(endDateInput(container).value, "2026-07-01");
+    await pickDate(endDateTrigger(container), "2026-07-01");
+    // A controlled trigger that ignored the pick would still read 2026-08-19.
+    assert.equal(endDateTrigger(container).textContent.trim(), "2026-07-01");
   });
 });
 
@@ -170,7 +244,7 @@ test("AC-9: confirming sends one PATCH with the shown date and moves the card to
     const container = await mount(loadPage());
     await openCancelModal(container, "Netflix");
 
-    await setValue(endDateInput(container), "2026-07-01");
+    await pickDate(endDateTrigger(container), "2026-07-01");
     await click(buttonByKey(container, "subscriptions.confirm_cancel"));
 
     assert.equal(g.subWrites.length, 1, "exactly one request");
@@ -209,7 +283,7 @@ test("AC-11: an end date before the start date is blocked with a message and no 
   assert.equal(SUBSCRIPTIONS.find((s) => s.id === "sub-1").start_date, "2026-03-01");
   const before = await openCancelModal(container, "Netflix");
 
-  await setValue(endDateInput(container), "2026-02-28");
+  await pickDate(endDateTrigger(container), "2026-02-28");
   await click(buttonByKey(container, "subscriptions.confirm_cancel"));
 
   assert.ok(endDateError(container), "a visible message is in the DOM");
@@ -226,7 +300,7 @@ test("AC-11: an end date EQUAL to the start date is accepted", async () => {
   await openCancelModal(container, "Netflix");
 
   // Started and cancelled the same day is real; the guard is strictly-earlier.
-  await setValue(endDateInput(container), "2026-03-01");
+  await pickDate(endDateTrigger(container), "2026-03-01");
   await click(buttonByKey(container, "subscriptions.confirm_cancel"));
 
   assert.equal(endDateError(container), null);
@@ -241,7 +315,7 @@ test("AC-11: a subscription with no start date accepts any end date", async () =
   // missing start date must never block recording an end date.
   await openCancelModal(container, "Spotify");
 
-  await setValue(endDateInput(container), "2020-01-01");
+  await pickDate(endDateTrigger(container), "2020-01-01");
   await click(buttonByKey(container, "subscriptions.confirm_cancel"));
 
   assert.equal(endDateError(container), null);
@@ -254,11 +328,11 @@ test("AC-11: correcting the date clears the message and lets the archive through
   const container = await mount(loadPage());
   await openCancelModal(container, "Netflix");
 
-  await setValue(endDateInput(container), "2026-02-28");
+  await pickDate(endDateTrigger(container), "2026-02-28");
   await click(buttonByKey(container, "subscriptions.confirm_cancel"));
   assert.ok(endDateError(container));
 
-  await setValue(endDateInput(container), "2026-04-01");
+  await pickDate(endDateTrigger(container), "2026-04-01");
   assert.equal(endDateError(container), null, "the message cleared as soon as the date changed");
 
   await click(buttonByKey(container, "subscriptions.confirm_cancel"));
@@ -292,16 +366,20 @@ test("AC-13: the Add modal's start date is pre-filled with the local date and is
     install();
     const container = await mount(loadPage());
 
-    await click([...container.querySelectorAll("button")].find((b) => b.className.includes("btn-primary")));
+    await openAddModal(container);
 
-    const input = startDateInput(container);
-    assert.ok(input, "the Add modal has a start date field");
-    assert.equal(input.type, "date");
+    const trigger = startDateTrigger(container);
+    assert.ok(trigger, "the Add modal has a start date field");
+    assert.equal(trigger.type, "button", "a picker trigger, not a typed-into field");
     // Same derivation AC-8 pins: the 19th locally, never the UTC 18th.
-    assert.equal(input.value, "2026-08-19");
+    assert.equal(trigger.textContent.trim(), "2026-08-19");
 
-    await setValue(input, "2025-11-30");
-    assert.equal(input.value, "2025-11-30", "editable before submitting");
+    await pickDate(trigger, "2025-11-30");
+    assert.equal(
+      startDateTrigger(container).textContent.trim(),
+      "2025-11-30",
+      "editable before submitting"
+    );
   });
 });
 
@@ -310,10 +388,10 @@ test("AC-14: creating a subscription sends the submitted start_date and an empty
     const g = install();
     const container = await mount(loadPage());
 
-    await click([...container.querySelectorAll("button")].find((b) => b.className.includes("btn-primary")));
+    await openAddModal(container);
     await setValue(container.querySelector('input[placeholder="e.g. Netflix"]'), "Disney+");
     await setValue(container.querySelector('input[type="number"]'), "270");
-    await setValue(startDateInput(container), "2025-11-30");
+    await pickDate(startDateTrigger(container), "2025-11-30");
     await click(buttonByKey(container, "subscriptions.add"));
 
     assert.equal(g.subWrites.length, 1);
@@ -361,7 +439,7 @@ test("AC-20: the end date appears on the card as soon as an archive succeeds", a
     install();
     const container = await mount(loadPage());
     await openCancelModal(container, "Netflix");
-    await setValue(endDateInput(container), "2026-07-01");
+    await pickDate(endDateTrigger(container), "2026-07-01");
     await click(buttonByKey(container, "subscriptions.confirm_cancel"));
 
     const line = cardFor(container, "Netflix").querySelector('[data-testid="end-date"]');
@@ -472,7 +550,7 @@ test("AC-27: archiving keeps the start date and adds the end date beside it", as
     install();
     const container = await mount(loadPage());
     await openCancelModal(container, "Netflix");
-    await setValue(endDateInput(container), "2026-07-01");
+    await pickDate(endDateTrigger(container), "2026-07-01");
     await click(buttonByKey(container, "subscriptions.confirm_cancel"));
 
     assert.equal(sectionOf(container, "Netflix"), "subscriptions.cancelled", "it moved");
@@ -510,4 +588,206 @@ test("AC-25: the new strings come from keys present in en and zh with identical 
     Object.keys(ZH.subscriptions).sort(),
     "the two subscriptions blocks have identical key sets"
   );
+});
+
+// ---------------------------------------------------------------------------
+// Entity 057 — the two fields above are now triggers for the shared calendar.
+// Everything from here down is new; everything above is entity 053's suite,
+// unchanged except for the eight assertions that named the old native input.
+// ---------------------------------------------------------------------------
+
+// AC-1 (no native date input anywhere) is asserted by the app-wide walker in
+// date-picker.render.test.js, which entity 046 built for exactly this invariant
+// and which entity 057 updated to expect an empty result. Kept in one place.
+
+test("AC-2: the Add form's Start Date opens the picker on its own value", async () => {
+  await atClock(EARLY_MORNING, async () => {
+    install();
+    const container = await mount(loadPage());
+    await openAddModal(container);
+
+    const trigger = startDateTrigger(container);
+    assert.equal(trigger.tagName, "BUTTON");
+    assert.equal(trigger.getAttribute("type"), "button", "a plain button, so it cannot submit anything");
+    assert.equal(picker(), null, "the picker stays closed until the field is tapped");
+
+    await click(trigger);
+
+    assert.ok(picker(), "tapping the field opened the picker");
+    assert.equal(
+      dayCell("2026-08-19").getAttribute("aria-selected"),
+      "true",
+      "opened at addForm.start_date — a picker seeded from anywhere else misses this day"
+    );
+  });
+});
+
+test("AC-3: the Cancel confirmation's end date opens the picker on cancelDate", async () => {
+  await atClock(EARLY_MORNING, async () => {
+    install();
+    const container = await mount(loadPage());
+    await openCancelModal(container, "Netflix");
+
+    const trigger = endDateTrigger(container);
+    assert.equal(trigger.tagName, "BUTTON");
+    assert.equal(trigger.getAttribute("type"), "button");
+    assert.equal(picker(), null);
+
+    await click(trigger);
+
+    assert.ok(picker(), "tapping the field opened the picker");
+    assert.equal(dayCell("2026-08-19").getAttribute("aria-selected"), "true", "opened at cancelDate");
+  });
+});
+
+test("AC-4: both triggers show the raw ISO date, matching the card line beneath them", async () => {
+  await atClock(EARLY_MORNING, async () => {
+    install();
+    const container = await mount(loadPage());
+
+    await openAddModal(container);
+    // Exactly the ISO string, not prose: the edit sheet formats its trigger, but
+    // the Subscriptions cards render start/end verbatim, so prose here would
+    // disagree with the line directly below it.
+    assert.equal(startDateTrigger(container).textContent.trim(), "2026-08-19");
+
+    await click(buttonByKey(container, "common.cancel"));
+    await openCancelModal(container, "Netflix");
+    assert.equal(endDateTrigger(container).textContent.trim(), "2026-08-19");
+  });
+});
+
+test("AC-4: an empty value renders the choose_date fallback, not a blank tap target", async () => {
+  // Unreachable through the UI — both fields are pre-filled at open time — so
+  // the only honest way into the branch is to empty the pre-fill itself. The
+  // compiled page calls todayLocalIso() through the module object at open time
+  // (page.js:128, :218), so swapping the export drives the REAL page down the
+  // real fallback path rather than re-rendering a replica of the markup.
+  const lib = require("../.test-build-ui/lib/subscriptions.js");
+  const realTodayLocalIso = lib.todayLocalIso;
+  lib.todayLocalIso = () => "";
+  try {
+    install();
+    const container = await mount(loadPage());
+
+    await openAddModal(container);
+    assert.equal(startDateTrigger(container).textContent.trim(), "picker.choose_date");
+
+    await click(buttonByKey(container, "common.cancel"));
+    await openCancelModal(container, "Netflix");
+    assert.equal(endDateTrigger(container).textContent.trim(), "picker.choose_date");
+  } finally {
+    lib.todayLocalIso = realTodayLocalIso;
+  }
+});
+
+test("AC-5: picking a day writes only that field, leaving the rest of the Add form alone", async () => {
+  await atClock(EARLY_MORNING, async () => {
+    install();
+    const container = await mount(loadPage());
+    await openAddModal(container);
+
+    const nameInput = () => container.querySelector('input[placeholder="e.g. Netflix"]');
+    const numberValues = () =>
+      [...container.querySelectorAll('input[type="number"]')].map((i) => i.value);
+    const categoryValue = () => container.querySelector("select").value;
+
+    await setValue(nameInput(), "Disney+");
+    await click(buttonByKey(container, "subscriptions.annual"));
+    const before = { name: nameInput().value, numbers: numberValues(), category: categoryValue() };
+    assert.equal(before.numbers.length, 3, "annual shows amount, due month and due day");
+
+    await pickDate(startDateTrigger(container), "2025-11-30");
+
+    assert.equal(startDateTrigger(container).textContent.trim(), "2025-11-30", "the date took the pick");
+    assert.equal(picker(), null, "and the picker closed itself");
+    assert.ok(modalBox(container), "the Add modal is still open underneath");
+    assert.equal(nameInput().value, before.name, "the name survived");
+    assert.deepEqual(numberValues(), before.numbers, "amount, due month and due day are untouched");
+    assert.equal(categoryValue(), before.category, "the category is untouched");
+    assert.ok(
+      buttonByKey(container, "subscriptions.annual").className.includes("btn-primary"),
+      "the frequency toggle is still on annual"
+    );
+  });
+});
+
+test("AC-11: the picker's overlay outranks daisyUI's .modal so it paints above the dialog", async () => {
+  // jsdom computes no layout, so this pins both halves of the comparison
+  // statically: the constant the picker has to beat, and the token it emits.
+  // Asserting the daisyUI value too means a future daisyUI bump that moves the
+  // constant fails here instead of silently making the check meaningless.
+  const css = fs.readFileSync(
+    path.join(__dirname, "..", "node_modules", "daisyui", "daisyui.css"),
+    "utf8"
+  );
+  const declared = /\.modal\{[^}]*?z-index:\s*(\d+)/.exec(css);
+  assert.ok(declared, "daisyUI still declares a z-index on .modal");
+  const modalZ = Number(declared[1]);
+  assert.equal(modalZ, 999, "the constant entity 057 raised the picker to beat");
+
+  install();
+  const container = await mount(loadPage());
+  await openCancelModal(container, "Netflix");
+  await click(endDateTrigger(container));
+
+  const overlay = picker();
+  assert.ok(overlay, "the picker is on screen");
+  const token = /z-\[(\d+)\]/.exec(overlay.className);
+  assert.ok(token, `the picker overlay carries no z-[N] token: ${overlay.className}`);
+  assert.ok(
+    Number(token[1]) > modalZ,
+    `picker z-index ${token[1]} must be strictly greater than daisyUI's .modal ${modalZ}`
+  );
+});
+
+test("dismissing the picker leaves the dialog that summoned it open, with its date intact", async () => {
+  await atClock(EARLY_MORNING, async () => {
+    install();
+    const container = await mount(loadPage());
+    await openCancelModal(container, "Netflix");
+    await click(endDateTrigger(container));
+    assert.ok(picker(), "the picker is open on top of the Cancel dialog");
+
+    // The overlay root IS the picker's backdrop, so clicking it is the dismiss.
+    // Subscriptions hangs its own onClick on the sibling .modal-backdrop, which
+    // this click must never reach.
+    await click(picker());
+
+    assert.equal(picker(), null, "the picker closed");
+    assert.ok(modalBox(container), "the Cancel dialog underneath is still open");
+    assert.equal(endDateTrigger(container).textContent.trim(), "2026-08-19", "still showing its date");
+    assert.equal(sectionOf(container, "Netflix"), "subscriptions.active", "and nothing was archived");
+  });
+});
+
+test("the picker's own close button closes only the picker", async () => {
+  install();
+  const container = await mount(loadPage());
+  await openAddModal(container);
+  await click(startDateTrigger(container));
+  assert.ok(picker());
+
+  await click($('[data-testid="picker-close"]'));
+
+  assert.equal(picker(), null, "the picker closed");
+  assert.ok(modalBox(container), "the Add modal is still open");
+  assert.ok(startDateTrigger(container), "with its start-date field still there");
+});
+
+test("Escape closes the picker only, leaving the dialog underneath open", async () => {
+  install();
+  const container = await mount(loadPage());
+  await openCancelModal(container, "Netflix");
+  await click(endDateTrigger(container));
+  assert.ok(picker());
+
+  await pressEscape();
+
+  assert.equal(picker(), null, "one Escape closed the picker");
+  // Subscriptions' modals bind no Escape handler of their own. If a later change
+  // adds one at the dialog level, both would close on a single press and this
+  // fails rather than quietly losing the captain's place.
+  assert.ok(modalBox(container), "the Cancel dialog is still open");
+  assert.ok(endDateTrigger(container), "and still holds its end-date field");
 });
