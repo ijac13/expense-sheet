@@ -1,7 +1,7 @@
 ---
 id: 057
 title: Use Shared Calendar Date Picker on Subscriptions
-status: build
+status: verify
 source: captain
 started:
 completed:

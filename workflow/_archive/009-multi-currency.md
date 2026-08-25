@@ -12,6 +12,8 @@ issue:
 pr:
 ---
 
+**Dropped, 2026-08-25:** Captain's call — not building this. Archived at ideation, never specced.
+
 Sometimes an expense happens in a foreign currency — while traveling, or paying for an international service online. The app's base currency is TWD, but forcing manual conversion before logging creates friction and loses the original amount.
 
 ## User Stories
