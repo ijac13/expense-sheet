@@ -1,0 +1,40 @@
+#!/usr/bin/env node
+'use strict';
+
+const { scanStagedDiff } = require('./pii-scan.js');
+
+const { findings, binarySkipped, error } = scanStagedDiff(process.cwd());
+
+if (error) {
+  process.stderr.write('PII pre-commit check could not read the staged diff:\n' + error + '\n');
+  process.exit(1);
+}
+
+// Stays on stdout, but git runs hooks with stdout redirected into stderr, so
+// under a real `git commit` the user reads this on stderr either way.
+if (binarySkipped > 0) {
+  const noun = binarySkipped === 1 ? 'binary file' : 'binary files';
+  process.stdout.write(
+    `PII pre-commit check: skipped ${binarySkipped} ${noun} (binary content is not scanned).\n`
+  );
+}
+
+if (findings.length === 0) process.exit(0);
+
+const files = new Set(findings.map((f) => f.file));
+const lines = [
+  `PII pre-commit check FAILED: ${findings.length} match(es) in ${files.size} file(s).`,
+  '',
+];
+for (const f of findings) {
+  lines.push(`  ${f.file}:${f.line}  [${f.kind}]  ${f.value}`);
+}
+lines.push(
+  '',
+  'This repo is public. Replace the value with a constructed stand-in.',
+  'If this is a genuine one-off false positive, commit with --no-verify.',
+  'If it represents a whole category, extend the allowlist in scripts/hooks/pii-scan.js instead.',
+  ''
+);
+process.stderr.write(lines.join('\n'));
+process.exit(1);

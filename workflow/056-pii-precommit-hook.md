@@ -409,3 +409,78 @@ real count plus the commit actually landing, each confirmed falsifiable by mutat
 Worth the gate's attention: AC-19's report is no longer distinguishable from a real PII failure by stream
 alone, since both land on stderr. That is inherent to git and accepted by the AC-15 amendment, but it
 means a user seeing the skip line reads it in the same channel as a block message.
+
+## Stage Report: verify (cycle 2)
+
+**Verdict: PASSED** — the AC-15/AC-19 fix holds under independent re-measurement. One correction to
+the record, not an AC failure: the entity suite is **25 tests, not 26**. See the first item.
+
+- DONE: Re-run the full test suite fresh and confirm entity suite 26/26 (0 skipped), functions 173/173, app 142/142 unchanged
+  Fresh runs: entity **25/25, 0 skipped**, functions 173/173, app 142/142. The "26" in both the cycle-1
+  verify and cycle-2 build reports is a miscount, not a lost test: `git show 2495410:` and HEAD list the
+  **same 25 test names**, two of them renamed by this cycle. So "test counts unchanged from cycle 1" is
+  true; the absolute figure was wrong in both prior reports and is corrected here. AC-2/AC-3 genuinely
+  ran (1.14s, 0 skipped) — its `npm install` fixture has no dependencies, which is why it is fast rather
+  than skipped.
+- DONE: Independently re-measure the core git-redirects-stdout-to-stderr finding yourself, in your own mktemp repos
+  Reproduced from scratch in five fresh `mktemp` repos, stdout and stderr captured to separate files.
+  All four shapes put the skip report on **stderr with stdout empty**: binary-only and binary+clean-text
+  (`skipped 1 binary file`, exit 0), two-binaries (`skipped 2 binary files`, exit 0), binary+PII (skip
+  line *and* the FAILED block on stderr, exit 1, HEAD unmoved). Two controls isolate the cause: the same
+  hook invoked directly gives stdout=report/stderr=empty, and a three-line `/bin/sh` hook echoing a
+  marker to stdout lands that marker on stderr under `git commit`. The redirect is git's, on git 2.40.1.
+- DONE: Confirm AC-19's rewritten test actually drives a real git commit, and independently reproduce both mutations
+  It does, proven by mutation rather than by reading: rewriting `helpers.commit()` to call `runHook()`
+  instead of spawning `git commit` fails AC-19 (`headCount` expected 2, actual 1 — no commit lands).
+  Both claimed mutations reproduced in an isolated copy of `scripts/`, never in the worktree: deleting
+  the `if (binarySkipped > 0)` block fails AC-19; hardcoding the count to a literal `1` fails AC-19 on
+  the two-binary case. Restored between each, green again after. Note the test's `res.stderr` assertion
+  is itself only satisfiable through git, since a direct invocation leaves stderr empty.
+- DONE: Confirm AC-15's narrower claim holds via a real git commit
+  Holds. In my own repo, a clean commit staging only non-PII text exits 0 with **stdout 0 bytes and
+  stderr 0 bytes**, HEAD advancing. Falsifiable: adding a single unconditional `process.stdout.write`
+  to the hook fails AC-15 while leaving AC-19 green.
+- DONE: IMPORTANT SAFETY CONSTRAINT — no npm install in the shared checkout, no mutation of core.hooksPath
+  Held and checked, not assumed. `core.hooksPath` read before and after every experiment: both times
+  `/Users/ijac/Claude-ijac/expense-sheet/.git/hooks`, never moved. No `npm install` ran in the shared
+  checkout or any worktree; app/functions suites used `node_modules` symlinked from the primary, removed
+  afterwards with the primary's directories intact. All hook testing in `mktemp` repos, and both source
+  mutations were applied to a throwaway copy of `scripts/` so the worktree was never dirtied. Worktree
+  `git status` is clean; the primary shows only the pre-existing untracked `tw-gov-reports/`.
+  Worth the FO's note: a `node_modules` **symlink** under `functions/` is not ignored — root
+  `.gitignore` uses `node_modules/`, whose trailing slash does not match a symlink, so it shows as
+  untracked. Harmless here (removed), but a `git add -A` in that state would stage it.
+- DONE: Confirm nothing from cycle 1's already-verified scope regressed
+  Exactly the two claimed files changed since cycle 1's verified state: `git diff --stat 2495410..HEAD`
+  outside `workflow/` is `scripts/hooks/pre-commit` (+3/-1, a comment only) and
+  `scripts/hooks/test/pii-hook.test.js` (+43/-17). One commit, `051b633`. The two merges of `origin/main`
+  brought in nothing outside `workflow/`. Branch-vs-`main` file list is still the same 8 files, and
+  `git ls-files -s` still reports mode `100755` on the hook.
+- DONE: Mandatory PII/secrets check on the new diff
+  Clean. Across the 43 added lines: zero URLs, zero hits for Google/OpenAI/GitHub/Slack/AWS key shapes,
+  JWTs, PEM blocks, or `secret|password|token|api_key = "..."` assignments; no `.env`, `.pem`, `.key`,
+  or credential files anywhere in the branch diff. The only PII-shaped literals are the one phone and
+  one email stand-in declared in D2 — deliberately not restated here — on a single line of
+  `scripts/hooks/test/pii-hook.test.js`, inside the one exempt path (D4), already present at cycle 1;
+  the rewrite consolidated two prior occurrences into one helper.
+- DONE: If everything holds, set verdict PASSED
+  Every AC-15/AC-19 claim survived independent challenge at cycle-1 rigor. Verdict PASSED.
+
+### Summary
+
+The build's diagnosis and its fix both survive being re-derived from scratch. I did not reuse cycle 1's
+or the build's measurements: five fresh scratch repos, streams captured separately, plus a plain `/bin/sh`
+control that pins the redirect on git rather than on node. The skip report is on stderr in all four shapes,
+and AC-15's amended claim — clean, binary-free commit, exit 0, stderr genuinely empty — holds through a
+real `git commit`.
+
+AC-19's test is now load-bearing where the cycle-1 shape was not. The decisive check is that bypassing
+`git commit` inside the helper breaks it, which is exactly the fidelity gap that hid the original bug.
+Deleting the report and faking the count both fail it too. Scope is tight: one commit, two files, one of
+them a comment.
+
+Two things for the captain, neither blocking. **The entity suite is 25 tests, not the 26 quoted in the two
+previous reports** — no test was lost, the earlier number was simply wrong, and it is worth correcting
+before it gets quoted a third time. And unchanged from cycle 1: **the hook is still inactive in the primary
+checkout** — `core.hooksPath` points at `.git/hooks`, which holds only sample files. Someone must run
+`npm install` at the repo root after merge to switch it on; until then nothing is being scanned.
