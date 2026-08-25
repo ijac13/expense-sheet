@@ -217,3 +217,38 @@ The change is minimal and confined to that one test: the expectation becomes `[]
 Both Subscriptions date fields now open the shared calendar, and the picker was raised to `z-[1000]` so it paints above daisyUI's `.modal` rather than behind it. Entity 053's suite kept all 26 tests and gained 9; the full suite went 142 → 151 with zero failures, and four mutations confirm the highest-risk claims fail when the behaviour they name is removed.
 
 The one thing for the gate is the fourth file: entity 046's AC-26 test hardcoded the two native inputs this entity removes, so it had to be updated. AC-12 remains the untestable half — whether the calendar actually paints above the dialog needs a human on staging, which is exactly what verify is for.
+
+## Stage Report: verify
+
+- DONE: Re-run the full test suite fresh (npm install/ci, not symlinks) and confirm 151/151, with entity 053's suite specifically confirmed at 35/35 (26 original + 9 new) and none of the original 26 test names missing or weakened
+  `app/node_modules` was a real directory (not a symlink); deleted it, `npm ci`, then `npm test` → **151 pass, 0 fail**. `grep -c '^test('` on `subscription-dates.render.test.js`: 26 on `main`, 35 on HEAD. `comm -23` of the two sorted name lists returns **empty** — no original name missing or renamed; no `.skip`/`.todo` anywhere in the file.
+- DONE: Independently reproduce all 4 of the build's mutation claims
+  All four reproduced from a clean tree, each reverted and the tree re-verified clean after. (1) `z-[1000]`→`z-[70]`: **1 fail**, entity 057's AC-11 alone. (2) delete `setCancelInvalid(false)` at `page.tsx:693` (the `onPick` copy, leaving the three other call sites): **1 fail**, "correcting the date clears the message and lets the archive through". (3) delete the end-date trigger's `onClick` at `:680`: **13 fails**, including "AC-8: the pre-filled date is editable" — so the editability claim really did survive the `.readOnly` replacement. (4) re-derive both pre-fills via `toISOString().slice(0,10)` at `:154`/`:245`: **8 fails**, including the 00:30-Taipei pre-fill test.
+- DONE: Independently confirm the "fourth file" justification
+  Confirmed, and the change is forced rather than discretionary. `git show main:app/app/subscriptions/page.tsx | grep -c 'type="date"'` → **2**, matching the list `main`'s AC-26 asserted. Fifth mutation (mine, not the build's): restored `main`'s `date-picker.render.test.js` verbatim against the new source → **1 fail**, "AC-26: only the two Subscriptions inputs still use a native date input". AC-1 and AC-13 genuinely cannot both hold while that expectation stands. Test count in that file is **34 on main and 34 on HEAD**; `diff` of the sorted `test(` lines shows exactly **one** line changed — AC-26's title. The original four fields' coverage is untouched.
+- DONE: Confirm scope boundary otherwise held
+  `git diff main...HEAD --name-only` → exactly the four files: `subscriptions/page.tsx`, `components/DatePickerModal.tsx`, `test/subscription-dates.render.test.js`, `test/date-picker.render.test.js`. `DatePickerModal.tsx` is 1 insertion / 1 deletion, the z-index token only. Nothing else.
+- DONE: Mandatory PII/secrets check on the full diff, same bar as every other entity this session
+  No `.env` file in the diff. Added lines contain no API key, token, password, private key, or service-account identifier — the only `token` matches are a local variable holding the `z-\[(\d+)\]` regex result. No email addresses, phone numbers, private URLs, spreadsheet IDs, or Firebase project IDs. The only capitalised string literals added across both test files are `"Netflix"` (a pre-existing fixture), `"BUTTON"`, and `"Escape"`. I copied `app/.env.staging` into the worktree as `app/.env.local` to build for staging; `app/.gitignore:34` (`.env*`) covers it and `git status` is clean.
+- FAILED: Complete AC-12 as much as possible from this environment: deploy this branch to staging …
+  **The deploy did not happen — `firebase deploy --only hosting --project staging` was blocked by the Claude Code permission classifier.** Everything either side of the deploy is confirmed. The local staging build succeeds (14/14 static pages) and its CSS carries `z-\[1000\]{z-index:1000}` with **no `z-[70]` rule anywhere** in `app/out`. Live staging (`https://expense-sheet-staging.web.app/subscriptions`) answers **HTTP 200** but `last-modified: Mon, 24 Aug 2026 10:43:21 GMT`, and its served stylesheet declares `z-\[60\]` and **`z-[70]`, with no `z-[1000]`** — i.e. staging is still the pre-057 bundle. The captain has nothing to tap yet.
+- SKIPPED: the visual "does it render above the dialog" half of AC-12
+  No browser in this sandbox, and it is moot until the deploy lands.
+
+### Verdict
+
+**PASSED on every criterion this environment can reach; AC-12 is BLOCKED, not merely visually unverified.**
+
+AC-1 through AC-11 and AC-13 through AC-15 hold under independent re-execution, and five mutations confirm the highest-risk claims are falsifiable rather than tautological. Nothing here routes back to build — the implementation is sound and the fourth file is justified.
+
+The one open item is captain action, not a code defect: **staging still serves the old bundle**, so the FO must not present a "go tap staging" gate yet. Unblock is one command, run from `/Users/ijac/Claude-ijac/expense-sheet/.worktrees/spacedock-ensign-057-subscriptions-date-picker` (the build output is already in place at `app/out`):
+
+    firebase deploy --only hosting --project staging
+
+After it lands, the check that the deploy went through is that the served stylesheet flips from `z-[70]` to `z-\[1000\]{z-index:1000}` — then the captain taps Add → Start Date and Cancel → end date on staging and confirms the calendar paints above the dialog in both.
+
+### Summary
+
+Re-ran everything from a clean `npm ci`: 151/151, entity 053's suite intact at 35 tests with all 26 original names present and no weakening. All four of the build's mutation claims reproduced exactly (1, 1, 13, 8 failures), and a fifth mutation of my own proves the fourth-file edit was forced — `main`'s AC-26 test fails against the new source. Scope is exactly four files and the PII/secrets scan is clean.
+
+The gap is AC-12. The permission classifier blocked `firebase deploy`, so this branch never reached staging: the built bundle has `z-[1000]`, the live staging bundle still has `z-[70]`. Every code-side claim is verified, but the calendar-above-the-dialog check — the whole reason this entity touched the shared component — remains untested by anyone until someone with deploy permission pushes the build that is already sitting in `app/out`.
