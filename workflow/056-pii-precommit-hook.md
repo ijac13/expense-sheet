@@ -359,3 +359,53 @@ checkout** — `core.hooksPath` points at `.git/hooks`, which contains only samp
 `npm install` at the repo root after merge to switch it on, and until then nothing is being scanned. And
 the 051 archive redaction is confirmed intact at HEAD, `main`, and `origin/main`, with the scanner proven
 to catch the pre-redaction content, so no captain action remains on that Findings item.
+
+## Stage Report: build (cycle 2)
+
+Scoped to the AC-15/AC-19 test-fidelity fix. AC-1..14, 16..18, 20..24 untouched.
+
+- DONE: Fix the verify-stage (cycle 1) REJECTED finding: AC-15 and AC-19 as originally written are jointly unachievable under real git
+  Fixed as a test-fidelity change, not a behaviour change. Commit `051b633`.
+- DONE: Update the AC-19 test to spawn a real `git commit` and assert the skip-count report is visible in whatever stream git actually delivers it on — confirm this yourself rather than trusting the prior measurement
+  Re-measured independently before touching the test, in `mktemp` repos, on git 2.40.1. Across all four
+  shapes verify named — binary-only, binary+clean-text, two-binaries, binary+PII — the report arrives on
+  **stderr** under `git commit` and never on stdout, while the same hook invoked directly puts it on
+  stdout with stderr empty. A three-line `/bin/sh` hook echoing to stdout behaves identically, so the
+  redirect is git's, not node's. Verify's measurement reproduced exactly. AC-19's test now drives
+  `H.commit()` and asserts on that measured stream.
+- DONE: Do not weaken AC-19's actual guarantee (the skip count must still be reported and visible) — only fix how/where the test observes it
+  The guarantee is asserted two ways: visibility across `stdout + stderr` (stream-agnostic, the thing the
+  user actually experiences) and the measured stream specifically. Strengthened rather than weakened —
+  the test now also asserts the commit lands (`headCount` moves) and adds a two-binary case so the count
+  is load-bearing. Proven by mutation: deleting the report block fails AC-19; hardcoding the count to a
+  constant `1` fails AC-19 on the two-binary case. Both mutations passed the cycle-1 test shape's intent
+  but are now caught through the real commit path.
+  One assertion deliberately no longer discriminates: routing the write to stderr (a cycle-1 mutation)
+  now passes. That is correct — under git the stream choice is unobservable, so the old assertion was
+  measuring git's behaviour rather than the hook's, which is precisely what hid this gap.
+- DONE: Re-verify AC-15 still holds for its now-narrower claim: a commit with no matches AND no skipped binaries prints nothing to stderr and exits 0
+  Holds, with no code change, and now confirmed through a real `git commit`: exit 0, `stderr === ''`,
+  HEAD advances. Falsifiable — making the hook emit one line on a clean commit fails AC-15.
+- DONE: Re-run the full suite fresh and confirm nothing else regressed: entity suite, functions 173/173, app 142/142
+  Fresh runs after cleanup: entity 26/26 (0 skipped), functions 173/173, app 142/142. Test counts
+  unchanged from cycle 1 — the two rewritten tests are rewrites, not additions.
+- DONE: Continue observing the safety constraint from cycle 1 — no npm install in the shared checkout, no mutation of the live core.hooksPath
+  Held and checked, not assumed. `core.hooksPath` read before and after every experiment, both times
+  `/Users/ijac/Claude-ijac/expense-sheet/.git/hooks` — never moved. No `npm install` ran anywhere: the
+  app/functions suites used `node_modules` symlinked read-only from the primary checkout, removed
+  afterwards with the primary's directories intact and `git status` showing only the two intended files.
+  All hook testing ran in `mktemp` repos.
+
+### Summary
+
+Verify's diagnosis was right and I reproduced it from scratch rather than taking it on trust: git runs
+hooks with stdout redirected into stderr, so the cycle-1 test asserting `stderr === ''` on a directly
+invoked hook was measuring a process git never runs. AC-15 and AC-19 now both drive real `git commit`s.
+
+The hook's behaviour is unchanged — the only source edit is a comment that had asserted the now-disproven
+rationale for writing to stdout. AC-19's guarantee is stricter than before, not looser: visibility plus a
+real count plus the commit actually landing, each confirmed falsifiable by mutation.
+
+Worth the gate's attention: AC-19's report is no longer distinguishable from a real PII failure by stream
+alone, since both land on stderr. That is inherent to git and accepted by the AC-15 amendment, but it
+means a user seeing the skip line reads it in the same channel as a block message.
