@@ -1,7 +1,7 @@
 ---
 id: 056
 title: Pre-Commit PII Scanner
-status: ideation
+status: spec
 source: captain
 started:
 completed:
