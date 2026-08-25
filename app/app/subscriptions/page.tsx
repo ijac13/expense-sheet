@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Subscription, getNextDueDate, todayLocalIso, endsBeforeStart } from "../lib/subscriptions";
 import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription, getSchedulerStatus, SchedulerStatus } from "../lib/subscriptionService";
 import { Category, DEFAULT_CATEGORIES, categoryIcon, resolveCategory } from "../lib/categories";
@@ -47,10 +47,14 @@ interface EditFormState {
   due_month: string;
 }
 
+// category_id is deliberately empty rather than a DEFAULT_CATEGORIES slug: the
+// select is populated from the live list, so a slug here would show one category
+// and submit another. openAdd fills it from the live list, and submission is
+// blocked until that list exists.
 const defaultAddForm: AddFormState = {
   name: "",
   amount: "",
-  category_id: DEFAULT_CATEGORIES[0].id,
+  category_id: "",
   frequency: "monthly",
   due_day: "1",
   due_month: "1",
@@ -66,6 +70,13 @@ export default function SubscriptionsPage() {
   // Full live list, archived included — a subscription on an archived category
   // still resolves its icon. DEFAULT_CATEGORIES is the offline fallback only.
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  // Same split as the home screen: DEFAULT_CATEGORIES still renders a stored
+  // category's icon while the live list is in flight, but nothing may be written
+  // against it. Entity 049 fixed which id the add form STARTS on; this is the
+  // guard for the two residual paths it left — a failed fetch, and a modal opened
+  // before the fetch resolves.
+  const [categoriesReady, setCategoriesReady] = useState(false);
+  const [categoriesFailed, setCategoriesFailed] = useState(false);
 
   useEffect(() => {
     getSubscriptions()
@@ -74,15 +85,18 @@ export default function SubscriptionsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    getCategories()
+  const loadCategories = useCallback(() => {
+    setCategoriesFailed(false);
+    return getCategories()
       .then((cats) => {
-        if (cats.length > 0) setCategories(cats);
+        if (cats.length === 0) { setCategoriesFailed(true); return; }
+        setCategories(cats);
+        setCategoriesReady(true);
       })
-      .catch(() => {
-        // Keep DEFAULT_CATEGORIES as fallback
-      });
+      .catch(() => setCategoriesFailed(true));
   }, []);
+
+  useEffect(() => { loadCategories(); }, [loadCategories]);
 
   const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null);
 
@@ -111,7 +125,7 @@ export default function SubscriptionsPage() {
   const [editForm, setEditForm] = useState<EditFormState>({
     name: "",
     amount: "",
-    category_id: DEFAULT_CATEGORIES[0].id,
+    category_id: "",
     due_day: "1",
     due_month: "1",
   });
@@ -133,7 +147,7 @@ export default function SubscriptionsPage() {
     // left open overnight does not offer yesterday.
     setAddForm({
       ...defaultAddForm,
-      category_id: activeCategories[0]?.id ?? defaultAddForm.category_id,
+      category_id: activeCategories[0]?.id ?? "",
       start_date: todayLocalIso(),
     });
     setModalMode("add");
@@ -157,7 +171,7 @@ export default function SubscriptionsPage() {
   }
 
   async function handleAdd() {
-    if (addSubmitting) return;
+    if (addSubmitting || !categoriesReady) return;
     const amount = parseFloat(addForm.amount);
     if (!addForm.name.trim() || isNaN(amount) || amount <= 0) return;
     const due_day = Math.max(1, Math.min(31, parseInt(addForm.due_day) || 1));
@@ -187,7 +201,7 @@ export default function SubscriptionsPage() {
   }
 
   async function handleEdit() {
-    if (!editingId || editSubmitting) return;
+    if (!editingId || editSubmitting || !categoriesReady) return;
     const amount = parseFloat(editForm.amount);
     if (isNaN(amount) || amount <= 0) return;
     const due_day = Math.max(1, Math.min(31, parseInt(editForm.due_day) || 1));
@@ -261,6 +275,26 @@ export default function SubscriptionsPage() {
   const editingFrequency = editingId
     ? subscriptions.find((s) => s.id === editingId)?.frequency
     : undefined;
+
+  // Rendered inside whichever modal is open, next to the disabled Save.
+  const categoryStatus = !categoriesReady && (
+    <div
+      data-testid="category-status"
+      className={`text-xs mt-3 flex items-center gap-2 ${categoriesFailed ? "text-error" : "text-base-content/50"}`}
+    >
+      <span>{categoriesFailed ? t("common.categories_unavailable") : t("common.categories_loading")}</span>
+      {categoriesFailed && (
+        <button
+          type="button"
+          data-testid="category-retry"
+          className="btn btn-ghost btn-xs"
+          onClick={() => loadCategories()}
+        >
+          {t("common.retry")}
+        </button>
+      )}
+    </div>
+  );
 
   // Every stored subscription carries a legacy slug id, which is absent from the
   // live list. Keep that stored id as the option's value so saving an unrelated
@@ -521,11 +555,12 @@ export default function SubscriptionsPage() {
                 />
               </div>
             </div>
+            {categoryStatus}
             <div className="modal-action mt-4">
               <button className="btn btn-ghost" onClick={closeModal}>
                 {t("common.cancel")}
               </button>
-              <button className="btn btn-primary" onClick={handleAdd} disabled={addSubmitting}>
+              <button className="btn btn-primary" onClick={handleAdd} disabled={addSubmitting || !categoriesReady}>
                 {addSubmitting ? <span className="loading loading-spinner loading-xs" /> : t("subscriptions.add")}
               </button>
             </div>
@@ -598,6 +633,7 @@ export default function SubscriptionsPage() {
                 />
               </div>
             </div>
+            {categoryStatus}
             <div className="modal-action mt-4">
               <button className="btn btn-ghost" onClick={closeModal}>
                 {t("common.cancel")}
@@ -605,7 +641,7 @@ export default function SubscriptionsPage() {
               <button
                 className="btn btn-primary"
                 onClick={handleEdit}
-                disabled={editSubmitting || !editForm.amount || parseFloat(editForm.amount) <= 0}
+                disabled={editSubmitting || !categoriesReady || !editForm.amount || parseFloat(editForm.amount) <= 0}
               >
                 {editSubmitting ? <span className="loading loading-spinner loading-xs" /> : t("common.save")}
               </button>

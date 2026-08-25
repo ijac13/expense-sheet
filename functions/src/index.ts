@@ -120,6 +120,38 @@ async function ensureSubscriptionColumns(
   return { tab: map.tab, index, width: first + missing.length };
 }
 
+/**
+ * Reject a `category_id` that names no row in the live Categories tab.
+ *
+ * The valid set is READ per request, never a copy of the client's slug table:
+ * duplicating DEFAULT_CATEGORIES into functions/ would recreate the second
+ * source of truth entity 054 removed. So this is strict accept-or-reject with no
+ * name_en bridge — a legacy slug like `eating-out` is in no live row and is a
+ * 400, which is the point. The Categories tab is ~25 rows and readTab is already
+ * called three times in this file, so the extra read is cheap.
+ *
+ * `is_active: false` is ACCEPTED. Rejection is for ids absent from the tab
+ * entirely; an archived category still has to be editable on historical rows.
+ *
+ * Returns the error message, or null when the id is good.
+ */
+async function categoryIdError(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  value: unknown
+): Promise<string | null> {
+  // Validate exactly the string that would be written, so nothing can be
+  // accepted in one shape and stored in another.
+  const categoryId = String(value ?? "");
+  if (!categoryId.trim()) return "category_id is required.";
+
+  const { rows, map } = await readTab(sheets, spreadsheetId, CATEGORIES_SPEC);
+  const known = rows.slice(1).some((r) => (cell(r, map, "id") ?? "") === categoryId);
+  if (known) return null;
+
+  return `category_id "${categoryId}" is not a category in the ${CATEGORIES_TAB} tab.`;
+}
+
 function rowToExpense(row: Row, map: ColumnMap): Record<string, unknown> {
   return {
     id: cell(row, map, "id") ?? "",
@@ -383,6 +415,12 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       // POST — add a new subscription
       if (req.method === "POST") {
         const body = req.body as Record<string, unknown>;
+
+        // Before ensureSubscriptionColumns, which itself writes a header row: a
+        // rejected request must leave the sheet byte-identical.
+        const catError = await categoryIdError(sheets, spreadsheetId, body.category_id);
+        if (catError) { res.status(400).json({ error: catError }); return; }
+
         const id = `sub-${Date.now()}`;
 
         // A full-tab read, not just row 1: the header placement below has to see
@@ -422,6 +460,14 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       if (req.method === "PATCH") {
         const body = req.body as Record<string, unknown>;
         const targetId = String(body.id ?? "");
+
+        // Only when the field is being changed. An omitted category_id carries
+        // the stored cell forward, so an unrelated edit to a subscription filed
+        // under a since-deleted category is not blocked by this guard.
+        if (body.category_id !== undefined) {
+          const catError = await categoryIdError(sheets, spreadsheetId, body.category_id);
+          if (catError) { res.status(400).json({ error: catError }); return; }
+        }
 
         // Find the row
         const { rows, map } = await readTab(sheets, spreadsheetId, SUBSCRIPTIONS_SPEC);
@@ -619,6 +665,12 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       const targetId = String(body.id ?? "");
       if (!targetId) { res.status(400).json({ error: "id is required" }); return; }
 
+      // Only when the field is being changed — see the subscriptions PATCH.
+      if (body.category_id !== undefined) {
+        const catError = await categoryIdError(sheets, spreadsheetId, body.category_id);
+        if (catError) { res.status(400).json({ error: catError }); return; }
+      }
+
       const { rows, map } = await readTab(sheets, spreadsheetId, EXPENSES_SPEC);
       const rowIndex = rows.findIndex((r, i) => i > 0 && cell(r, map, "id") === targetId);
       if (rowIndex === -1) {
@@ -712,6 +764,12 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
     // POST — add a new expense
     if (req.method === "POST") {
       const body = req.body as Record<string, unknown>;
+
+      // The chokepoint every expense write passes through, including the one the
+      // home screen posts without the captain touching the picker.
+      const catError = await categoryIdError(sheets, spreadsheetId, body.category_id);
+      if (catError) { res.status(400).json({ error: catError }); return; }
+
       const id = `exp-${Date.now()}`;
       const created_at = new Date().toISOString();
 

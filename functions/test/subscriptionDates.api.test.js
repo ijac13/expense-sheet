@@ -28,9 +28,22 @@ const SUBS_ROWS = [
 const USERS = { header: ["email", "Users"], rows: [["ijac@example.com", "ijac"]] };
 const EXPENSES_HEADER = ["id", "date", "amount", "category_id", "paid_by", "created_by", "notes", "created_at"];
 
+// Entity 058 validates every submitted category_id against this tab, so the ids
+// these fixtures write have to exist here. Nothing in this file asserts on
+// categories; the tab is a precondition, the way Users already is.
+const CATEGORIES = {
+  header: ["id", "name_en", "name_zh", "icon", "sort_order", "is_active", "gov_category", "note"],
+  rows: [
+    ["cat_002", "Digital", "數位", "💻", "2", "true", "transport_communication", ""],
+    ["cat_003", "Groceries", "食材", "🥕", "3", "true", "food_beverage_tobacco", ""],
+    ["cat_005", "Insurance", "保險", "🛡️", "5", "true", "insurance_financial", ""],
+  ],
+};
+
 const fixture = (over = {}) => makeSheets({
   Subscriptions: { header: LEGACY_HEADER, rows: SUBS_ROWS.map((r) => r.slice()) },
   Expenses: { header: EXPENSES_HEADER, rows: [] },
+  Categories: CATEGORIES,
   Users: USERS,
   ...over,
 });

@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, PenLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
 import DatePickerModal from "./components/DatePickerModal";
-import { Category, DEFAULT_CATEGORIES, categoryIcon, getDefaultCategory, resolveCategory, saveLastCategory } from "./lib/categories";
+import { Category, DEFAULT_CATEGORIES, categoryIcon, getDefaultCategory, pickCategoryId, resolveCategory, saveLastCategory } from "./lib/categories";
 import { getCategories } from "./lib/categoryService";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
 import { DEFAULT_USER, USERS, type UserId } from "./lib/users";
@@ -29,7 +29,13 @@ export default function HomePage() {
   const lang = i18n.language;
   const { resolvedUserId } = useAuth();
   const [categoryId, setCategoryId] = useState<string>(() => getDefaultCategory());
+  // DEFAULT_CATEGORIES is what the picker DRAWS before the live list arrives, so
+  // the screen is never blank. `categoriesReady` is what decides whether anything
+  // may be SUBMITTED — a slug is a legitimate placeholder and an illegitimate
+  // write, and conflating the two is the bug this entity exists to remove.
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [categoriesReady, setCategoriesReady] = useState(false);
+  const [categoriesFailed, setCategoriesFailed] = useState(false);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [noteOpen, setNoteOpen] = useState(false);
@@ -58,20 +64,30 @@ export default function HomePage() {
       .catch(() => setExpenses([]));
   }, []);
 
-  useEffect(() => {
-    getCategories()
+  const loadCategories = useCallback(() => {
+    setCategoriesFailed(false);
+    return getCategories()
       .then((cats) => {
         const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
-        if (active.length > 0) setCategories(active);
+        if (active.length === 0) { setCategoriesFailed(true); return; }
+        setCategories(active);
+        // The seed from localStorage was never reconciled here, which is how a
+        // stale slug survived all the way into the POST body on the fastest path
+        // through the app: type an amount, confirm, touch nothing else.
+        setCategoryId((current) => pickCategoryId(current, active));
+        setCategoriesReady(true);
       })
-      .catch(() => {
-        // Keep DEFAULT_CATEGORIES as fallback
-      });
+      .catch(() => setCategoriesFailed(true));
   }, []);
+
+  useEffect(() => { loadCategories(); }, [loadCategories]);
 
   function handleSelectCategory(id: string) {
     setCategoryId(id);
-    saveLastCategory(id);
+    // Only a live id is worth remembering. Before the list resolves the tiles are
+    // DEFAULT_CATEGORIES placeholders, and persisting one of those would replace
+    // the captain's real last-used category with a slug.
+    if (categoriesReady) saveLastCategory(id);
   }
 
   function handleKey(key: string) {
@@ -81,6 +97,9 @@ export default function HomePage() {
   }
 
   async function handleConfirm() {
+    // The write is blocked here as well as on the button, because a visible error
+    // beats a silently mis-filed expense — and the button is not the only caller.
+    if (!categoriesReady) return;
     let val: number;
     try { val = Function(`"use strict"; return (${amount || "0"})`)() as number; }
     catch { return; }
@@ -171,6 +190,27 @@ export default function HomePage() {
       {/* Bottom: date + keypad + save */}
       <div className="shrink-0 bg-base-100 border-t border-base-300 px-3 pt-2 pb-16">
 
+        {/* Why Save is dead. Sits next to the button it explains, so the captain
+            is never left tapping an unresponsive control. */}
+        {!categoriesReady && (
+          <div
+            data-testid="category-status"
+            className={`text-xs mb-2 px-1 flex items-center gap-2 ${categoriesFailed ? "text-error" : "text-base-content/50"}`}
+          >
+            <span>{categoriesFailed ? t("common.categories_unavailable") : t("common.categories_loading")}</span>
+            {categoriesFailed && (
+              <button
+                type="button"
+                data-testid="category-retry"
+                className="btn btn-ghost btn-xs"
+                onClick={() => loadCategories()}
+              >
+                {t("common.retry")}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Date stepper */}
         <div className="flex items-center justify-between mb-2 px-1">
           <button onClick={() => stepDate(-1)} className="w-6 h-6 grid place-items-center rounded-full bg-base-200 active:bg-base-300">
@@ -220,7 +260,7 @@ export default function HomePage() {
           >C</button>
           <button
             onClick={handleConfirm}
-            disabled={submitting}
+            disabled={submitting || !categoriesReady}
             className={`col-span-2 h-9 rounded-xl font-semibold text-sm active:opacity-80 disabled:opacity-50 transition-colors
               ${saved ? "bg-success text-success-content" : "bg-primary text-primary-content"}`}
           >
