@@ -1,16 +1,18 @@
 ---
 id: 056
 title: Pre-Commit PII Scanner
-status: verify
+status: done
 source: captain
 started:
 completed:
-verdict: REJECTED
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-056-pii-precommit-hook
 issue:
-pr:
+pr: "#28"
 ---
+
+**Activated:** `npm install` run at the repo root 2026-08-25 (after confirming no other worktree was mid-commit — `core.hooksPath` is shared repo-wide). Confirmed via `git config --get core.hooksPath` → `scripts/hooks`. Live-tested for real: staged a file containing a genuine phone-number-shaped string and ran `git commit` — blocked at exit 1, naming the file, line, and match, with no commit created. Test file removed afterward.
 
 This session leaked real personal data into tracked files on this public repo twice: entity 052 wrote both real emails into its own ideation prose (caught late, redacted after the fact); entity 051's build wrote two real phone numbers and four family members' subscription names into test fixtures (caught by verify, required a full history rewrite to actually remove). Both times, a person (the AI doing the work) typed real data into a file without noticing the repo is public, and the mistake was only caught downstream, by chance, in a later review step.
 
