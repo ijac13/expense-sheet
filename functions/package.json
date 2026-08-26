@@ -16,6 +16,7 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
+    "check:auth-emails": "node scripts/check-auth-emails.js",
     "migrate:insurance-tax": "node -r ./scripts/load-local-env.js scripts/apply-insurance-tax-categories.js",
     "migrate:insurance-tax:dry-run": "node -r ./scripts/load-local-env.js scripts/apply-insurance-tax-categories.js --dry-run",
     "backfill:analyze": "npm run build && node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --analyze",
