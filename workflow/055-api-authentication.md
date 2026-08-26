@@ -1,13 +1,13 @@
 ---
 id: 055
 title: Add Real Authentication/Authorization to the API
-status: spec
+status: build
 source: captain
 started:
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-055-api-authentication
 issue:
 pr:
 ---
