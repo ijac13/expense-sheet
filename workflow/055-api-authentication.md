@@ -218,3 +218,61 @@ The gate lives at `index.ts:275`, after `setCors()` and after the OPTIONS early 
 Two findings worth the gate's attention. First, the spec's prediction about the test stub was right and slightly understated: `call()` needed headers *and* `res.set` had to stop being a no-op, otherwise AC-14 would have passed vacuously by comparing two empty header maps — the test now guards against exactly that. Second, the frontend change breaks the app render tests in a way the spec did not anticipate: they exercise the real services, which now demand a Firebase `currentUser` that does not exist headlessly. The harness stubs the compiled `apiClient` (the same `require.cache` technique the existing `mockAuth` uses), and `app/test/api-auth.test.js` covers the real helper separately so the stub does not hide it.
 
 Nothing was run against a real spreadsheet or with a real token. AC-21/AC-22 are untouched, and the preflight currently reports MISMATCH because `AUTHORIZED_EMAILS` is not yet in the captain's `functions/.env` — which is the correct pre-deploy state and the first step of the runbook.
+
+## Stage Report: verify
+
+**Verdict: PASSED** for AC-1 through AC-20. AC-21 and AC-22 are unmet and reserved for the captain — see below. A staging deploy was deliberately NOT performed; the reason is a real blocker, not an omission.
+
+- DONE: Re-run the full test suite fresh (npm install/ci, not symlinks) and confirm functions 193/193 and app 160/160
+  `npm ci` in both packages (real dirs, no symlinks), then functions **193/193**, app **160/160**.
+- DONE: Independently reproduce all 3 of the build's mutation claims
+  Run in a disposable repo copy so the branch never held a weakened gate. (1) fail-open → exactly AC-8 + AC-14 fail (11/13). (2) gate above the OPTIONS early return → exactly both AC-12 tests fail (11/13). (3) `authorize()` in `runSubscriptionScheduler` → **21–23 of 25** scheduler tests fail, not 8; see Summary.
+- DONE: Independently spot-check the two things the build found beyond the spec's prediction
+  `res.set` was `set() {}` on main and now records. With `res.set` reverted to a no-op **and** the guard line deleted, AC-14 **passes vacuously** (only AC-13 catches it); restoring the guard alone fails AC-14. Real helper confirmed: deleting the `headers.set("Authorization", …)` line fails 3 AC-15 tests — impossible against a stub. A planted bare `fetch(` fails the walker, naming `lib/expenseService.ts:36`.
+- DONE: Confirm AC-18 as a hard boundary, not just a diff check
+  `grep -nE 'auth|token|authorize|verifyIdToken|Authorization|AUTHORIZED'` over `functions/src/scheduler.ts` → **zero matches**. sha256 of `scheduler.test.js` identical across main / branch HEAD / worktree (`78f22f1f…bb51`); `scheduler.ts` identical main vs HEAD (`958455a6…16d3`).
+- DONE: Confirm the firebase-admin initialization is genuinely guarded against double-init
+  Probed against the **real** firebase-admin SDK (no stub): 5 sequential `authorize()` calls → app count 0→1, stays 1, no throw. Reverse case: an app pre-initialized by another module first → 3 more calls, still 1 app, no duplicate-app throw. Node's runner also forks per test file, so cross-file collision cannot arise here.
+- DONE: IMPORTANT — DO NOT DEPLOY TO PRODUCTION under any circumstance in this stage
+  No production deploy and no write of any kind to the production project. Nothing outside the worktree was modified.
+- SKIPPED: Attempt AC-21 as far as possible (deploy to STAGING, prove 401 paths, obtain a real token if possible)
+  **The entity's own Rollout Plan step 1 stops this deploy**: preflight exits non-zero. `AUTHORIZED_EMAILS` is set in neither `functions/.env` nor `functions/.env.staging`, and the config gate runs *before* the token check — so a staging deploy as-is returns **500 to every request including tokenless ones**, leaving AC-21's 401s unreachable and staging fail-closed for the captain. Setting it means writing the two real addresses into the main checkout, outside this worktree and a captain credentials decision. No real Firebase ID token was obtainable: minting one needs Admin-SDK service-account credentials for `expense-sheet-staging` plus an existing Auth user, or the browser OAuth flow this environment cannot run. Live evidence obtained another way — see below.
+- DONE: Confirm the preflight check:auth-emails script currently reports MISMATCH as expected
+  Exit **1**, "MISMATCH: AUTHORIZED_EMAILS is unset or empty — the API would fail closed (500)." Counts only (0 server / 2 client), never an address. Its 7 tests pass, covering the exit-0 match path and the never-print-an-address rule.
+- DONE: Mandatory PII/secrets check on the full diff
+  Every email-shaped string this branch adds is on the reserved `@example.test` domain (7 distinct, all fixtures). Zero JWT-shaped strings, zero PEM/private-key material, zero API-key shapes. Only `.env.example` and `functions/.env.staging.example` are committed, both placeholder-only (`TODO_…`). The only token literal is `"id-token-abc"`. A branch-wide scan surfaces two real-looking addresses, but both pre-exist on main as entity 056's own PII-hook fixtures — constructed stand-ins that entity documents as such. They are not restated here, because this repo is public and 056's pre-commit hook correctly blocks that (it blocked this very report until the literals were removed).
+- DONE: Report clearly which parts of AC-21/AC-22 remain for the captain
+  Both remain open and are listed explicitly below. Neither was silently skipped.
+
+### Live evidence
+
+**Current staging, pre-merge (the hole is real):** `GET https://expense-sheet-staging.web.app/api/scheduler-status` with **no token** → **200**, 117 bytes of real scheduler data. That is today's deployed behaviour and exactly what this entity closes.
+
+**New code over real HTTP** (Firebase functions emulator, `demo-verify` project, real compiled `lib/`, no shared environment touched):
+
+| Request | Result |
+|---|---|
+| `GET /api/scheduler-status`, no header | **401** `{"error":"unauthorized"}` + all 3 CORS headers |
+| `GET`, `Authorization: Bearer not-a-real-token` | **401** `{"error":"unauthorized"}` |
+| Headers `""`, `abc`, `Bearer`, `Bearer `, `Basic eHl6` | **401** ×5 |
+| `POST`/`PATCH`/`DELETE /api`, `POST`/`PATCH /api/subscriptions`, `POST /api/migrate-users`, no token | **401** ×6 |
+| `OPTIONS` on all 7 paths, no token | **204** ×7 |
+| Allowlist unset, no token | **500** `{"error":"AUTHORIZED_EMAILS not configured"}` + CORS headers |
+| Allowlist unset, *with* a token | **500** — config gate fires before the token check |
+| Allowlist unset, `OPTIONS` | **204** — preflight still passes |
+
+`Access-Control-Allow-Headers: Content-Type, Authorization` on every response above, rejections included (AC-13/AC-14 live). The emulator read a local gitignored `functions/.env` holding only `@example.test` addresses; it was deleted afterwards and the worktree is clean.
+
+### Reserved for the captain
+
+1. **Set `AUTHORIZED_EMAILS`** (blocks everything else) in `functions/.env` and `functions/.env.staging`, to the same two addresses as `NEXT_PUBLIC_USER1_EMAIL`/`NEXT_PUBLIC_USER2_EMAIL`. Then `npm --prefix functions run check:auth-emails` must exit 0 — until it does, the runbook forbids deploying.
+2. **AC-21** — staging deploy, then a real Google sign-in on `https://expense-sheet-staging.web.app` recording: authorized email → 200 with real data; no token → 401; tampered token → 401. Report `aud`/`iss`/`email_verified` and the email *domain* only.
+3. **AC-22** — the production deploy, hosting **before** functions, captain signed in and standing by. Recovery is `git revert` + `firebase deploy --only functions` (~1–3 min).
+
+### Summary
+
+AC-1 through AC-20 hold, verified by exercising rather than by re-reading the build's report: a fresh `npm ci` reproduced 193/193 and 160/160, all three mutations were re-run in a disposable copy, and the auth gate was driven over real HTTP for its 401, 500, 204 and CORS behaviour. AC-18 is a hard boundary by sha256, not a diff impression, and the firebase-admin guard was probed against the real SDK in both the cold and pre-initialized directions.
+
+Two corrections to the build's report, neither a defect. Its third mutation claim understates itself: `authorize()` inside `runSubscriptionScheduler` fails **21 of 25** scheduler tests with an early return and **23 of 25** when it throws — not 8. No variant failing only 8 was reachable, so treat the number as wrong and the protection as stronger than advertised. Separately, a small hole in AC-15's "single door" guarantee: the source walker's regex excludes any `.fetch(`, so a future `window.fetch(` or `globalThis.fetch(` would pass unnoticed. Every current call site routes through `apiFetch`, so this is not blocking — but the guard is not airtight.
+
+The one thing verify could not do is AC-21, and the reason is structural rather than environmental. `AUTHORIZED_EMAILS` is unset server-side and the config gate precedes the token check, so a staging deploy today would 500 every request, prove nothing about the 401 paths, and leave staging fail-closed for the captain. The entity's own preflight already encodes this as a stop condition and currently exits non-zero, which is the correct pre-deploy state. The captain sets that variable first; staging and production then follow the runbook's order.
