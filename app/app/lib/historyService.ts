@@ -1,4 +1,5 @@
 import { Expense } from "./expenses";
+import { apiFetch } from "./apiClient";
 
 const API_BASE = "/api";
 
@@ -6,7 +7,7 @@ const API_BASE = "/api";
  * Fetch all expenses from the API, sorted by date descending.
  */
 export async function getAllExpenses(): Promise<Expense[]> {
-  const res = await fetch(API_BASE);
+  const res = await apiFetch(API_BASE);
   if (!res.ok) {
     throw new Error(`Failed to fetch expenses: ${res.status} ${res.statusText}`);
   }

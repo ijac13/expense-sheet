@@ -1,9 +1,10 @@
 import { Category } from "./categories";
+import { apiFetch } from "./apiClient";
 
 const API_BASE = "/api/categories";
 
 export async function getCategories(): Promise<Category[]> {
-  const res = await fetch(API_BASE);
+  const res = await apiFetch(API_BASE);
   if (!res.ok) throw new Error(`Failed to load categories: ${res.status}`);
   return res.json() as Promise<Category[]>;
 }
@@ -11,7 +12,7 @@ export async function getCategories(): Promise<Category[]> {
 export async function addCategory(
   data: Omit<Category, "id" | "sort_order" | "is_active">
 ): Promise<Category> {
-  const res = await fetch(API_BASE, {
+  const res = await apiFetch(API_BASE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -24,7 +25,7 @@ export async function updateCategory(
   id: string,
   data: Partial<Pick<Category, "name_en" | "name_zh" | "icon" | "sort_order" | "is_active" | "gov_category" | "note">>
 ): Promise<Category> {
-  const res = await fetch(`${API_BASE}/${id}`, {
+  const res = await apiFetch(`${API_BASE}/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),

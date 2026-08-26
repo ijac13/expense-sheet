@@ -198,7 +198,29 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
     }
     return { ok: true, status: 200, json: async () => expFixture.map((e) => ({ ...e })) };
   };
+  mockApiClient();
   return { dom, requests, writes, categories, setCategoryIcon, scrolls, subscriptions, subWrites, expWrites, setOffline, releaseCategories };
+}
+
+/**
+ * Replace the API client with one that calls `global.fetch` directly. The real
+ * apiFetch mints a Firebase ID token from `getFirebaseAuth().currentUser`, which
+ * is null headlessly — every service call would throw NotSignedInError instead of
+ * reaching the fetch stub above. What the real helper puts on the wire is covered
+ * by test/api-auth.test.js, which exercises it against a stubbed firebase module.
+ */
+function mockApiClient() {
+  const id = require.resolve("../../.test-build-ui/lib/apiClient.js");
+  class NotSignedInError extends Error {}
+  require.cache[id] = {
+    id,
+    filename: id,
+    loaded: true,
+    exports: {
+      apiFetch: (input, init) => global.fetch(input, init),
+      NotSignedInError,
+    },
+  };
 }
 
 /**

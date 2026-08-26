@@ -1,4 +1,5 @@
 import { Subscription } from "./subscriptions";
+import { apiFetch } from "./apiClient";
 
 const API_BASE = "/api/subscriptions";
 
@@ -24,7 +25,7 @@ export async function getSchedulerStatus(): Promise<SchedulerStatus> {
     stale: true,
   };
   try {
-    const res = await fetch("/api/scheduler-status");
+    const res = await apiFetch("/api/scheduler-status");
     if (!res.ok) return unknown;
     return (await res.json()) as SchedulerStatus;
   } catch {
@@ -33,13 +34,13 @@ export async function getSchedulerStatus(): Promise<SchedulerStatus> {
 }
 
 export async function getSubscriptions(): Promise<Subscription[]> {
-  const res = await fetch(API_BASE);
+  const res = await apiFetch(API_BASE);
   if (!res.ok) throw new Error(`Failed to load subscriptions: ${res.status}`);
   return res.json() as Promise<Subscription[]>;
 }
 
 export async function addSubscription(data: Omit<Subscription, "id" | "is_active">): Promise<Subscription> {
-  const res = await fetch(API_BASE, {
+  const res = await apiFetch(API_BASE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -52,7 +53,7 @@ export async function updateSubscription(
   id: string,
   data: Partial<Pick<Subscription, "name" | "amount" | "category_id" | "due_day" | "due_month">>
 ): Promise<void> {
-  const res = await fetch(API_BASE, {
+  const res = await apiFetch(API_BASE, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, ...data }),
@@ -63,7 +64,7 @@ export async function updateSubscription(
 // The end date is passed in rather than derived here: it is whatever the captain
 // confirmed in the modal, which may be days earlier than today.
 export async function cancelSubscription(id: string, end_date: string): Promise<void> {
-  const res = await fetch(API_BASE, {
+  const res = await apiFetch(API_BASE, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, is_active: false, end_date }),

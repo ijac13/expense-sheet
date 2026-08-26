@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { apiFetch } from "../lib/apiClient";
 import {
   BarChart,
   Bar,
@@ -245,7 +246,7 @@ function InsightsCard({ period }: { period: InsightsPeriod }) {
     inflightKeysRef.current.add(requestKey);
     startTimer();
     try {
-      const res = await fetch(`${API_BASE}/api/insights`, {
+      const res = await apiFetch(`${API_BASE}/api/insights`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),

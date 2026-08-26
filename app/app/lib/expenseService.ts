@@ -1,4 +1,5 @@
 import { Expense } from "./expenses";
+import { apiFetch } from "./apiClient";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -6,7 +7,7 @@ export async function updateExpense(
   id: string,
   data: Partial<Omit<Expense, "id" | "created_by" | "created_at">>
 ): Promise<Expense> {
-  const res = await fetch(`${API_BASE}/api`, {
+  const res = await apiFetch(`${API_BASE}/api`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, ...data }),
@@ -19,7 +20,7 @@ export async function updateExpense(
 }
 
 export async function deleteExpense(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api`, {
+  const res = await apiFetch(`${API_BASE}/api`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
