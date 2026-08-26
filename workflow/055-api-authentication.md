@@ -1,7 +1,7 @@
 ---
 id: 055
 title: Add Real Authentication/Authorization to the API
-status: build
+status: verify
 source: captain
 started:
 completed:
