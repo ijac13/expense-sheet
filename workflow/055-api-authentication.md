@@ -189,3 +189,32 @@ Traced every claim against the code rather than carrying the ideation's assumpti
 The load-bearing find for build is that `call()` in `functions/test/sheetsStub.js:171-190` builds requests with no `headers` key. Exercised it directly against a stand-in handler: reading `req.headers.authorization` throws `TypeError: Cannot read properties of undefined`, so all 81 `call()` invocations across 5 files break unless the stub supplies headers and a default authorized token. Baseline confirmed green first — `npm --prefix functions test` passes 173/173 today, which is what AC-6 measures non-regression against.
 
 Rollout safety is specified rather than left to build: hosting-before-functions ordering, a preflight env-match check, real-token staging evidence, and a redeploy recovery path with the captain standing by.
+
+## Stage Report: build
+
+- DONE: Implement AC-1 through AC-5 (rejection)
+  `functions/src/auth.ts` + gate at `index.ts:275-283`; commit 106a5a5. AC-1/AC-4 loop all 14 combinations asserting status, body, a byte-identical grid snapshot AND an empty `requests` log — removing the gate, or moving it after `getSheetsClient()`, fails on the request log even if the status were still right.
+- DONE: Implement AC-6/AC-7 (acceptance, non-regression)
+  All 173 pre-existing assertions pass with only `sheetsStub.js` changed (default authorized token + recording `res.set`). AC-6 additionally drives both authorized emails over all 14 combinations asserting the response is not one of the three gate bodies; AC-7 feeds uppercased/padded claims against a mixed-case, padded, trailing-comma env value — dropping either `.toLowerCase()` or `.trim()` fails it.
+- DONE: Implement AC-8 through AC-11 (configuration)
+  AC-8 covers `undefined`/`""`/`"   "`/`","`/`" , , "`/`",,,"` across all 14 combinations, asserting 500, an untouched grid, no Sheets request, and **zero verifyIdToken calls**. `AUTHORIZED_EMAILS` documented with placeholders in `.env.example` and `functions/.env.staging.example`; `functions/scripts/check-auth-emails.js` + `check:auth-emails` script with 7 tests in `checkAuthEmails.test.js` driving it as a real subprocess against throwaway env files in a non-git tmpdir.
+- DONE: Implement AC-12 through AC-14 (CORS/preflight)
+  AC-12 asserts 204 on all 14 paths with `verifyCalls` empty — a spy, not the status code — plus a case with `AUTHORIZED_EMAILS` deleted. `res.set` now records, so AC-14 compares the full header map of 401/403/500 against a 200 and guards that comparison with a non-emptiness check (otherwise two empty maps would pass).
+- DONE: Implement AC-15 through AC-17 (frontend)
+  Commit 8c6754f: 16 call sites across 8 files now call `apiFetch`; `app/test/api-auth.test.js` exercises the **real** helper against a stubbed firebase module. A source-walking test fails on any bare `fetch(` in `app/app` outside `apiClient.ts`. AC-16 asserts `NotSignedInError` **and** an empty call log; AC-17 asserts `getSchedulerStatus()` returns `stale:true` with no user and the real payload when signed in.
+- DONE: Implement AC-18 through AC-20 (no collateral damage)
+  `git diff main...HEAD` touches neither `functions/test/scheduler.test.js` nor `functions/src/scheduler.ts`; grep finds no token logic in the scheduler path. `app/app/lib/auth.ts` deleted with zero importers (asserted by a test, not just a grep). `npm --prefix app run build` compiles 14 routes. Final: functions **193/193**, app **160/160**.
+- SKIPPED: Do NOT attempt AC-21/AC-22 (rollout safety with real tokens and the actual production deploy)
+  Reserved for verify and the captain per the Rollout Plan. No real Firebase token was used and nothing was run against a real spreadsheet — every test drives the in-memory sheet fixture with a stubbed verifier.
+- DONE: Set up the firebase-admin initialization for the first time in functions/src
+  `auth.ts:1-2` uses the modular `firebase-admin/app` (`initializeApp`/`getApps`) and `firebase-admin/auth` (`getAuth`) entrypoints, guarded by `getApps().length === 0`. Deliberately not cached in a module-level binding — `getAuth()` already returns the SDK's per-app instance, and a local cache would survive a test's re-stub.
+- DONE: Self-check every AC against a fixture/stub, with falsifiability proven by mutation on AC-8, AC-12, AC-18
+  Baseline re-confirmed fresh at 173/173 before any edit. Three mutations applied, each reverted after: (1) fail-closed → fail-open (`return {ok:true}` on an empty list) — AC-8 and AC-14 fail; (2) auth gate moved above the OPTIONS early return — both AC-12 tests fail; (3) `authorize()` called inside `runSubscriptionScheduler` — 8 scheduler tests fail. Working tree confirmed identical to HEAD afterwards.
+
+### Summary
+
+The gate lives at `index.ts:275`, after `setCors()` and after the OPTIONS early return, and checks configuration before credentials: an unusable `AUTHORIZED_EMAILS` 500s without ever reading the token, so a config slip cannot silently reopen the hole. 401 covers absent/malformed/unverifiable credentials, 403 covers a token that verifies but is not authorized or not `email_verified`.
+
+Two findings worth the gate's attention. First, the spec's prediction about the test stub was right and slightly understated: `call()` needed headers *and* `res.set` had to stop being a no-op, otherwise AC-14 would have passed vacuously by comparing two empty header maps — the test now guards against exactly that. Second, the frontend change breaks the app render tests in a way the spec did not anticipate: they exercise the real services, which now demand a Firebase `currentUser` that does not exist headlessly. The harness stubs the compiled `apiClient` (the same `require.cache` technique the existing `mockAuth` uses), and `app/test/api-auth.test.js` covers the real helper separately so the stub does not hide it.
+
+Nothing was run against a real spreadsheet or with a real token. AC-21/AC-22 are untouched, and the preflight currently reports MISMATCH because `AUTHORIZED_EMAILS` is not yet in the captain's `functions/.env` — which is the correct pre-deploy state and the first step of the runbook.
