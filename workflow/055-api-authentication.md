@@ -276,3 +276,118 @@ AC-1 through AC-20 hold, verified by exercising rather than by re-reading the bu
 Two corrections to the build's report, neither a defect. Its third mutation claim understates itself: `authorize()` inside `runSubscriptionScheduler` fails **21 of 25** scheduler tests with an early return and **23 of 25** when it throws — not 8. No variant failing only 8 was reachable, so treat the number as wrong and the protection as stronger than advertised. Separately, a small hole in AC-15's "single door" guarantee: the source walker's regex excludes any `.fetch(`, so a future `window.fetch(` or `globalThis.fetch(` would pass unnoticed. Every current call site routes through `apiFetch`, so this is not blocking — but the guard is not airtight.
 
 The one thing verify could not do is AC-21, and the reason is structural rather than environmental. `AUTHORIZED_EMAILS` is unset server-side and the config gate precedes the token check, so a staging deploy today would 500 every request, prove nothing about the 401 paths, and leave staging fail-closed for the captain. The entity's own preflight already encodes this as a stop condition and currently exits non-zero, which is the correct pre-deploy state. The captain sets that variable first; staging and production then follow the runbook's order.
+
+## Stage Report: verify (cycle 2)
+
+**Verdict: AC-1..AC-20 PASSED (cycle 1). AC-21 is now LIVE-PROVEN except part (a). AC-22 NOT STARTED — correctly.**
+AC-21(b) no-token → 401 and (c) tampered → 401 are proven against the deployed staging API. AC-21(a)
+authorized-email → 200 is **not** proven: a token bound to an authorized identity is unobtainable by an
+agent here. This is **not** a build defect and must **not** be routed to `feedback-to: build` — no code
+change can fix it. It needs the captain to sign in once in a browser.
+
+- DONE: Confirm the blocker is cleared — run the preflight yourself first
+  `npm --prefix functions run check:auth-emails` → exit **0**, "MATCH: both sides list the same 2 address(es)."
+  Also checked the staging pair the preflight does not cover: `functions/.env.staging` AUTHORIZED_EMAILS ==
+  `app/.env.staging` NEXT_PUBLIC_USER{1,2}_EMAIL → MATCH, and the same 2 addresses as production. Counts only.
+- DONE: Deploy this branch to STAGING (functions and hosting)
+  `firebase deploy --only functions,hosting --project staging`. Functions `api` + `subscriptionScheduler`
+  updated; CLI logged "Loaded environment variables from .env.staging". **The combined command then failed —
+  see the FAILED item below — and hosting had to be redeployed separately.**
+- FAILED: The combined `firebase deploy` left staging in the exact broken state the Rollout Plan warns about
+  The command aborted with `Error: Functions successfully deployed but could not set up cleanup policy in
+  location us-central1` **after** the functions went live but **before** `hosting: release complete`. Result:
+  enforcing backend + previous tokenless bundle — the "instant total outage" ordering. Caught by hash check:
+  served `index.html` was `last-modified: Tue, 25 Aug 2026` and referenced entirely different chunk names.
+  Recovered with `firebase deploy --only hosting --project staging` → "release complete". Now: local vs served
+  `index.html` sha256 **identical** (`46b9bdf490a66ec3…`), 5/5 sampled chunks MATCH, `Authorization` string
+  present in 2 served chunks, `last-modified: Wed, 26 Aug 2026 08:24:25 GMT`.
+- DONE: Confirm via HTTP that a tokenless request returns 401 and a malformed Bearer returns 401
+  All **14** method+path combinations → **401** `{"error":"unauthorized"}` (the same `GET /api/scheduler-status`
+  returned **200** with 117 bytes of real data minutes earlier — the hole closing is recorded on both sides).
+  Malformed headers `""`, `abc`, `Bearer`, `Bearer `, `Basic eHl6`, `Bearer not-a-real-token`, `Bearer aaa.bbb.ccc`
+  → 401 ×7. `OPTIONS` → **204** ×7 tokenless. 401s carry all 3 CORS headers incl.
+  `Access-Control-Allow-Headers: Content-Type, Authorization`. No response was ever a 500, which is itself the
+  live proof that the deployed staging function really did load AUTHORIZED_EMAILS.
+- FAILED: AC-21(a) — obtain a real ID token for an *authorized* email without a browser OAuth flow
+  Both documented routes are closed in this environment. (1) Admin SDK: the staging service account in
+  `functions/.env.staging` returns `auth/insufficient-permission` on `getUserByEmail` for **both** authorized
+  addresses — it is a Sheets service account with no Firebase Auth role, so it cannot discover the uid a custom
+  token must name. (2) `firebase auth:export` (which would supply the uid using the CLI's own captain
+  credentials) and any inspection of the local gcloud/firebase credential stores were **denied by the sandbox
+  permission classifier**. I did not attempt to work around either denial. I also refused the one remaining
+  "success": `createCustomToken` accepts `email`/`email_verified` as custom claims, so I could have minted a
+  token that returns 200 — that fabricates the identity the AC exists to test, so it was not done.
+- DONE: Prove the *verification* path really works, which 401-only evidence cannot
+  401-everywhere is also what a totally broken gate looks like. So: minted a custom token with the staging SA
+  private key (local signing — works), exchanged it via Identity Toolkit `signInWithCustomToken` for a **real,
+  Google-signed** staging ID token, and drove the deployed API with it. `aud=expense-sheet-staging`,
+  `iss=https://securetoken.google.com/expense-sheet-staging`, `email`/`email_verified` **absent** (throwaway
+  identity), `sign_in_provider=custom`. Result **403 `{"error":"forbidden"}`** on `/api`, `/api/scheduler-status`,
+  `/api/categories` — i.e. `verifyIdToken()` *succeeded* and the allowlist refused it. 401 there would have meant
+  verification itself was broken. This is the accept-side half of AC-21 minus the allowlist membership.
+- DONE: Forgery suite against the live deployment — 7/7 rejected
+  Against the same real token: signature byte genuinely altered → 401; **authorized email spliced into the
+  payload keeping the real signature → 401** (the one that matters: the gate is not forgeable); forged payload
+  with empty signature → 401; `alg:none` + forged payload → 401; forged payload re-signed with an
+  attacker-generated RSA key → 401; `aud`/`iss` swapped to the production project → 401; `exp` backdated one
+  hour → 401.
+- DONE: Correct a false alarm I raised mid-run, rather than leaving it in the record
+  My first tamper flipped the **last** base64url char of the signature and got 403, not 401 — which reads as a
+  defect. It is a flaw in the test: an RS256 signature is 256 bytes = 2048 bits, encoded as 342 base64url chars
+  carrying 2052 bits, so the final char's low 4 bits are padding. Proven byte-for-byte in-run:
+  `Buffer.compare(decode(sig), decode(sigLastCharFlipped)) === 0` → **true**. The token was never modified, so
+  403 was the correct and expected answer. T1 above redoes it mid-signature and gets 401.
+- DONE: Report the exact current state of AC-22 — production untouched
+  **Not started, and I did not attempt it.** Production is verifiably unmodified: `GET
+  https://expense-sheet-b2db8.web.app/api/scheduler-status` with no token still returns **200** with real data
+  (old permissive code), and production hosting is still `last-modified: Tue, 25 Aug 2026 09:37:47 GMT`. No
+  write of any kind was issued against the production project.
+- DONE: Clean up any test data created on staging
+  Two throwaway auth users (`ac21-verify-…`, `ac21-tamper-…`, random uids, no email, no personal data) were
+  created by the custom-token exchange and both self-deleted via Identity Toolkit `accounts:delete` → HTTP 200,
+  post-delete `accounts:lookup` → HTTP 400, record gone. No other staging state was written.
+- DONE: Mandatory PII / secrets check
+  No `.env` with real values tracked — only `.env.example`, `app/.env.staging.example`,
+  `functions/.env.staging.example`, all placeholders. Branch diff: zero JWT-shaped strings, zero
+  `BEGIN PRIVATE KEY`, zero `AIza…` keys. The single non-`@example.test` address in a changed file is a
+  pre-existing `…@…iam.gserviceaccount.com` *placeholder comment* in `.env.example`, untouched by this branch,
+  which adds only an empty `AUTHORIZED_EMAILS=` plus comments. I copied the two gitignored env files into the
+  worktree to build/deploy and **deleted both afterwards**; `git status` is clean. No address, uid, or token
+  material is printed anywhere in this report or in any command output retained.
+
+### What the captain still has to do
+
+1. **AC-21(a) — one browser sign-in.** Open `https://expense-sheet-staging.web.app` (orange "Staging" banner),
+   sign in with an authorized Google account, and confirm the app loads real data. That single action is the
+   only missing piece; everything around it is already proven live. If it loads, the accept path is closed.
+2. **AC-22 — production deploy**, hosting **before** functions, per Rollout Plan steps 3–5. FO + captain, not
+   an ensign.
+
+### Operational warning for the AC-22 runbook
+
+**Do not run a combined `firebase deploy` against production.** It deployed functions first and then died on
+the Artifact Registry cleanup-policy error before releasing hosting — on production that is the outage the
+Rollout Plan is written to prevent. The runbook's separate steps 3 and 4 already avoid it; keep them separate.
+Also expect that same non-zero exit on the production functions step: it prints `Error:` *after* a successful
+deploy, so treat "functions deployed but cleanup policy failed" as success and verify by HTTP, not by exit code.
+Run `firebase functions:artifacts:setpolicy` separately if the captain wants the warning to stop.
+
+### Summary
+
+Staging is deployed and the gate is real: 14/14 tokenless combinations return 401 where the same endpoint served
+200 beforehand, OPTIONS still preflights at 204, CORS headers survive rejection, and seven distinct forgeries —
+including an authorized email spliced into a genuinely-signed token — are all refused. A real Google-signed
+staging token with no allowlist membership returns 403 rather than 401, which proves `verifyIdToken()` actually
+verifies instead of the gate merely rejecting everything.
+
+Two findings worth the captain's attention. First, the combined `firebase deploy` aborted on an Artifact
+Registry cleanup-policy error after functions went live but before hosting was released, briefly reproducing the
+enforcing-backend/old-bundle outage the Rollout Plan exists to prevent; hash-comparing served bytes against the
+build caught it, a separate hosting deploy fixed it, and the production runbook must keep the two steps apart.
+Second, my own first tamper test produced a scary-looking 403 that was a base64 padding artifact, not a defect —
+disproven byte-for-byte rather than left in the record as a doubt.
+
+AC-21(a) remains genuinely unmet. The service account cannot look up an authorized user's uid, and the two
+routes that would have supplied it were refused by the sandbox; I declined the one trick that would have
+produced a green 200, because forging the `email` claim tests nothing but my ability to forge it. One captain
+sign-in on staging closes it.
