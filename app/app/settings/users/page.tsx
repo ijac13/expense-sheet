@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { apiFetch } from "../../lib/apiClient";
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,7 +20,7 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/users`)
+    apiFetch(`${API_BASE}/api/users`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<User[]>;

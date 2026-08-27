@@ -1,3 +1,5 @@
+import { apiFetch } from "./apiClient";
+
 export interface Expense {
   id: string;
   date: string; // ISO date string "YYYY-MM-DD"
@@ -46,7 +48,7 @@ const API_BASE = "/api";
  * Add an expense via the Firebase Function API.
  */
 export async function addExpense(expense: Omit<Expense, "id" | "created_at">): Promise<Expense> {
-  const res = await fetch(API_BASE, {
+  const res = await apiFetch(API_BASE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(expense),
@@ -61,7 +63,7 @@ export async function addExpense(expense: Omit<Expense, "id" | "created_at">): P
  * Get all today's expenses from the API.
  */
 export async function getTodayExpenses(): Promise<Expense[]> {
-  const res = await fetch(API_BASE);
+  const res = await apiFetch(API_BASE);
   if (!res.ok) {
     throw new Error(`Failed to fetch expenses: ${res.status} ${res.statusText}`);
   }

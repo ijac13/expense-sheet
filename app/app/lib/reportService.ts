@@ -16,6 +16,7 @@ import { Expense } from "./expenses";
 import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory } from "./categories";
 import { getCategories } from "./categoryService";
 import { USERS } from "./users";
+import { apiFetch } from "./apiClient";
 
 const API_BASE = "/api";
 
@@ -66,7 +67,7 @@ function resolvePayerName(payer: Exclude<PayerFilter, "all">): string {
 // Data fetcher — cached per call (no module-level cache to avoid stale data)
 // ---------------------------------------------------------------------------
 async function fetchAllExpenses(): Promise<Expense[]> {
-  const res = await fetch(API_BASE);
+  const res = await apiFetch(API_BASE);
   if (!res.ok) {
     throw new Error(`Failed to fetch expenses: ${res.status} ${res.statusText}`);
   }

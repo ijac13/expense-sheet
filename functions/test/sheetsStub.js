@@ -154,8 +154,63 @@ function makeSheets(tabs) {
   return { grids, requests, sheets, deleteTab };
 }
 
+// ---------------------------------------------------------------------------
+// Firebase Auth stub
+// ---------------------------------------------------------------------------
+// A fake ID token is base64 of its own claims, so a test states the identity it
+// wants inline instead of registering tokens up front. Anything that does not
+// decode to claims throws, which is exactly how a real expired/tampered/wrong-
+// audience token surfaces to us: verifyIdToken rejects and we never see why.
+const AUTHORIZED_EMAIL = "authorized-user1@example.test";
+const OTHER_AUTHORIZED_EMAIL = "authorized-user2@example.test";
+const AUTHORIZED_EMAILS = `${AUTHORIZED_EMAIL}, ${OTHER_AUTHORIZED_EMAIL}`;
+
+function fakeToken(claims) {
+  return Buffer.from(JSON.stringify(claims), "utf8").toString("base64url");
+}
+
+const VALID_TOKEN = fakeToken({ email: AUTHORIZED_EMAIL, email_verified: true });
+
+/** Records every verifyIdToken call, so a test can assert it was never reached. */
+function makeAuthStub() {
+  const verifyCalls = [];
+  const auth = {
+    verifyIdToken: async (token) => {
+      verifyCalls.push(token);
+      let claims;
+      try {
+        claims = JSON.parse(Buffer.from(token, "base64url").toString("utf8"));
+      } catch {
+        throw new Error("Firebase ID token has invalid signature");
+      }
+      if (!claims || typeof claims !== "object") throw new Error("Firebase ID token is malformed");
+      return claims;
+    },
+  };
+  return { auth, verifyCalls };
+}
+
+function installAuthStub(authStub) {
+  const appId = require.resolve("firebase-admin/app");
+  require.cache[appId] = {
+    id: appId,
+    filename: appId,
+    loaded: true,
+    // getApps() reports an initialized app so the handler never calls
+    // initializeApp(), which would look for real credentials.
+    exports: { initializeApp: () => ({}), getApps: () => [{}] },
+  };
+  const authId = require.resolve("firebase-admin/auth");
+  require.cache[authId] = {
+    id: authId,
+    filename: authId,
+    loaded: true,
+    exports: { getAuth: () => authStub.auth },
+  };
+}
+
 /** Install the stub, then load the compiled handler on top of it. */
-function loadApi(sheets) {
+function loadApi(sheets, authStub = makeAuthStub()) {
   const id = require.resolve("googleapis");
   require.cache[id] = {
     id,
@@ -163,30 +218,53 @@ function loadApi(sheets) {
     loaded: true,
     exports: { google: { auth: { getClient: async () => ({}) }, sheets: () => sheets } },
   };
+  installAuthStub(authStub);
   process.env.SPREADSHEET_ID = "sheet-under-test";
+  process.env.AUTHORIZED_EMAILS = AUTHORIZED_EMAILS;
   delete require.cache[require.resolve("../lib/index.js")];
+  delete require.cache[require.resolve("../lib/auth.js")];
   return require("../lib/index.js").api;
 }
 
-function call(api, method, path, body) {
+// `headers` left undefined means "an ordinary authorized caller" — that default
+// is what keeps the pre-auth call sites asserting behaviour rather than auth.
+// Passing an explicit object (including {}) uses it verbatim.
+function call(api, method, path, body, headers) {
   return new Promise((resolve) => {
+    const sent = {};
     const res = {
-      set() {},
+      set(key, value) {
+        sent[key] = value;
+        return this;
+      },
       status(code) {
         this.code = code;
         return this;
       },
       json(payload) {
-        resolve({ status: this.code, body: payload });
+        resolve({ status: this.code, body: payload, headers: sent });
         return this;
       },
       send(payload) {
-        resolve({ status: this.code, body: payload });
+        resolve({ status: this.code, body: payload, headers: sent });
         return this;
       },
     };
-    api({ method, path, body }, res);
+    const reqHeaders = headers ?? { authorization: `Bearer ${VALID_TOKEN}` };
+    api({ method, path, body, headers: reqHeaders }, res);
   });
 }
 
-module.exports = { COL, parseRange, makeSheets, loadApi, call };
+module.exports = {
+  COL,
+  parseRange,
+  makeSheets,
+  loadApi,
+  call,
+  makeAuthStub,
+  fakeToken,
+  AUTHORIZED_EMAIL,
+  OTHER_AUTHORIZED_EMAIL,
+  AUTHORIZED_EMAILS,
+  VALID_TOKEN,
+};

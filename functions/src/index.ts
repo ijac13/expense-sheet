@@ -19,6 +19,7 @@ import {
   rowToSubscription,
 } from "./sheetSchema";
 import { TIME_ZONE, runSubscriptionScheduler, readSchedulerStatus } from "./scheduler";
+import { authorize } from "./auth";
 
 const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
 
@@ -39,7 +40,7 @@ const HEADER_RANGE = "A1:Z1";
 function setCors(res: { set: (key: string, value: string) => void }) {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
 async function getSheetsClient() {
@@ -268,6 +269,15 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
 
   if (req.method === "OPTIONS") {
     res.status(204).send("");
+    return;
+  }
+
+  // Every non-preflight request past this point carries a verified, authorized
+  // identity. setCors already ran, so a rejection is readable by the browser as
+  // a real status rather than an opaque CORS failure.
+  const auth = await authorize(req);
+  if (!auth.ok) {
+    res.status(auth.status).json(auth.body);
     return;
   }
 
