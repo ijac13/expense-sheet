@@ -391,3 +391,10 @@ AC-21(a) remains genuinely unmet. The service account cannot look up an authoriz
 routes that would have supplied it were refused by the sandbox; I declined the one trick that would have
 produced a green 200, because forging the `email` claim tests nothing but my ability to forge it. One captain
 sign-in on staging closes it.
+
+### AC-21(a) closed — FO note, 2026-08-27
+
+Captain signed in to `https://expense-sheet-staging.web.app` with an authorized Google account and confirmed
+the app loads normally with real data. AC-21 is now fully proven in all three parts: (a) authorized accept,
+(b) no-token reject, (c) tampered-token reject. Verdict for verify stands at PASSED across AC-1 through AC-21.
+AC-22 (production deploy) is next, per the Rollout Plan, with the captain's explicit go-ahead.
