@@ -185,7 +185,7 @@ test("AC-14: a failed load does not persist a placeholder slug as the last-used 
 
 // Production shape after entity 054: every stored category_id is already live.
 const LIVE_SUBS = [
-  { id: "sub-1", name: "Netflix", amount: 390, category_id: "cat_001", frequency: "monthly", due_day: 15, paid_by: "Karen", is_active: true, start_date: "2026-03-01", end_date: "" },
+  { id: "sub-1", name: "Netflix", amount: 390, category_id: "cat_001", frequency: "monthly", due_day: 15, paid_by: "Karen", is_active: true, start_date: "2026-03-01", end_date: "", notes: "" },
 ];
 
 const mountSubs = async (opts = {}) => {

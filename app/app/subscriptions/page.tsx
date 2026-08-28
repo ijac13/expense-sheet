@@ -38,6 +38,7 @@ interface AddFormState {
   due_day: string;
   due_month: string;
   start_date: string;
+  notes: string;
 }
 
 interface EditFormState {
@@ -46,7 +47,13 @@ interface EditFormState {
   category_id: string;
   due_day: string;
   due_month: string;
+  notes: string;
 }
+
+// A hard cap rather than a truncating ellipsis, following entity 043: a note is
+// either fully readable on the card or it was never accepted. Enforced in the
+// handler as well as by maxLength, so a paste is capped by the same rule typing is.
+const NOTES_MAX = 200;
 
 // category_id is deliberately empty rather than a DEFAULT_CATEGORIES slug: the
 // select is populated from the live list, so a slug here would show one category
@@ -60,6 +67,7 @@ const defaultAddForm: AddFormState = {
   due_day: "1",
   due_month: "1",
   start_date: "",
+  notes: "",
 };
 
 export default function SubscriptionsPage() {
@@ -129,6 +137,7 @@ export default function SubscriptionsPage() {
     category_id: "",
     due_day: "1",
     due_month: "1",
+    notes: "",
   });
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
@@ -165,6 +174,11 @@ export default function SubscriptionsPage() {
       category_id: sub.category_id,
       due_day: String(sub.due_day),
       due_month: String(sub.due_month ?? 1),
+      // `?? ""` despite the type: hosting and functions deploy in one command but
+      // land independently, so a new bundle can briefly talk to a backend whose
+      // /api/subscriptions carries no notes key. Without this, opening Edit in
+      // that window throws on .trim() and takes the whole page down.
+      notes: sub.notes ?? "",
     });
     setModalMode("edit");
   }
@@ -194,6 +208,9 @@ export default function SubscriptionsPage() {
         paid_by: USERS.find(u => u.id === currentUserId)?.name ?? currentUserId,
         start_date: addForm.start_date,
         end_date: "",
+        // Trimmed, so a note of only spaces is stored as unset rather than as a
+        // note line that occupies card space showing nothing.
+        notes: addForm.notes.trim(),
       });
       setSubscriptions((prev) => [...prev, newSub]);
       closeModal();
@@ -218,6 +235,7 @@ export default function SubscriptionsPage() {
       category_id: editForm.category_id,
       due_day,
       due_month,
+      notes: editForm.notes.trim(),
     };
     setEditSubmitting(true);
     try {
@@ -225,7 +243,7 @@ export default function SubscriptionsPage() {
       setSubscriptions((prev) =>
         prev.map((s) =>
           s.id === editingId
-            ? { ...s, name: updates.name ?? s.name, amount: updates.amount, category_id: updates.category_id ?? s.category_id, due_day: updates.due_day ?? s.due_day, due_month: due_month ?? s.due_month }
+            ? { ...s, name: updates.name ?? s.name, amount: updates.amount, category_id: updates.category_id ?? s.category_id, due_day: updates.due_day ?? s.due_day, due_month: due_month ?? s.due_month, notes: updates.notes }
             : s
         )
       );
@@ -387,6 +405,14 @@ export default function SubscriptionsPage() {
                               {t("subscriptions.started")} {sub.start_date}
                             </div>
                           )}
+                          {/* Absent, not empty — same rule as the dates above. The
+                              note is capped at input time, so it renders in full;
+                              pre-line keeps the captain's own line breaks. */}
+                          {sub.notes && (
+                            <div data-testid="notes" className="text-xs text-base-content/50 whitespace-pre-line break-words">
+                              {sub.notes}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-1.5 shrink-0">
@@ -447,6 +473,11 @@ export default function SubscriptionsPage() {
                           {sub.end_date && (
                             <div data-testid="end-date" className="text-xs text-base-content/40">
                               {t("subscriptions.ended")} {sub.end_date}
+                            </div>
+                          )}
+                          {sub.notes && (
+                            <div data-testid="notes" className="text-xs text-base-content/50 whitespace-pre-line break-words">
+                              {sub.notes}
                             </div>
                           )}
                         </div>
@@ -569,6 +600,17 @@ export default function SubscriptionsPage() {
                   />
                 )}
               </div>
+              <div>
+                <label className="label label-text text-xs">{t("subscriptions.notes_label")}</label>
+                <textarea
+                  data-testid="add-notes"
+                  className="textarea textarea-bordered w-full"
+                  rows={3}
+                  maxLength={NOTES_MAX}
+                  value={addForm.notes}
+                  onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value.slice(0, NOTES_MAX) }))}
+                />
+              </div>
             </div>
             {categoryStatus}
             <div className="modal-action mt-4">
@@ -645,6 +687,17 @@ export default function SubscriptionsPage() {
                   max="31"
                   value={editForm.due_day}
                   onChange={(e) => setEditForm((f) => ({ ...f, due_day: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="label label-text text-xs">{t("subscriptions.notes_label")}</label>
+                <textarea
+                  data-testid="edit-notes"
+                  className="textarea textarea-bordered w-full"
+                  rows={3}
+                  maxLength={NOTES_MAX}
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value.slice(0, NOTES_MAX) }))}
                 />
               </div>
             </div>

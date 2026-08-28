@@ -515,7 +515,7 @@ test("AC-27: a CANCELLED subscription with an end date and no start date shows o
   // nobody ever backfilled when it began.
   install({
     subscriptions: [
-      { id: "sub-9", name: "HBO", amount: 200, category_id: "cat_003", frequency: "monthly", due_day: 3, paid_by: "Karen", is_active: false, start_date: "", end_date: "2026-05-31" },
+      { id: "sub-9", name: "HBO", amount: 200, category_id: "cat_003", frequency: "monthly", due_day: 3, paid_by: "Karen", is_active: false, start_date: "", end_date: "2026-05-31", notes: "" },
     ],
   });
   const container = await mount(loadPage());
@@ -531,7 +531,7 @@ test("AC-27: a CANCELLED subscription with a start date and no end date shows on
   // hand in the sheet without typing an end date.
   install({
     subscriptions: [
-      { id: "sub-9", name: "HBO", amount: 200, category_id: "cat_003", frequency: "monthly", due_day: 3, paid_by: "Karen", is_active: false, start_date: "2025-02-14", end_date: "" },
+      { id: "sub-9", name: "HBO", amount: 200, category_id: "cat_003", frequency: "monthly", due_day: 3, paid_by: "Karen", is_active: false, start_date: "2025-02-14", end_date: "", notes: "" },
     ],
   });
   const container = await mount(loadPage());

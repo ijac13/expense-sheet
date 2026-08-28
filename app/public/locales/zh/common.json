@@ -91,7 +91,11 @@
     "confirm_cancel": "確認取消",
     "end_before_start": "結束日期不能早於開始日期。",
     "started": "開始於",
-    "ended": "結束於"
+    "ended": "結束於",
+    "notes_label": "備註",
+    "search_placeholder": "搜尋訂閱",
+    "search_clear": "清除搜尋",
+    "search_no_results": "沒有符合「{{query}}」的訂閱。"
   },
   "settings": { "title": "設定", "signed_in_as": "目前登入", "sign_out": "登出", "font_size": "字體大小", "small": "小", "medium": "中", "large": "大", "language": "語言", "category_management": "分類管理", "user_management": "使用者管理", "open_sheet": "開啟 Google 試算表" },
   "users": { "title": "使用者管理", "description": "請至 Google 試算表的「使用者」分頁新增或移除使用者。", "loading": "載入中…", "no_email": "未設定信箱", "empty": "使用者分頁中未找到任何使用者。" },
