@@ -1,16 +1,35 @@
 ---
 id: "059"
 title: Subscriptions — Add Notes and Search
-status: verify
+status: done
 source: captain
 started: 2026-08-28T10:06:09Z
-completed:
+completed: 2026-08-28
 verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-059-subscriptions-notes-search
+worktree:
 issue:
 pr: "#31"
 ---
+
+**Production deploy:** 2026-08-28, hosting and functions as separate commands.
+1. `firebase deploy --only hosting --project production` — verified by hash: local `app/out/index.html` sha256
+   `dee8ac09…` == served sha256 `dee8ac09…`, byte-identical, `last-modified: Fri, 28 Aug 2026 12:37:09 GMT`.
+2. `firebase deploy --only functions --project production` — both `api` and `subscriptionScheduler` updated,
+   exit 0, no cleanup-policy error this time. Verified live: tokenless `GET /api/scheduler-status` → **401**,
+   unchanged from before this deploy — entity 055's auth enforcement is intact and the function is responding.
+   This feature is purely additive (`notes` is an optional field), so deploy order carried no outage risk either
+   way, unlike entity 055.
+3. Staged first: deployed to staging (functions + hosting, separate commands, hash-verified) and the captain
+   manually tested notes add/edit/display and search-by-name/search-by-note live in a real browser — pass. This
+   closes verify's one open gap (the feature had only run under jsdom until this test).
+4. Captain approved production merge and deploy after the staging pass: "manual test pass, approve to merge."
+
+All 41 ACs closed: build implemented and self-verified by mutation on the two sheet-safety-critical items
+(AC-A1, AC-A7); verify independently reproduced both mutations (finding AC-A1's real blast radius was larger
+than build reported — 111/206 functions tests, not 8 — a safe-direction discrepancy) plus 8+ more ACs by reading
+test bodies directly; captain closed the one remaining gap with a live staging test before this production
+deploy.
 
 Add a notes field to subscriptions and a search function on the Subscriptions page, so it's easier to record context on a subscription and find one quickly as the list grows.
 
