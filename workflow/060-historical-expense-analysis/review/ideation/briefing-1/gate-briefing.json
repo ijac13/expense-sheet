@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:060:ideation:attempt-1:revision-1",
+  "question": "Approve this outcome and scope to advance to spec? Two calls are needed first.\n\n(1) You have pointed at tab gid=0 of the 2024 workbook as holding 2023~2024 data. The recorded spec finding states that no 2023 record exists anywhere in the archive, and Decision 3 leans on that absence to make 2024 the \"now\" anchor. If 2023 data is real, spec must re-inspect that tab and correct both AC-8's year inventory and the anchor choice. Does 2023 data exist there?\n\n(2) Does 2024 remain the comparison anchor, or does 2023 take that role?",
+  "artifacts": [
+    {
+      "id": "artifact:060:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/1035cef8daf3a279e2563e0c53348ceb3a10e74a/workflow/060-historical-expense-analysis.md",
+      "rev": "sha256:f2d1977fd71e21311b7ac3fbe4ec79c667cb6a9ef9f163c458d208cba9e67156",
+      "mediaType": "text/markdown",
+      "summary": "Outcome: a privately delivered written report explaining why annual spending now exceeds the sub-NT$1.2M/year level of earlier years, plus a gradual year-by-year glide path back toward it. No historical row is ever written into the app.\n\nScope this round: the 2024 workbook in full, one baseline year from the sub-NT$1.2M era in full, and a shape inventory of every year from 2006 to 2025 so a follow-up can batch the rest. Access is already resolved: both sources read through the captain's own Google Drive account, so no service-account work and no captain action are needed.\n\nExcluded: migrating any historical row into the app's Expenses, Subscriptions, or Categories tabs; any new app UI, dashboard, or target line; automated budget enforcement; multi-currency handling; changes to the app's gov_category assignments; processing all 18 archived years this round; and tax, legal, or investment advice.\n\nProof spec owes: a corrected year inventory for 2006-2025 reflecting whatever tab gid=0 actually contains; a reconciliation rule that excludes the aggregate rows interleaved among the data, where a roughly doubled total is the failure signature; rental-property flows reported separately from household cost; and a delivery destination that keeps real figures out of this public repository, whose PII hook catches only phone numbers and email addresses.\n\nOpen captain decisions carried from the prior spec run: where the report lives (proposed: a private Google Doc in the captain's archive folder, with the repo recording only the URL); how many years this round (proposed: 2024 plus one baseline year plus the inventory); and what \"today\" is measured as (proposed: 2024, now contested by the 2023 claim)."
+    }
+  ]
+}

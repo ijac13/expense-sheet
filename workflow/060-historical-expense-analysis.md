@@ -10,6 +10,22 @@ score:
 worktree:
 issue:
 pr:
+gates:
+    version: 1
+    records:
+        - id: gate:060:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:060-ideation-1
+              briefing:
+                id: briefing:060:ideation:attempt-1:revision-1
+                digest: sha256:798d4729d706304bbfe534a89c782af478099fb12e883a88c65a36b8c5f481fe
+                request-digest: sha256:2ee7c185dab62179144108262616ae5a7c1af4c9c301ea58520688b2e0cc8840
+                room-ref: ./060-historical-expense-analysis/review/ideation/briefing-1
+              withdrawal:
+                by: agent:first-officer
+                at: "2026-08-28T13:37:21.134116Z"
+                reason: Captain changed scope before rendering a decision. The bound Briefing asserts "No historical row is ever written into the app" and lists migration under exclusions, matching the entity's twice-stated no-migration constraint. The captain now asks that 2023 and 2024 data be migrated into the app, that feasibility be evaluated, and that the report analysis cover 2006-2025 rather than 2024 plus one baseline year. The Briefing no longer states the captain's scope.
 ---
 
 Produce an analysis report of past expense records — all years since 2006, starting with a 2024 Google Sheet as the first one to work through, in varying formats — with no migration into the app's data at all. The goal is purely to understand spending patterns well enough to answer one question: in the past the captain could live on less than NT$1.2M/year, and today needs more — why, and what would it take to bring that back down gradually (not by next year — slowly, over time)?
