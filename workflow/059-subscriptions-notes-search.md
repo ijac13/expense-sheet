@@ -1,13 +1,13 @@
 ---
 id: "059"
 title: Subscriptions — Add Notes and Search
-status: ideation
+status: build
 source: captain
-started:
+started: 2026-08-28T10:06:09Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-059-subscriptions-notes-search
 issue:
 pr:
 ---
