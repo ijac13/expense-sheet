@@ -437,7 +437,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         // data sitting under a blank header cell, which row 1 alone cannot show.
         const { rows: subRows, map: readMap } = await readTab(sheets, spreadsheetId, SUBSCRIPTIONS_SPEC);
         const map = await ensureSubscriptionColumns(
-          sheets, spreadsheetId, readMap, subRows, ["start_date", "end_date"]
+          sheets, spreadsheetId, readMap, subRows, ["start_date", "end_date", "notes"]
         );
 
         const paidById = String(body.paid_by ?? "");
@@ -458,6 +458,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           // subscription is active, so it has no end date.
           start_date: String(body.start_date ?? ""),
           end_date: "",
+          notes: String(body.notes ?? ""),
         });
 
         await insertRowAtTop(sheets, spreadsheetId, SUBSCRIPTIONS_TAB, row);
@@ -491,7 +492,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         // carries their existing cells forward untouched. The same rule is what
         // keeps an unrelated edit from blanking a date.
         const updates: Record<string, string> = {};
-        for (const field of ["name", "amount", "category_id", "due_day", "due_month", "is_active", "start_date", "end_date"]) {
+        for (const field of ["name", "amount", "category_id", "due_day", "due_month", "is_active", "start_date", "end_date", "notes"]) {
           if (body[field] !== undefined) updates[field] = String(body[field]);
         }
 
