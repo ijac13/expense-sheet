@@ -197,7 +197,9 @@ test("AC-7: adding a subscription sends a live category_id", async () => {
   const { container, subWrites } = await mountSubs();
 
   await click(byText(container, "subscriptions.add"));
-  const inputs = [...container.querySelectorAll("input")];
+  // Scoped to the open modal: the page itself carries a search input (entity
+  // 059), so an unscoped positional lookup types into the filter box instead.
+  const inputs = [...container.querySelectorAll(".modal-open input")];
   await setInput(inputs[0], "Spotify");
   await setInput(inputs[1], "149");
   await click([...container.querySelectorAll(".modal-action button")].pop());
@@ -224,7 +226,9 @@ test("AC-15: with the categories fetch failed, the add modal blocks and says why
   const { container, subWrites } = await mountSubs({ offline: true });
 
   await click(byText(container, "subscriptions.add"));
-  const inputs = [...container.querySelectorAll("input")];
+  // Scoped to the open modal: the page itself carries a search input (entity
+  // 059), so an unscoped positional lookup types into the filter box instead.
+  const inputs = [...container.querySelectorAll(".modal-open input")];
   await setInput(inputs[0], "Spotify");
   await setInput(inputs[1], "149");
 

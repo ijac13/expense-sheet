@@ -148,9 +148,28 @@ export default function SubscriptionsPage() {
   const [startPickerOpen, setStartPickerOpen] = useState(false);
   const [endPickerOpen, setEndPickerOpen] = useState(false);
 
+  // Held in component state only: never persisted, never in the URL, so a reload
+  // starts on the full list rather than on a filter the captain forgot about.
+  const [query, setQuery] = useState("");
+  const trimmedQuery = query.trim();
+
+  // Client-side over the array the page already loaded on mount — no request is
+  // issued per keystroke. Plain case-insensitive substring, no normalisation
+  // beyond toLowerCase, which is a no-op on Chinese and so leaves a Chinese
+  // query matching a Chinese name.
+  const matching = useMemo(() => {
+    const needle = trimmedQuery.toLowerCase();
+    if (!needle) return subscriptions;
+    return subscriptions.filter((s) =>
+      s.name.toLowerCase().includes(needle) || (s.notes ?? "").toLowerCase().includes(needle)
+    );
+  }, [subscriptions, trimmedQuery]);
+
   // Sort newest first (IDs are timestamp-based: sub-{ms})
-  const active = subscriptions.filter((s) => s.is_active).sort((a, b) => b.id.localeCompare(a.id));
-  const cancelled = subscriptions.filter((s) => !s.is_active).sort((a, b) => b.id.localeCompare(a.id));
+  // Filtering happens before the split, so an emptied section simply fails its
+  // existing `length > 0` guard and renders no header — no new conditionals.
+  const active = matching.filter((s) => s.is_active).sort((a, b) => b.id.localeCompare(a.id));
+  const cancelled = matching.filter((s) => !s.is_active).sort((a, b) => b.id.localeCompare(a.id));
 
   function openAdd() {
     // The options are live categories now, so the initial value has to be a live
@@ -365,6 +384,34 @@ export default function SubscriptionsPage() {
         </button>
       </div>
 
+      {/* Search — over the loaded list, so it is offered only when there is a
+          list to search. Gated on the FULL list, never the filtered one: gating
+          on the result would delete the box the moment a query matched nothing,
+          leaving no way back to the list. */}
+      {subscriptions.length > 0 && (
+        <div className="relative mb-4">
+          <input
+            type="text"
+            data-testid="subscription-search"
+            className="input input-bordered w-full pr-10"
+            placeholder={t("subscriptions.search_placeholder")}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {query && (
+            <button
+              type="button"
+              data-testid="subscription-search-clear"
+              aria-label={t("subscriptions.search_clear")}
+              className="btn btn-ghost btn-xs btn-circle absolute right-2 top-1/2 -translate-y-1/2"
+              onClick={() => setQuery("")}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Active subscriptions */}
       {active.length > 0 && (
         <section className="mb-6">
@@ -492,8 +539,16 @@ export default function SubscriptionsPage() {
         </section>
       )}
 
-      {active.length === 0 && cancelled.length === 0 && (
+      {/* Owning nothing and matching nothing are different facts. The empty
+          state now answers only the first: telling a captain with 30
+          subscriptions that she has none would simply be false. */}
+      {subscriptions.length === 0 && (
         <p className="text-base-content/50 text-center mt-12">{t("subscriptions.empty")}</p>
+      )}
+      {subscriptions.length > 0 && active.length === 0 && cancelled.length === 0 && (
+        <p data-testid="search-no-results" className="text-base-content/50 text-center mt-12">
+          {t("subscriptions.search_no_results", { query: trimmedQuery })}
+        </p>
       )}
 
       {/* Add Modal */}
