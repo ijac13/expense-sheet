@@ -1,16 +1,37 @@
 ---
 id: 055
 title: Add Real Authentication/Authorization to the API
-status: verify
+status: done
 source: captain
 started:
-completed:
-verdict:
+completed: 2026-08-28
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-055-api-authentication
+worktree:
 issue:
-pr:
+pr: "#30"
 ---
+
+**Production deploy:** Rollout Plan executed in order, 2026-08-27/28.
+1. Preflight `npm --prefix functions run check:auth-emails` → MATCH, 2 addresses, exit 0.
+2. Staging already deployed and AC-21 fully proven in verify cycle 2 (all three parts, including the captain's
+   browser sign-in for AC-21(a)).
+3. `firebase deploy --only hosting --project production` — separate command, no combined-deploy risk taken.
+   Verified by hash: local `app/out/index.html` sha256 `6780721b…` == served sha256 `6780721b…`, byte-identical.
+   `last-modified: Thu, 27 Aug 2026 01:51:13 GMT`. At this point the API was still tokenless-permissive by design
+   (`GET /api/scheduler-status` with no token → 200) — captain confirmed the app worked normally on the new bundle
+   before functions went live.
+4. `firebase deploy --only functions --project production` — separate command. Both `api` and
+   `subscriptionScheduler` updated, exit 0, no Artifact Registry cleanup-policy error this time. Verified live,
+   not by exit code: `GET /api/scheduler-status` with no token → **401** `{"error":"unauthorized"}` (was 200
+   moments earlier); malformed `Authorization: Bearer not-a-real-token` → **401**; `OPTIONS` preflight still →
+   **204** (auth gate correctly bypassed for CORS preflight). Captain reloaded the live app immediately after and
+   confirmed it loads real data normally with no errors.
+5. This record is step 5. `status: done` set below; entity moving to `_archive/`.
+
+All 22 ACs closed: AC-1 through AC-20 PASSED in verify cycle 1, AC-21 (a/b/c) fully proven live across verify
+cycle 2 and the captain's staging sign-in, AC-22 (production rollout) completed and evidenced above with the
+captain standing by for the enforcement-activating step, exactly as the Rollout Plan required.
 
 The API (`functions/src/index.ts`, the `api` Cloud Function) has no authentication or authorization check anywhere — confirmed by grep (zero `Authorization`/`verifyIdToken`/token-check references) and confirmed live: every endpoint (expenses, subscriptions, categories, insights) answers a plain unauthenticated request with real household financial data, on both staging and production. This isn't just read exposure — GET, PATCH, POST, and DELETE all work with no credential, which this session's own testing relied on directly (calling PATCH/POST/DELETE against production without ever presenting a token).
 
@@ -126,7 +147,7 @@ No collateral damage
 Rollout safety
 
 - [ ] AC-21 — Verify produces **live staging evidence using a real Firebase ID token** minted by a real Google sign-in on `https://expense-sheet-staging.web.app` — not a fixture, not a unit test. It records, against the live staging API: (a) authorized email → 200 with real data, (b) no token → 401, (c) tampered token → 401. Decoded claims are reported as `aud`, `iss`, and `email_verified` values plus the email *domain* only — never the raw token, never the full address.
-- [ ] AC-22 — Production deploy follows the ordered runbook in **Rollout Plan** below, with the captain signed in and standing by, and the post-deploy live check is recorded in the entity body before `status: done`.
+- [x] AC-22 — Production deploy follows the ordered runbook in **Rollout Plan** below, with the captain signed in and standing by, and the post-deploy live check is recorded in the entity body before `status: done`.
 
 ### Rollout Plan
 
