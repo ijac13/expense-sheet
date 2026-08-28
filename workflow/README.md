@@ -35,9 +35,13 @@ Build a personal expense tracking app for daily spending capture — quick manua
 
 ## File Naming
 
-Each feature is a markdown file named `{id}-{slug}.md` — zero-padded id prefix, lowercase slug, hyphens, no spaces. Example: `010-edit-delete-expense.md`. This makes the id visible without opening the file or running `status`.
+Each feature is a folder named `{id}-{slug}/` containing `index.md` — zero-padded id prefix, lowercase slug, hyphens, no spaces. Example: `010-edit-delete-expense/index.md`. This makes the id visible without opening the file or running `status`.
 
-`spacedock new <slug>` mints the id, stamps it into the frontmatter, and writes a flat `{slug}.md` — it does not know the id-prefix convention. Immediately after filing, rename the file to add the `{id}-` prefix (`mv`/`git mv` + `git add`) before committing. Once renamed, the full filename stem — id prefix included — is the slug used everywhere else (`--set`, `--entity-path`, worktree paths, branch names). Do not rename a file while its `worktree:` field is set — the worktree, branch, and dispatch names are already keyed to the pre-rename slug; rename only after the entity reaches a terminal or worktree-free state.
+Folder form is the standard here, not the exception. Every feature in this workflow passes through at least one gate, and `spacedock gate prepare` writes its gate rooms to `{id}-{slug}/review/{stage}/briefing-{n}/`. In flat form those rooms land as a directory sitting beside a same-named `.md` file — the shape `status --validate` warns about. Folder form keeps a feature and its rooms in one place.
+
+`spacedock new <slug>` mints the id, stamps it into the frontmatter, and writes a flat `{slug}.md` — it does not know the id-prefix convention. Immediately after filing: `mkdir {id}-{slug}`, then `git mv {slug}.md {id}-{slug}/index.md`, then `git add` before committing. (`spacedock new --folder <slug>` writes folder form directly but still without the id prefix, so the rename is needed either way.) Once renamed, the folder name — id prefix included — is the slug used everywhere else (`--set`, `--entity-path`, worktree paths, branch names).
+
+Do not rename a feature while its `worktree:` field is set — the worktree, branch, and dispatch names are already keyed to the pre-rename slug; rename only after the feature reaches a terminal or worktree-free state. Converting an existing flat feature that already holds gate rooms requires moving the file and rewriting every `room-ref:` inside it in the same commit, or every retained room becomes unreadable.
 
 ## Schema
 

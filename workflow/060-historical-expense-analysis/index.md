@@ -21,7 +21,7 @@ gates:
                 id: briefing:060:ideation:attempt-1:revision-1
                 digest: sha256:798d4729d706304bbfe534a89c782af478099fb12e883a88c65a36b8c5f481fe
                 request-digest: sha256:2ee7c185dab62179144108262616ae5a7c1af4c9c301ea58520688b2e0cc8840
-                room-ref: ./060-historical-expense-analysis/review/ideation/briefing-1
+                room-ref: ./review/ideation/briefing-1
               withdrawal:
                 by: agent:first-officer
                 at: "2026-08-28T13:37:21.134116Z"
