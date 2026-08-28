@@ -34,6 +34,11 @@ function makeSheets(tabs) {
     sheetIds[name] = nextSheetId++;
   }
   const requests = [];
+  // Every values write with the option it carried, so a test can assert the
+  // sheet was told to store text literally. A silent switch to USER_ENTERED
+  // turns a note beginning "=" into a formula, which no in-memory grid
+  // comparison can see.
+  const valueWrites = [];
 
   const gridFor = (tab) => {
     if (!grids[tab]) throw new Error(`Unit tests: no such tab "${tab}"`);
@@ -121,8 +126,9 @@ function makeSheets(tabs) {
           });
           return { data: { values } };
         },
-        update: async ({ range, requestBody }) => {
+        update: async ({ range, requestBody, valueInputOption }) => {
           requests.push(`UPDATE ${range}`);
+          valueWrites.push({ range, valueInputOption, values: requestBody.values });
           writeRange(range, requestBody.values);
           return {};
         },
@@ -151,7 +157,7 @@ function makeSheets(tabs) {
     delete sheetIds[name];
   };
 
-  return { grids, requests, sheets, deleteTab };
+  return { grids, requests, valueWrites, sheets, deleteTab };
 }
 
 // ---------------------------------------------------------------------------

@@ -67,11 +67,14 @@ const EXPENSES = [
 // must never block an archive. iCloud is a subscription cancelled before this
 // feature existed — end_date "" — which is the state of all 10 live cancelled
 // rows; Disney+ is one cancelled since, carrying a real date.
+// `notes` covers both shapes on both sides of the Active/Cancelled split: an
+// active and a cancelled subscription carrying a real note, and one of each with
+// "" — which is what every row reads as until someone writes one (entity 059).
 const SUBSCRIPTIONS = [
-  { id: "sub-1", name: "Netflix", amount: 390, category_id: "eating-out", frequency: "monthly", due_day: 15, paid_by: "Karen", is_active: true, start_date: "2026-03-01", end_date: "" },
-  { id: "sub-2", name: "Spotify", amount: 149, category_id: "cat_003", frequency: "monthly", due_day: 1, paid_by: "Karen", is_active: true, start_date: "", end_date: "" },
-  { id: "sub-3", name: "iCloud", amount: 30, category_id: "fuel", frequency: "monthly", due_day: 20, paid_by: "Karen", is_active: false, start_date: "", end_date: "" },
-  { id: "sub-4", name: "Disney+", amount: 270, category_id: "cat_003", frequency: "monthly", due_day: 8, paid_by: "Karen", is_active: false, start_date: "2025-01-15", end_date: "2026-06-30" },
+  { id: "sub-1", name: "Netflix", amount: 390, category_id: "eating-out", frequency: "monthly", due_day: 15, paid_by: "Karen", is_active: true, start_date: "2026-03-01", end_date: "", notes: "" },
+  { id: "sub-2", name: "Spotify", amount: 149, category_id: "cat_003", frequency: "monthly", due_day: 1, paid_by: "Karen", is_active: true, start_date: "", end_date: "", notes: "shared with mum" },
+  { id: "sub-3", name: "iCloud", amount: 30, category_id: "fuel", frequency: "monthly", due_day: 20, paid_by: "Karen", is_active: false, start_date: "", end_date: "", notes: "family plan" },
+  { id: "sub-4", name: "Disney+", amount: 270, category_id: "cat_003", frequency: "monthly", due_day: 8, paid_by: "Karen", is_active: false, start_date: "2025-01-15", end_date: "2026-06-30", notes: "" },
 ];
 
 // A healthy scheduler: a run recorded minutes ago. `stale` comes from the API,

@@ -16,12 +16,13 @@ export interface Subscription {
   // active subscription's end_date is "" rather than a second kind of empty.
   start_date: string;
   end_date: string;
+  notes: string;
 }
 
 export const MOCK_SUBSCRIPTIONS: Subscription[] = [
-  { id: "sub1", name: "Netflix", amount: 390, category_id: "entertainment", frequency: "monthly", due_day: 15, paid_by: "user1", is_active: true, start_date: "", end_date: "" },
-  { id: "sub2", name: "Spotify", amount: 149, category_id: "entertainment", frequency: "monthly", due_day: 1, paid_by: "user2", is_active: true, start_date: "", end_date: "" },
-  { id: "sub3", name: "iCloud", amount: 30, category_id: "digital", frequency: "monthly", due_day: 20, paid_by: "user1", is_active: false, start_date: "", end_date: "" },
+  { id: "sub1", name: "Netflix", amount: 390, category_id: "entertainment", frequency: "monthly", due_day: 15, paid_by: "user1", is_active: true, start_date: "", end_date: "", notes: "" },
+  { id: "sub2", name: "Spotify", amount: 149, category_id: "entertainment", frequency: "monthly", due_day: 1, paid_by: "user2", is_active: true, start_date: "", end_date: "", notes: "" },
+  { id: "sub3", name: "iCloud", amount: 30, category_id: "digital", frequency: "monthly", due_day: 20, paid_by: "user1", is_active: false, start_date: "", end_date: "", notes: "" },
 ];
 
 // The captain's LOCAL calendar date. `new Date().toISOString().split("T")[0]` —
