@@ -5,11 +5,11 @@ status: verify
 source: captain
 started: 2026-08-28T10:06:09Z
 completed:
-verdict:
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-059-subscriptions-notes-search
 issue:
-pr:
+pr: "#31"
 ---
 
 Add a notes field to subscriptions and a search function on the Subscriptions page, so it's easier to record context on a subscription and find one quickly as the list grows.
