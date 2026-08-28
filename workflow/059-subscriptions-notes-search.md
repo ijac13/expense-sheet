@@ -300,3 +300,38 @@ Three things worth the reviewer's attention. First, a `?? ""` guard was added at
 Not verified: the feature was never driven in a real browser. The app sits behind a Google sign-in that needs live Firebase credentials and the production Sheet, so the closest available proof is the jsdom harness mounting the real page component and dispatching real DOM events, plus a rendered-markup dump inspected by hand. Nothing was deployed.
 
 One open question for the gate, carried forward from the spec: the 200-character cap renders in full on the card with no truncation. On a phone that is roughly four lines. Dropping it to 120 (matching entity 043) is a one-line change to `NOTES_MAX`.
+
+## Stage Report: verify
+
+Verdict: **PASSED**. Independent reproduction, not a re-read of the build report. All three mutations were reverted; the working tree is clean and both suites are green at the committed state.
+
+- DONE: Re-run both test suites fresh and confirm the reported counts
+  Ran now, not at build time: functions **206/206**, app **198/198** (app includes `test:compile`). Both match the build's claim exactly.
+- DONE: AC-A1 reproduced by mutation — `notes` moved `optional` → `required`
+  `sheetSchema.ts:41-42`. Result: **111/206 functions tests fail**, each with `Subscriptions tab: missing required column header "notes"` from `buildColumnMap`. Reverted → 206/206. Note: the build reported "8 tests failed"; the real blast radius is 111, so the guard is materially more load-bearing than the report claimed — the finding strengthens the AC rather than weakening it.
+- DONE: AC-A7 reproduced by mutation — placement reverted to row-1 length
+  Confirmed the fixture is real first (`subscriptionNotes.api.test.js:238-252`): row 1 = 9 headers, row 5 = 11 cells, asserted in-test. Mutated `index.ts:111` to `const first = map.width` → exactly 2 tests fail, both the blank-header guard: new `AC-A7` and the pre-existing entity-053 `AC-5`. Failure is the corruption itself — `J1 is blank but its column holds data — it must not be claimed`, actual `notes`. Reverted → 206/206.
+- DONE: Spot-check ACs across B, C, D by reading test bodies, not the report
+  AC-B7 genuinely tests **absence**: `noteLine` resolves `[data-testid="notes"]` and the assert is `=== null`, not an empty-string compare; render site is `{sub.notes && (…)}` (`page.tsx:458,525`). Independently mutated it to `{true && (…)}` → 3 fails (B5, B7, B10), reverted → 198/198. AC-C3 is a real request count: `g.requests.length === before` plus `filter(r => r === "/api/subscriptions").length === 1`, guarded by `assert.ok(before > 0)` so it cannot pass vacuously. AC-D3 resolves the notes column by header index, asserts the created expense reads `Netflix` **and** `notEqual` the subscription's own note `cancel before renewal`. Also read B6/B8 (newline + `whitespace-pre-line`), C8 (asserts `subscriptions.empty` absent and the search box survives), C9, C12 (localStorage snapshot + URL + remount), C13. None vacuous.
+- DONE: Confirm the build's flagged `?? ""` guard exists and would prevent a crash
+  `page.tsx:200` `notes: sub.notes ?? ""` in `openEdit`, with the deploy-skew rationale in a comment. `undefined` notes yields `""`, so the downstream `.trim()` at `:257` cannot throw. Guard is real and correctly placed.
+- DONE: Confirm the claimed side-fix in `legacy-category-writes.render.test.js`
+  Both lookups rescoped `querySelectorAll("input")` → `.modal-open input` (`:202`, `:231`); file passes inside the green app suite. Genuinely scoped against the page-level search input. Residual, non-blocking: indices stay positional *within* the modal, so a new `<input>` added above Name would still shift them — the Notes field is a `<textarea>`, which is why it did not.
+- DONE: AC-D6 — grep `app/app/` for `fetch(` outside `apiClient.ts`
+  Exactly one match repo-wide in `app/app/`: `apiClient.ts:31`, the definition of `apiFetch` itself. Zero bare calls elsewhere.
+- DONE: Confirm non-regression — no existing assertion weakened
+  `git diff main...HEAD -- app/test functions/test`: 3 files new, 5 modified, all additive. `dom.js` and `subscription-dates` gain `notes` fixture fields only; `sheetsStub.js` adds a `valueWrites` recorder; `sheetColumns` updates a golden snapshot string to include `"notes":""` while staying an exact-equality assert. No deletion, no loosened assert. All three new app test files are registered in `app/package.json`'s explicit list (functions uses `node --test test/`, directory-wide).
+- DONE: Build succeeds for real
+  `npm --prefix app run build` exits 0; TypeScript clean; 14/14 static pages generated and `/subscriptions` is listed as prerendered (`○ Static`).
+- DONE: PII/secrets check on the full branch diff
+  Only email in the diff is `ijac@example.com` (RFC-2606 reserved domain, test fixture). No phone numbers, no tokens or credentials — the `secret` grep hits are pre-existing `secrets: [anthropicKey]` context lines, not literals. Diff scope is 18 files, all subscription notes/search code, tests, and i18n.
+- SKIPPED: Live-browser / staging verification
+  No live Firebase credentials available to this agent, and deploying was out of scope by instruction. Accepted on the same basis as prior entities: the jsdom harness mounts the real page component and dispatches real events, and the two sheet-safety ACs are proven at the functions layer where the data-loss risk actually lives.
+
+### Summary
+
+Verified independently rather than by agreement. The two entity-053 regression guards are real and load-bearing: making `notes` required breaks 111 of 206 functions tests, and placing the new header by row 1's length makes it claim occupied column J and surface another subscription's private cell as its note — reproduced, then confirmed re-guarded. The frontend AC most likely to be faked (B7's "no element at all") holds up under its own mutation, and C3's no-network claim is a genuine request count with an anti-vacuity guard.
+
+One discrepancy worth recording: the build under-reported the AC-A1 mutation as 8 failing tests when it is 111. That is a reporting inaccuracy in the safe direction and does not change the verdict.
+
+Two items carried to the gate, neither blocking: the build's open question on `NOTES_MAX` 200 vs 120, and the note that this feature has never been driven in a real browser.
