@@ -27,6 +27,12 @@ gates:
                 by: agent:first-officer
                 at: "2026-08-28T14:39:26.491363Z"
                 reason: Bound Briefing omits the first officer's recommendation and the concrete decision effect, which the gate-presentation contract requires the captain to see in the presentation channel. This workflow declares Subspace as its review surface, so the room itself must carry them rather than relying on surrounding chat. Inputs are unchanged; only the Briefing's completeness is at fault.
+            - id: gate-attempt:061-ideation-2
+              briefing:
+                id: briefing:061:ideation:attempt-2:revision-1
+                digest: sha256:f9c2cf21c57f70dc9f65739e3e54596ca31649c6eb70e313114c5cff13897358
+                request-digest: sha256:0df636f568ce44ae9440694e05a7d87a64c52388cdf1302933d28f9d1f2abd05
+                room-ref: ./review/ideation/briefing-2
 ---
 
 Evaluate whether the captain's 2023 and 2024 historical expense records can be migrated into the live app, and if so, migrate them — so the app itself holds those two years instead of them living only in Google Sheets. Feasibility is judged before any write is attempted.
