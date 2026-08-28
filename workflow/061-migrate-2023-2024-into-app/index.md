@@ -11,6 +11,18 @@ worktree:
 issue:
 pr:
 mod-block:
+gates:
+    version: 1
+    records:
+        - id: gate:061:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:061-ideation-1
+              briefing:
+                id: briefing:061:ideation:attempt-1:revision-1
+                digest: sha256:90c429a00191a5d21bfb921d288df43483503ef28ccf426975c16e81967923fe
+                request-digest: sha256:616238f67c2e32a98590eb748fd3d55a0029d1b13b4af4c11e49a0129596d81b
+                room-ref: ./review/ideation/briefing-1
 ---
 
 Evaluate whether the captain's 2023 and 2024 historical expense records can be migrated into the live app, and if so, migrate them — so the app itself holds those two years instead of them living only in Google Sheets. Feasibility is judged before any write is attempted.
