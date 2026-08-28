@@ -1,7 +1,7 @@
 ---
 id: "059"
 title: Subscriptions — Add Notes and Search
-status: build
+status: verify
 source: captain
 started: 2026-08-28T10:06:09Z
 completed:
