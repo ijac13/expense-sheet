@@ -37,6 +37,11 @@ gates:
                 by: agent:first-officer
                 at: "2026-08-28T14:48:46.071606Z"
                 reason: Room briefing-2 was written by the spacedock 0.27.0 binary, which emits no index.json and is therefore unreadable by Subspace gate mode — the presentation failed its preflight. The binary is now 0.27.1, which does emit index.json. Rebinding so the room is readable in Subspace, this workflow's declared review surface. Briefing content is unchanged; only the room format is at fault.
+            - id: gate-attempt:061-ideation-3
+              briefing:
+                id: briefing:061:ideation:attempt-3:revision-1
+                digest: sha256:7d80892f81a50f494679959179b1c5c06fd3f727c2cd0b9cf06695db42f8038a
+                room-ref: ./review/ideation/briefing-3
 ---
 
 Evaluate whether the captain's 2023 and 2024 historical expense records can be migrated into the live app, and if so, migrate them — so the app itself holds those two years instead of them living only in Google Sheets. Feasibility is judged before any write is attempted.
