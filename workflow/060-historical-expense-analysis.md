@@ -12,7 +12,7 @@ issue:
 pr:
 ---
 
-Analyze past expense records — starting with a 2024 Google Sheet, with more records going back to 2006 in varying formats — not to migrate every row into the app, but to understand spending patterns well enough to answer one question: in the past the captain could live on less than NT$1.2M/year, and today needs more — why, and what would it take to bring that back down gradually (not by next year — slowly, over time)?
+Produce an analysis report of past expense records — all years since 2006, starting with a 2024 Google Sheet as the first one to work through, in varying formats — with no migration into the app's data at all. The goal is purely to understand spending patterns well enough to answer one question: in the past the captain could live on less than NT$1.2M/year, and today needs more — why, and what would it take to bring that back down gradually (not by next year — slowly, over time)?
 
 Reference sheet (2024, first data source): https://docs.google.com/spreadsheets/d/1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I/edit?gid=1209807047#gid=1209807047
 
@@ -26,15 +26,16 @@ Full historical archive (all years, captain's Google Drive folder): https://driv
 
 ## Success
 
-- 2024's historical data is pulled from the linked sheet and understood well enough to categorize spending (even if the categories don't map 1:1 to the app's current Categories tab).
-- A clear comparison exists between "what I spent then" and "what I spend now" by category, surfacing the biggest gaps.
+- A written analysis report covering every year since 2006 that has a usable record, starting with 2024 as the first one actually worked through — no data is loaded into the app itself.
+- Each year's spending is understood and categorized well enough to compare across years, even though formats differ and categories won't map 1:1 to the app's current Categories tab.
+- A clear comparison between "what I spent then" (the sub-NT$1.2M years) and "what I spend now" by category, surfacing the biggest gaps.
 - A written-out, honest set of candidate reasons for the increase (e.g. specific categories, one-time vs. recurring changes, inflation vs. lifestyle change) — not just a number.
-- Some form of gradual target/pacing the captain can track against over time (exact mechanism — dashboard, report, manual check-in — TBD at spec time).
+- A gradual, realistic target/pacing the captain can track against over time, delivered as part of the report (exact tracking mechanism, if any, is a separate later decision — see Out of Scope).
 
 ### Out of Scope (decide at spec time)
 
-- Migrating every historical row into the live app's Expenses/Subscriptions sheets. The goal is analysis and insight, not a complete data migration — years before 2024 may never be individually imported.
-- Any records earlier than 2024 for this first pass — those come later once the 2024 approach is proven, and each year may need its own format handling since none of the older records share a consistent format.
+- **Migrating any historical row into the live app's Expenses/Subscriptions sheets, for any year.** This is a report, not a data-loading project. The sheets and Drive folder are read-only source material.
+- Building any ongoing tracking mechanism (dashboard, new Reports view, target line in the app) — this entity delivers the analysis and a target; whether/how that becomes a live feature is a separate future decision.
 - Automating the reduction itself (budgets, alerts, spending caps) — this entity is about understanding and a target, not enforcement.
 - Multi-currency handling, if older records turn out to be in anything other than the currency the app already assumes.
 
@@ -43,6 +44,7 @@ Full historical archive (all years, captain's Google Drive folder): https://driv
 To be filled in at spec time — open questions this needs to resolve before/during spec:
 
 - **Sheet/folder access.** This is a personal Google Sheet and Drive folder, not the app's existing spreadsheet-as-database. Does the existing service account have access, or does the captain need to share the sheet (and eventually the folder) first (same blocker pattern as entity 042)?
-- **Format discovery.** What does the 2024 sheet's structure actually look like (columns, categories, granularity) before assuming anything about how to parse it or later years.
-- **Where the analysis lives.** A one-off script + written report, a new page/view in the app, or something else — not yet decided, and probably shouldn't be decided until the 2024 data has actually been looked at.
-- **How "reduce gradually" becomes trackable** — e.g. a rolling year-over-year comparison, a target line in Reports — without turning this into a budgeting-enforcement feature (explicitly out of scope above).
+- **Format discovery.** What does the 2024 sheet's structure actually look like (columns, categories, granularity), and what does the Drive folder actually contain (how many years, what file formats — Sheets, CSV, scanned images, something else) — before assuming anything about how to process any of it.
+- **How far back is realistic.** 2006–2024 could be up to 19 years of records in inconsistent formats. Spec should figure out what's actually in the folder before committing to processing every single year in one pass; a phased or best-effort approach across years may be more honest than promising all 19 up front.
+- **Where the report lives.** A written document (e.g. committed to the repo or shared as a doc), not a new app feature — matches "no migration" above.
+- **How "reduce gradually" gets expressed** in the report — e.g. a suggested year-over-year glide path — without turning this into a budgeting-enforcement feature (explicitly out of scope above).
