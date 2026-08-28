@@ -194,3 +194,109 @@ Non-binding, confirmed by reading the code — this should save the build agent 
 ### Summary
 
 Wrote a full spec for entity 059 covering both halves — an optional per-subscription notes field and a live client-side search box — and recommended keeping them in one entity, with reasoning and an escape hatch if the sheet-column work turns risky during build. The two sheet-safety requirements are called out as explicit ACs rather than prose: the new column must be placed by the widest occupied row (the entity 053 data-destruction bug), and `notes` must be an `optional` spec field or every subscriptions, insights, and scheduler request 500s on deploy. Three decisions the ideation left open are settled in the spec: notes are searchable, the column is created on demand by the existing helper rather than by a migration script, and search sits between the header and the Active section filtering both sections. One design call is flagged for the captain at the gate — the 200-character note cap renders in full on the card with no truncation, and dropping it to 120 (matching entity 043) is a one-line change if cards read as too busy.
+
+## Stage Report: build
+
+Commits: `e9aec0e` (Group A), `91005cd` (Group B), `6ecc3bf` (Group C). Every test cited names the change that would make it fail.
+
+**Group A — notes data layer**
+
+- DONE: AC-A1 `notes` in `SUBSCRIPTIONS_SPEC.optional`, proven by mutation
+  `sheetSchema.ts:42`. MUTATION RUN: moved `notes` to `required` → `GET /api/subscriptions` against a 9-header tab returned **500** (`missing required column header "notes"`) and 8 tests failed; reverted → 200 and 13/13 pass.
+- DONE: AC-A2 `rowToSubscription` returns `""` for all three unset shapes
+  Column absent, cell blank, row trimmed short — each asserted `strictEqual ""`, which rejects both `null` and `undefined`.
+- DONE: AC-A3 `GET` carries a `notes` string on every row, pre-existing rows included
+  Legacy 9-column tab → 200, `notes: ""` on all 3 rows, and a READ creates no header. A pre-existing `notes` column surfaces its stored text.
+- DONE: AC-A4 `POST` writes the submitted note (or `""`) and returns it in the 201
+  Omitting the key writes `""`, not the literal `"undefined"` — dropping the `?? ""` fails that assertion.
+- DONE: AC-A5 notes-only `PATCH` writes one cell, every other stays byte-identical
+  Asserted cell-by-cell across the patched row plus an unknown `renewal note` column and an untouched sibling row.
+- DONE: AC-A6 a `PATCH` omitting `notes` leaves the stored note unchanged
+  Proven for a rename, an amount change and an archive; the deliberate-clear path (`notes: ""`) is asserted separately so both remain reachable.
+- DONE: AC-A7 header placement from the widest occupied row, proven by mutation
+  Fixture: 9 headers in row 1, 11 cells in row 5. `notes` lands at index 11 (column L); J1/K1 stay blank and `KEEP-J`/`KEEP-K` survive. MUTATION RUN: `const first = map.width` (row-1 length) → header claimed J1 and HBO's private column-J data read back through the API as its note (`"KEEP-J"`); only this test failed. Reverted, 13/13.
+- DONE: AC-A8 POST's `ensureSubscriptionColumns` field list gains `"notes"`
+  `index.ts:440`. Removing it makes `buildWriteRow` 400 on the first add.
+- DONE: AC-A9 PATCH's patchable-field list gains `"notes"`
+  `index.ts:494`. Without it `updates` is empty and the notes-only PATCH silently no-ops at 200.
+- DONE: AC-A10 leading `=`/`+`/`-`/`@` round-trips as literal text
+  Four notes POSTed and read back unchanged, plus every `values.update` asserted `valueInputOption: "RAW"` — the stub cannot evaluate formulas, so the round-trip alone would pass under `USER_ENTERED`; the RAW assertion is what fails on a future switch. Required adding a `valueWrites` recorder to `test/sheetsStub.js` (additive).
+- DONE: AC-A11 frontend types
+  `subscriptions.ts:19` `notes: string` (+ the 3 `MOCK_SUBSCRIPTIONS`); `subscriptionService.ts:54` `Partial<Pick<…, "notes">>`.
+
+**Group B — notes UI**
+
+- DONE: AC-B1 Add modal textarea, empty, after Start Date
+  Position asserted via `compareDocumentPosition`, not by reading markup.
+- DONE: AC-B2 Edit modal pre-filled; empty note → empty textarea
+  Also asserted that reopening on a different subscription does not carry the previous note over — the path that would write one card's note onto another.
+- DONE: AC-B3 an empty Notes field never blocks Save
+  Save enabled and the write lands; the contrast is asserted directly — an empty amount still disables Save.
+- DONE: AC-B4 hard cap at 200 characters, typed or pasted
+  `maxLength={200}` plus a `.slice(0, 200)` in the handler. MUTATION RUN: dropping the slice → a 500-char paste stuck and AC-B4 failed.
+- DONE: AC-B5 trimmed before send; whitespace-only becomes `""`
+  MUTATION RUN: dropping `.trim()` → both AC-B5 tests failed. Interior spacing is asserted preserved.
+- DONE: AC-B6 non-empty note renders verbatim on Active and Cancelled cards
+  Asserted `textContent` equality on one card of each kind.
+- DONE: AC-B7 empty note renders no element at all
+  MUTATION RUN: rendering the element unconditionally → AC-B7, AC-B5 and AC-B10 failed.
+- DONE: AC-B8 newlines render as separate lines
+  The newline is asserted intact in `textContent` AND the element asserted to carry `whitespace-pre-line`. Honest limit: jsdom loads no stylesheet and computes no layout, so the class token is the strongest available proof that the break paints.
+- DONE: AC-B9 Notes label from a key in both locales
+  Key-echo test plus a live-i18n test rendering the real label: `Notes` / `備註`.
+- DONE: AC-B10 the card updates after a successful edit, no reload
+  Both directions: setting a note and clearing one (the line disappears rather than going blank).
+- DONE: AC-B11 a failed save alerts and leaves the displayed note at its pre-edit value
+  `failSubscriptionWrites` → 1 attempt, 1 alert, card still reads `shared with mum`.
+
+**Group C — search**
+
+- DONE: AC-C1 input between header and Active section when ≥1 subscription exists
+  Ordering asserted via `compareDocumentPosition` against `h1` and the first `section`.
+- DONE: AC-C2 zero subscriptions → no input, `subscriptions.empty` unchanged
+- DONE: AC-C3 filters per keystroke, no reload, no request
+  Typed `n`→`ne`→`net`→`netf` with the expected set at each step, then asserted the request count is unchanged and `GET /api/subscriptions` was issued exactly once all session — a count, not an inference.
+- DONE: AC-C4 case-insensitive substring, not prefix, not fuzzy
+  `net`/`NET`/`Net`/`flix` match Netflix; `ntflx` matches nothing. MUTATION RUN: `startsWith` → AC-C4 and AC-C11 failed.
+- DONE: AC-C5 matches `name` and `notes`
+  `family` finds iCloud by its note alone. MUTATION RUN: name-only matching → 4 tests failed.
+- DONE: AC-C6 empty or whitespace-only query renders the pre-feature list
+  Baseline captured before typing, then compared after filtering and clearing — names, order and both section headers.
+- DONE: AC-C7 leading/trailing whitespace trimmed
+  MUTATION RUN: dropping the trim → AC-C7 and the whitespace-only AC-C6 case failed.
+- DONE: AC-C8 distinct no-results message including the query, never `subscriptions.empty`
+  Key-echo test proves the dedicated element and the absence of the empty state; a live-i18n test proves what the captain actually reads: `No subscriptions match "hulu".` and `沒有符合「hulu」的訂閱。`. MUTATION RUN: falling back to the empty state → 2 tests failed.
+- DONE: AC-C9 sections filter independently; an emptied section renders no header
+  A cancelled-only match renders no Active header, and the mirror case no Cancelled header.
+- DONE: AC-C10 clear control appears with a non-empty query and restores the full list
+- DONE: AC-C11 a Chinese query matches a Chinese name
+  Also a Chinese *note*. `toLowerCase()` is the only normalisation, so non-Latin input is untouched.
+- DONE: AC-C12 query not persisted
+  `localStorage` snapshot unchanged, URL unchanged, and a remount starts empty on the full list.
+- DONE: AC-C13 placeholder and no-results message from keys in both locales
+  Keys asserted in the echo harness; real rendered strings asserted in en and zh.
+
+**Group D — non-regression**
+
+- DONE: AC-D1 Add/Edit/Cancel still persist every existing field
+  Request bodies asserted field by field on add and edit; the whole entity 053/057 cancel suite still passes untouched.
+- DONE: AC-D2 scheduler status line unaffected by the query
+  Still present and byte-identical under a query that hides every card.
+- DONE: AC-D3 scheduler's `notes: sub.name` untouched
+  `scheduler.ts:257` unchanged, and proven rather than assumed: a subscription carrying its own note generates an expense whose notes cell reads `Netflix`, asserted `notEqual` to the subscription's note.
+- DONE: AC-D4 `/api/insights` and every `rowToSubscription` caller still 200
+  Insights asserted not-500 against a tab with no notes header; the full functions suite covers the rest.
+- DONE: AC-D6 all frontend requests go through `apiFetch`; no bare `fetch(` added
+  Branch diff over `app/app/` adds no `fetch(`; the only bare `fetch(` in app source is inside `apiClient.ts:31`, the definition of `apiFetch` itself. `page.tsx` issues no direct network call. No auth logic added.
+- DONE: AC-D5 `npm test` passes in both packages; new test files registered
+  **functions 206/206, app 198/198** (app includes `test:compile`). Three files added to the `test` list in `app/package.json`: `subscription-notes.render.test.js`, `subscription-search.render.test.js`, `subscription-search-i18n.render.test.js`. The real `next build` also succeeds and `/subscriptions` prerenders.
+
+### Summary
+
+Landed notes first and search second, as the spec's scope recommendation required. Both sheet-safety items were proven by mutation, not assertion: making `notes` required 500s `GET /api/subscriptions` on a legacy tab, and reverting the column placement to row 1's length makes the new header claim an occupied column and surface another subscription's private data as its note — the entity 053 failure, reproduced and then re-guarded.
+
+Three things worth the reviewer's attention. First, a `?? ""` guard was added at `openEdit` (`page.tsx:172`) despite `notes` being typed as required: hosting and functions land independently from this repo's single deploy command, so a new bundle can briefly talk to a backend returning no `notes` key, and without the guard opening Edit throws on `.trim()` and takes the page down. Second, adding a search input to the page broke a positional `querySelectorAll("input")[0]` lookup in `legacy-category-writes.render.test.js`; both call sites were scoped to `.modal-open` rather than reindexed, since one of them had started passing for the wrong reason. Third, the shared jsdom fixture and two inline fixtures gained `notes` so they match what the API now always returns.
+
+Not verified: the feature was never driven in a real browser. The app sits behind a Google sign-in that needs live Firebase credentials and the production Sheet, so the closest available proof is the jsdom harness mounting the real page component and dispatching real DOM events, plus a rendered-markup dump inspected by hand. Nothing was deployed.
+
+One open question for the gate, carried forward from the spec: the 200-character cap renders in full on the card with no truncation. On a phone that is roughly four lines. Dropping it to 120 (matching entity 043) is a one-line change to `NOTES_MAX`.
