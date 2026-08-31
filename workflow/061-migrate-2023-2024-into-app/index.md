@@ -98,6 +98,11 @@ gates:
                     5. FORMAT AND APPROACH CHANGE. Captain: "I know [gid=1209807047] is not the same format. I think we can create another sheet to make this data easy to migrate." An intermediate normalization sheet is proposed instead of parsing the source matrix directly. This displaces a substantial part of the parser design and must be specced as the approach, with its own acceptance criteria, or argued against explicitly.
 
                     6. Context: the data is personal, unrelated to any work account. Confirms the account-mismatch diagnosis and rules out an org-permissions route.
+            - id: gate-attempt:061-spec-2
+              briefing:
+                id: briefing:061:spec:attempt-2:revision-1
+                digest: sha256:808aafe377df446f0779a9765c3137f45324ddf933965224f1476f781af9070b
+                room-ref: ./review/spec/briefing-2
 ---
 
 Evaluate whether the captain's 2023 and 2024 historical expense records can be migrated into the live app, and if so, migrate them — so the app itself holds those two years instead of them living only in Google Sheets. Feasibility is judged before any write is attempted.
