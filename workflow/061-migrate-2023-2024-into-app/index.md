@@ -1,7 +1,7 @@
 ---
 id: 061
 title: Migrate 2023–2024 Historical Expense Data Into The App
-status: ideation
+status: spec
 source: captain
 started: 2026-08-31T02:26:05Z
 completed:
@@ -58,6 +58,17 @@ gates:
                 id: briefing:061:ideation:attempt-4:revision-1
                 digest: sha256:417071a5ffe7bd8f836764c0673a227aef2490bd5e1128af601677c7640d22dd
                 room-ref: ./review/ideation/briefing-4
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:061:ideation:4
+                briefing: briefing:061:ideation:attempt-4:revision-1
+                by: person:captain
+                at: "2026-08-31T03:47:10.208462Z"
+                decision: approve
+                reason: 'Captain approved the corrected ideation scope in gate room briefing:061:ideation:attempt-4:revision-1, with no annotations. Access cleared and proven via the staging service account with two negative controls; 2023 confirmed by inspection at rows 33-58 of tab gid=1209807047; captain annotations A1-A6 folded; the normalization sheet accepted with its cost stated. Three decisions were put to the captain and left unanswered: 2022 in or out of scope, D4 date granularity for the undated days, and D3 undo/blast-radius/staging-first. Spec is instructed to carry each with a concrete recommendation and a stated default so the spec gate is a confirmation rather than another open round.'
+              application:
+                target-stage: spec
+                state: consumed
         - id: gate:061:spec
           stage: spec
           attempts:
