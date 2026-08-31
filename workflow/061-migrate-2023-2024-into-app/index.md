@@ -699,6 +699,41 @@ row-kind tag:
   `住/家具設備` and `住/住家維修` rows, about 8 rows per band. Following `008`, they
   land as ordinary expense rows with that label preserved in `notes`.
 
+##### D2a — Who paid? — RULED: `user1`, on 2026-08-31, raised in build
+
+**Outcome at stake:** whether two years of per-payer reporting is true, and whether
+1,670 rows are filed against a payer the app cannot select.
+
+The spec did not settle `paid_by` / `created_by`, and the source cannot: **the
+`Daily` tab has no payer column.** Verified rather than inferred — column A is a
+row-kind tag with two values, B the bucket, C the sub-category, D a free-text detail
+label, E the literal `Daily`. So `008`'s `誰 → user1/user2` mapping, which D2 adopts
+for everything else, has no column to map from here.
+
+Build proposed a neutral `Historical` literal, reasoning that naming a payer would
+invent a fact. **The captain ruled `user1`, and the ruling is better than the
+proposal.** The workbook is `ijacwei_income收支` — her own personal ledger. A personal
+ledger carries no payer column *because there was only ever one payer*. `user1` is
+therefore what that ledger records, and `Historical` would have been the invention: a
+payer who never existed, occupying every per-payer breakdown for two years and
+matching no filter.
+
+**The trap inside the ruling, and how it was avoided.** The stored value must be the
+**display name**, not the id. Read live from both tabs: `paid_by` holds only `ijac`
+and `wei` — 453/952 on staging, 785/1375 on production — and the id `user1` appears
+in neither. The app writes the name at creation time
+(`resolveUserDisplayNames`, `functions/src/index.ts:242`, falling back to
+`LEGACY_USER_MAP` at `:235`), and Reports filters by resolving id → name *before*
+comparing (`resolvePayerName`, `app/app/lib/reportService.ts`). Writing the literal
+`"user1"` would have filed all 1,670 rows against a third payer that no filter can
+select and no breakdown can show.
+
+So the importer resolves the name through the app's own `USERS` table
+(`app/app/lib/users.ts`, via the compiled `app/.test-build/users.js`) rather than
+holding a second copy of it, and logs the resolved value on every run. Three tests
+tie the assertion to that table: setting the constant to the id, to `Historical`, or
+to *user2's* name — a valid name for the wrong person — each turns the suite red.
+
 #### D3 — Undo, blast radius, and whether staging goes first — RULED: STAGING FIRST
 
 **Outcome at stake:** the live data two people use daily.
@@ -1138,6 +1173,41 @@ Falsified by: implementing `--target` as a single swappable credential pair — 
 Verified by: offline — the staging rehearsal (snapshot → apply → verify → hand-add a row → undo → diff) writes a receipt under the gitignored `functions/backfill-reports/` recording the target, the normalization sheet name, its `C1` digest, the row count and the undo result. `--target production --apply` reads that receipt and refuses — non-zero, nothing written, Expenses row count unchanged — if it is absent, or if its digest does not match the sheet about to be imported. A test drives production-apply with no receipt, and again with a receipt whose digest belongs to a different sheet; both must refuse.
 Falsified by: dropping the digest comparison and checking only that a receipt exists — a stale receipt from an earlier rehearsal then satisfies the gate, and production imports a sheet that was never rehearsed. The second test case catches exactly that.
 
+##### AMENDED in build, and RATIFIED by the captain on 2026-08-31
+
+**What was wrong with the criterion as approved.** It binds the receipt to the
+sheet's `C1` digest, and `C1` is stamped by the **extractor**. So it does not move
+when the captain hand-corrects a date, an amount, a category or a status — which is
+the entire purpose of the normalization sheet. A receipt bound to `C1` alone
+therefore still matched after she had edited, and `--target production --apply`
+would have imported content that no rehearsal had ever covered. The criterion's own
+falsifier ("a stale receipt from an earlier rehearsal") named the right failure and
+the mechanism it specified could not detect it.
+
+**The amendment.** The receipt records a **second digest, over the rows as read** —
+key, date, amount, category and status per row — and production-apply requires
+**both** to match. `C1` still gates the generation, exactly as approved; the content
+digest gates her corrections. The change is purely additive: it refuses strictly
+more than the approved criterion, never less, so nothing that used to be blocked is
+now permitted.
+
+**Two consequences recorded so the amendment has provenance rather than looking like
+drift:**
+
+- The receipt also records `approvedAtRehearsal`, because the rehearsal necessarily
+  runs **before** she approves — the rehearsal is the evidence she reads in order to
+  approve. `--rehearse` therefore does not require `B1 == APPROVED`, is restricted to
+  `--target staging`, and says so in its own log. AC-14 is unaffected and enforced
+  independently: `--target production --apply` still refuses on `B1` whatever any
+  receipt says.
+- Three tests cover it: the two digests are asserted **equal** across a hand edit
+  (proving `C1`'s blindness is real and not hypothetical), the content digest is
+  asserted to catch that same edit, and an unedited sheet is asserted to pass — so
+  the guard discriminates rather than simply always refusing.
+
+**Ratification.** Raised as a build finding, ruled on by the captain, accepted with
+the strengthening. AC-18 is met as originally written *and* as amended.
+
 ## Risk evidence
 
 **Reading the source workbook — was the riskiest mechanism, now exercised and proven.** The captain shared the workbook with the staging service account, and reading it through `expense-tracker-staging@expense-sheet-staging...` succeeded: nine tabs enumerated, the `Daily` tab's structure mapped, all three year bands located, and every count in **Source: what is actually there** taken from live reads. The prior diagnosis was half right — the Drive connector is authenticated to the wrong account and still returns `Requested entity was not found` — but its proposed remedy was wrong: reconnection was never needed. Note the account that works is the **staging** service account, not the production one, which returns `403 The caller does not have permission`. An admin script that resolves its credentials through `load-local-env.js` picks up the **production** key from `.env.local` and will therefore fail to read the source at all. That is a second, independent reason AC-12's explicit `--target` matters.
@@ -1163,8 +1233,56 @@ Two negative results from the same probe round change the design rather than jus
 
 ## Expected surface and tolerance
 
-Redone for the two-phase normalization-sheet approach. The parser does not go away;
-a sheet writer, a carry-forward and an approval check are added.
+> **RE-BASELINED 2026-08-31, after build, on the captain's ruling.** Build landed
+> **+5,004 net LOC across 11 files** — 397% of the estimate below. The captain
+> accepted the overrun rather than requiring a design reset, and directed that this
+> section be restated against the measured reality so `verify` is not held to a
+> number everybody already knows is wrong. The original estimate is kept beneath,
+> struck through in effect, because the gap between the two is the useful record.
+>
+> **Measured baseline: +5,004 net LOC across 11 files, tolerance ±10%** (4,504–5,504).
+> A tight tolerance is right now: the code exists and is measured, so any further
+> movement is a change of scope rather than an estimating error.
+>
+> | File | total | non-comment | original estimate |
+> |---|---|---|---|
+> | `functions/test/historical-expenses.test.js` | 1,437 | ~1,060 | ~250 |
+> | `functions/scripts/extract-historical-expenses.js` | 1,151 | 777 | 350–450 |
+> | `functions/scripts/import-historical-expenses.js` | 1,073 | ~760 | 300–400 |
+> | `functions/scripts/sync-staging-categories.js` | 322 | 239 | 90–120 |
+> | `functions/test/fixtures/historical-bands.json` (data) | 413 | — | ~80 |
+> | `functions/test/fixtures/generate-historical-bands.js` | 198 | 146 | not estimated |
+> | `functions/scripts/migration-env.js` | 121 | 74 | not estimated |
+> | `functions/scripts/load-local-env.js` (+66) | 151 | 95 | 30–50 |
+> | `functions/package.json`, `functions/test/sheetsStub.js` | +17 | — | 6–8 entries |
+> | `workflow/061.../index.md` (+308, not code) | — | — | — |
+>
+> **Where the overrun came from, largest first:**
+>
+> 1. **The test file, at 5.7x — and this cost belongs to the dispatch, not to the
+>    build's judgement.** The dispatch instructed that both silent-drop traps be
+>    proved *by falsification* — reintroduce the defect, watch the suite go red —
+>    rather than by assertion. That is a materially different and more expensive
+>    artefact: a patch-and-reload harness, plus for each trap a test that both
+>    asserts the correct behaviour and drives a deliberately broken copy. The ~250
+>    LOC figure was estimated against assertions. It bought the thing it cost: the
+>    `金額`-label defect that had already shipped once in this entity is now caught
+>    by a test that fails when it returns.
+> 2. **Comment density matches this codebase's, and this codebase's is high.** About
+>    32% of these files are comments. `backfill-subscription-history.js` — the script
+>    whose write shape this reuses — is 825 lines for narrower work. Non-comment
+>    lines total ~3,150, still ~2.5x.
+> 3. **Two files were never in the estimate.** `migration-env.js`, holding the
+>    two-credential contract in one place so three scripts cannot drift on it; and
+>    the fixture generator, so the fixture's date serials are computed rather than
+>    hand-typed.
+>
+> **No acceptance criterion was narrowed and nothing was cut to fit.** All 18 offline
+> criteria are met; AC-7 and AC-8 are interactive and belong to `verify`.
+
+Original estimate, retained for the record. Redone for the two-phase
+normalization-sheet approach. The parser does not go away; a sheet writer, a
+carry-forward and an approval check are added.
 
 Estimate: **+1,260 net LOC across 7 files, tolerance ±30%** (so 882–1,638).
 
@@ -1552,3 +1670,41 @@ No acceptance criterion was narrowed. Nothing was cut to fit.
 Four scripts, one test file, one synthetic fixture: the extractor writes a normalization sheet and cannot write an expense row; the importer reads an `APPROVED` sheet named explicitly and cannot produce one; `--target` plumbing publishes two credential pairs at once because only the staging account can read the captain's archive; and an additive, reversible staging Categories reconciliation applies the captain's R1. Every number the spec measured is reproduced by the code against the live source — 1,670 rows, 895 + 775, unaccounted cells 0 in both bands, 351 and 365 distinct dated day columns, October's variance cluster. The staging rehearsal passed all eight steps and left staging byte-identical to its snapshot.
 
 **Production was never written to, and is verified untouched.** `Migration 2023-2024` sits on staging with **B1 blank**, waiting for the captain. Three findings need her or the first officer: the AC-18 digest gap I closed, the `paid_by` literal I chose because the source has no payer column, and a surface 376% of estimate that I have not tried to explain away.
+
+## Stage Report: build (cycle 2 — captain's rulings on the three findings)
+
+- DONE: Ruling 1 — `paid_by` / `created_by` use `user1`, not the `Historical` literal.
+  Implemented as **`user1`'s display name `ijac`**, resolved through the app's own `USERS` table rather than a second copy of it. The ruling's caveat mattered: live `paid_by` holds only `ijac` and `wei` (staging 453/952, production 785/1375) and the id `user1` appears in neither tab, so the literal would have filed 1,670 rows against a payer no filter can select. Reasoning recorded at **D2a**. Commit 5c68440.
+- DONE: Ruling 1 — AC coverage reflects it, and something fails if the actor is wrong rather than merely different.
+  Three new tests, each tied to `app/app/lib/users.ts` rather than to a literal here. Watched red: actor = the id → 3 fail; actor = `Historical` → 3 fail; actor = **user2's name**, a valid name for the wrong person → 2 fail. Also fixed my own fixture, which had used `user1`/`user2` for pre-existing rows and was simply wrong about the app's storage convention.
+- DONE: Ruling 2 — AC-18 ratified with the strengthening; record that the approved AC was blind to captain edits, that the fix is additive, and that she ratified it.
+  Written into AC-18 itself as `##### AMENDED in build, and RATIFIED by the captain on 2026-08-31`, so the amendment has provenance at the point of use rather than only in a report.
+- DONE: Ruling 3 — re-baseline `## Expected surface and tolerance` to measured reality with the same breakdown, noting the test-file cost traces to the dispatch.
+  Re-baselined to **+5,004 net LOC across 11 files, tolerance ±10%**, with the original estimate retained beneath for the record. The test file at 5.7x is attributed to the dispatch's instruction to prove the traps by falsification rather than by assertion.
+- SKIPPED: Re-applying the import on staging.
+  Instructed not to: `verify` is a fresh agent and owns AC-7 and AC-8, including deciding what state staging needs to be in for them. Staging is left as the rehearsal left it — 1,405 Expenses rows, 0 `exp-hist-` rows.
+- SKIPPED: Anything against production.
+  The stage boundary, unchanged. Confirmed again after these changes: 2,160 Expenses rows, 0 `exp-hist-` rows, 25 Categories rows, no `Migration` tab.
+
+### What changed in the code
+
+One constant became a resolver, and the receipt gained a field:
+
+- `HISTORICAL_ACTOR = "Historical"` → `HISTORICAL_ACTOR_ID = "user1"` plus `historicalActorName()`, memoised, resolving through the app's compiled `USERS` and falling back along the API's own chain (`LEGACY_USER_MAP`, then the raw id).
+- `candidateRow(...)` takes the actor explicitly; `run()` resolves it once and logs it, so a run states out loud which payer 1,670 rows will carry.
+- No change to the extractor, the normalization sheet, the digests, or `--target`. The sheet on staging is untouched and still carries digest `b9e5d87f…`; the rehearsal receipt remains valid.
+
+Suite: **260 pass / 0 fail** (`npm --prefix functions test`), up from 257 by the three payer tests. A live read-only `--dry-run` against staging confirms `[actor] paid_by = created_by = "ijac"` and 1,670 rows planned, nothing written.
+
+### Summary
+
+Three rulings implemented. The one with substance was `paid_by`: the captain's `user1`
+is right for a reason worth keeping — a personal ledger has no payer column because
+it had one payer — but the value the app actually stores is the display name, so the
+implementation resolves `user1` through the app's own `USERS` table and a test fails
+if it ever becomes the id, the old literal, or the wrong person. AC-18's amendment is
+now recorded at the criterion itself with its provenance, and the surface section
+states the measured +5,004 rather than an estimate everyone knew was wrong.
+
+Nothing was written to production, and nothing was re-applied on staging. `Migration
+2023-2024` still waits on **B1 blank** for the captain.
