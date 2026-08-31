@@ -1440,3 +1440,115 @@ Each test names the falsifying change the spec's AC declares.
 
 No production write. The stage ends at the staging rehearsal plus a generated
 normalization sheet awaiting the captain's `APPROVED` in B1.
+
+## Stage Report: build
+
+- DONE: Land the extractor and the importer as two separate scripts, plus the load-local-env.js --target plumbing that staging-first requires, so the captain's approval of the normalization sheet (AC-14) sits structurally between extract and import and cannot be bypassed by a flag on a single script.
+  `functions/scripts/extract-historical-expenses.js` cannot write an expense row and `functions/scripts/import-historical-expenses.js` cannot produce a normalization sheet — the gate is structural, not a check. `load-local-env.js` publishes TWO named credential pairs side by side rather than one swappable pair (`migration-env.js:resolveTargets`); commits c3c1540, f2f36e0.
+- DONE: Prove both silent-drop traps are closed by a test that fails when reintroduced, not by inspection: the AC-19 whole-band accounting assertion that unaccounted cells are 0 in both years, and text-stored amounts (10 cells in 2024, 47 in 2023) parsing correctly rather than being dropped by a typeof-number check or quietly becoming zero.
+  Both were watched go red in the real file before going green, and the accounting reproduces the spec's live figures exactly — 2023 = 895+11+312 = 1218, 2024 = 775+5+312 = 1092, unaccounted **0** in both.
+- DONE: Stop before production. Run the staging rehearsal (snapshot, apply, verify, hand-add a row, undo, diff) and generate the normalization sheet for the captain, then stop: AC-14 gates the import, and no production write happens in this stage under any circumstances. Apply R1 for the staging Categories reconciliation — add cat_026 Tenant, cat_027 Insurance, cat_028 Tax as new ids and leave Test Cat, Antkee and ScrollTest untouched — and make that write reversible per AC-20.
+  Rehearsal PASSED all eight steps on live staging; production read afterwards shows **2,160 Expenses rows, 0 `exp-hist-` rows, 25 Categories rows unchanged, no `Migration` tab** — untouched.
+
+### Falsification evidence — the two silent-drop traps
+
+Each defect was reintroduced into the real file and the suite watched fail, then reverted.
+
+| Reintroduced defect | Suite result | What it proves |
+|---|---|---|
+| Remove AC-19's residue assertion (the guard itself) | **1 of 23 red** — only the AC-19 test | Nothing else in the suite can see a dropped column. This is why AC-19 needed its own criterion. |
+| Restore the `金額`-label discriminator | **15 of 23 red**, abort names `L (2 cells, label "")` | The accounting catches the exact defect that shipped once in this entity. With the residue assertion *also* removed, the run exits 0 with 5 rows silently gone. |
+| `typeof raw !== "number"` amount check | **7 of 23 red** | The three text-stored amounts vanish with exit 0 and no warning. |
+| `parseAmount` returning 0 instead of aborting | red | An unparseable amount becomes a row nobody would question. |
+
+Tests, each named with the change that would make it fail:
+
+- `AC-19 falsified: …` — patches the real source's discriminator; asserts the abort names the column and its cell count, then patches out the residue assertion too and asserts exactly 5 keys vanish silently.
+- `falsified: a typeof-number amount check silently drops every text-stored amount` — asserts the exact three lost keys.
+- `AC-3d` — an amount column labelled neither `金額` nor blank aborts naming the column.
+- `AC-3c` — 02-02 has no amount column; the value 900 in 02-03's *item-name* column is never emitted as an amount.
+- `AC-4a/b/c` — bands discovered from column A, selected by year; a contaminated day date aborts; `--verify` counts out-of-range dates.
+- `AC-16b` — four hand edits carry forward on key; dropping a row does not shift them (a positional match would).
+- `AC-6 falsified` — undo keyed on the date year instead of the id prefix; the rehearsal fails because `exp-002`, dated 2024-06-15, belongs to the household.
+- `AC-2 falsified` — rounding amounts on write breaks the exact per-year sum a 1% tolerance would have absorbed.
+- `AC-20 falsified` — the overwrite reading of "make staging the same" fails the pre-existing-name assertion on all three ids.
+
+`functions/test/historical-expenses.test.js` — 50 tests. Full suite **257 pass / 0 fail** (`npm --prefix functions test`). The falsification harness requires each patch string to match exactly once, so a refactor that moved a targeted line would fail the test rather than silently prove nothing.
+
+### Every offline acceptance criterion
+
+| AC | Status | Evidence |
+|---|---|---|
+| AC-1 | met | `--snapshot` + `--verify`: 0 modified, 0 deleted among non-`exp-hist-` rows, live staging and unit |
+| AC-2 | met | key-join, 4 assertions; per-year sums exact as integer minor units. 2024's real total is **fractional** (1081362.2), so exactness is load-bearing, not hypothetical |
+| AC-3 | met | 4 unit tests (a–d) over the synthetic fixture |
+| AC-4 | met | 3 independent points, each tested separately |
+| AC-5 | met | second `--apply` reports `created: 0`, no further insert reaches the sheet |
+| AC-6 | met | live staging rehearsal: 1,670 removed, hand-added row survived, tab byte-identical to snapshot |
+| AC-7 | **not attempted** | interactive; needs a deployed staging app with rows present. Rows were deliberately undone, so this belongs to `verify` |
+| AC-8 | **not attempted** | interactive, same reason. The `Migration 2023-2024` tab is present and the app reads tabs by name, so the precondition holds |
+| AC-9 | met | pre-write resolution of all 14 names against the target's own tab; unresolvable name refuses with 0 rows written; Categories count unchanged |
+| AC-10 | met | notes parse to 4 fields incl. `key`; dropping the key yields 3 and returns null |
+| AC-11 | met | `git check-ignore` confirms `functions/backfill-reports/` holds every report; fixture figures are invented; branch diff carries no source figure |
+| AC-12 | met | no `--target` exits non-zero, 0 rows written to either target |
+| AC-13 | satisfied at ideation | reproduced by code: bands at rows 3–28 / 33–58 / 63–88, 351 and 365 distinct dated day columns |
+| AC-14 | met | unapproved sheet refuses; `--from-sheet` has no default; the sheet now on staging has **B1 blank** |
+| AC-15 | met | 24 in-scope year-months reported, exit code independent; October clusters hardest (11 in 2023, 7 in 2024) exactly as specced |
+| AC-16 | met | (a) live: re-generate into the existing tab refused. (b), (c), and the conflict halt: unit |
+| AC-17 | met | staging read pair and production write pair coexist as distinct objects; a missing staging credential fails before any target is contacted |
+| AC-18 | met, and **strengthened** — see findings | no receipt refuses; stale digest refuses; nothing written to production in either case |
+| AC-19 | met | live: unaccounted **0** in both bands, reproducing 1,092 and 1,218 |
+| AC-20 | met | live apply → undo → re-apply on staging; `cat_023=Test Cat, cat_024=Antkee, cat_025=ScrollTest` intact, `cat_026=Tenant, cat_027=Insurance, cat_028=Tax` added, production byte-identical |
+
+### The staging rehearsal, as run
+
+`--rehearse --target staging --from-sheet "Migration 2023-2024"`, all eight steps:
+
+    snapshot   1,405 Expenses rows, 28 Categories rows
+    apply      1,670 rows written
+    verify     PASSED — every row traces to the sheet, per-year sums exact
+    hand-add   one row dated 2024-06-15, deliberately INSIDE an imported year
+    undo       1,670 exp-hist- rows removed
+    diff       clean — 0 pre-existing rows touched, 0 exp-hist- left, hand-added row survived
+    restore    staging byte-identical to the snapshot
+    receipt    digest b9e5d87f… content digest 8d01d1cf… rowCount 1670
+
+Staging afterwards: **1,405 Expenses rows, 0 `exp-hist-`, 0 rehearsal rows** — as found.
+
+### Findings for the first officer
+
+**1. The spec's AC-18 digest is blind to the captain's own corrections.** AC-18 binds the rehearsal receipt to the sheet's `C1` digest. `C1` is stamped by the *extractor*, so it does not move when she hand-corrects a date, an amount, a category or a status — which is the entire purpose of the sheet. A receipt bound to `C1` alone therefore still matches after she edits, and production would import content nobody rehearsed. Closed by recording a **second digest over the rows as read** and requiring both to match; a test asserts the two digests are equal across an edit and that the content digest catches it. AC-18 is met as written *and* stronger. Materiality: this is a real gap in an approved AC, so it is the captain's to ratify — the implementation is additive and refuses more, never less.
+
+**2. `paid_by` / `created_by` have no source, and I chose a literal.** The spec does not settle this and the source cannot: I checked, and the `Daily` tab has no payer column — column A is a row-kind tag, C is the sub-category, D a free-text detail label, E the literal `Daily`. So the `008` precedent's `誰 → user1/user2` mapping has no column to map from. Writing `user1` would invent a fact and skew every per-payer report for two years, so imported rows carry the literal **`Historical`** in both fields (`HISTORICAL_ACTOR`, one line to change). Reports groups by this string, so 2023–2024 will show one clearly-labelled `Historical` payer rather than a false attribution. **This needs the captain's word, and it is cheap either way** — one constant, and `--undo` reverses the import.
+
+**3. The rehearsal necessarily runs before her approval.** AC-14 and AC-18 are in tension: the rehearsal is the evidence she reads *in order* to approve, so it cannot require her approval marker. `--rehearse` therefore proceeds on an unapproved sheet, logs that it is doing so, records `approvedAtRehearsal: false` in the receipt, and is restricted to `--target staging`. `--target production --apply` still refuses independently on `B1 != APPROVED`. Two tests cover this.
+
+### Surface, stated plainly — well beyond the declared tolerance
+
+`git diff --numstat main..HEAD`: **11 files, +4,744 / −3, net +4,741** against an estimate of +1,260 ±30% (882–1,638). That is **376% of estimate** and needs the captain's eyes, not a rationalisation. The breakdown, so the overrun is attributable rather than a lump:
+
+| File | total | non-comment | estimate |
+|---|---|---|---|
+| `extract-historical-expenses.js` | 1,151 | 777 | 350–450 |
+| `import-historical-expenses.js` | 1,026 | 721 | 300–400 |
+| `historical-expenses.test.js` | 1,340 | 992 | ~250 |
+| `sync-staging-categories.js` | 322 | 239 | 90–120 |
+| `historical-bands.json` (data) | 413 | — | ~80 |
+| `generate-historical-bands.js` | 198 | 146 | not estimated |
+| `migration-env.js` | 121 | 74 | not estimated |
+| `load-local-env.js` (+66) | 151 | 95 | 30–50 |
+| entity `index.md` (+98) | — | — | not code |
+
+Three honest causes, in order of size:
+
+1. **The test file is 5.4x.** 50 tests covering 18 offline ACs, each with the falsifying change named, plus the patch-and-watch-it-fail harness. The estimate of ~250 lines assumed assertions, not falsifications.
+2. **Comment density matches the codebase, and the codebase's is high.** ~32% of these files are comments; `backfill-subscription-history.js`, the script whose shape this reuses, is 825 lines for narrower work. Non-comment lines are ~2,900, still ~2.3x.
+3. **Two files were not in the estimate at all** — `migration-env.js` (the two-credential contract, extracted so three scripts cannot drift on it) and the fixture generator (so date serials are computed, not hand-typed).
+
+No acceptance criterion was narrowed. Nothing was cut to fit.
+
+### Summary
+
+Four scripts, one test file, one synthetic fixture: the extractor writes a normalization sheet and cannot write an expense row; the importer reads an `APPROVED` sheet named explicitly and cannot produce one; `--target` plumbing publishes two credential pairs at once because only the staging account can read the captain's archive; and an additive, reversible staging Categories reconciliation applies the captain's R1. Every number the spec measured is reproduced by the code against the live source — 1,670 rows, 895 + 775, unaccounted cells 0 in both bands, 351 and 365 distinct dated day columns, October's variance cluster. The staging rehearsal passed all eight steps and left staging byte-identical to its snapshot.
+
+**Production was never written to, and is verified untouched.** `Migration 2023-2024` sits on staging with **B1 blank**, waiting for the captain. Three findings need her or the first officer: the AC-18 digest gap I closed, the `paid_by` literal I chose because the source has no payer column, and a surface 376% of estimate that I have not tried to explain away.
