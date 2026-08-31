@@ -96,84 +96,342 @@ This feature blocks `060-historical-expense-analysis`: the captain chose migrati
 
 ## Success
 
-- A written feasibility verdict, delivered before any write: possible, possible-with-caveats, or not possible, with the reason.
-- If feasible: 2023 and 2024 expense records present in the app, attributed to the correct categories, dates, and amounts.
+- **Feasibility: answered, and the answer is possible-with-caveats.** The source is
+  readable, both years exist, and the structure is parseable. The caveats are the
+  two source-integrity defects recorded below — damaged December 2024 headers, and
+  a workbook that disagrees with its own month totals about 12% of the time. Neither
+  blocks the migration; both mean the import cannot be proved by reconciling to the
+  workbook alone.
+- An intermediate normalization sheet the captain can read and correct, holding one
+  row per dated line item for 2023 and 2024, before anything is written to the app.
+- 2023 and 2024 expense records present in the app, attributed to the correct
+  categories, dates, and amounts.
 - The live data two people use daily is intact — no existing row altered or lost, verified against a before/after check, not asserted.
 - A stated, exercised way to undo the migration.
 
 ### Out of Scope
 
-- Years other than 2023 and 2024. The remaining archive years are inventoried and analysed by `060`, not imported here.
+- Years other than 2023 and 2024. **2022 is present in the same tab** (rows 63–88)
+  and is deliberately left there; the remaining archive years are inventoried and
+  analysed by `060`, not imported here.
+- The other eight tabs of the source workbook, including its separate `Income` tab.
 - The growth analysis itself — that is `060`'s deliverable.
 - Any new app UI for browsing historical years. This feature lands data, not screens.
 - Changing what the app does with categories going forward, beyond what landing these two years requires.
+- Any `gov_category` work. It is a property of a category, not of an expense row, so
+  it needs no mapping here — and per the captain it is deferred regardless.
+- Repairing the source workbook itself. Corrections are made in the normalization
+  sheet; the original is read-only throughout.
+
+## Source: what is actually there
+
+This section records what was read, not what was assumed. Everything below was
+obtained by reading the live workbook through the **staging service account**
+during ideation cycle 2; the probe scripts live under the gitignored
+`functions/backfill-reports/061-probe/`. It supersedes the earlier description
+of the source, which was inherited from `060`'s folder inventory and describes a
+different artefact.
+
+**Access is no longer blocked.** The captain shared the workbook with the staging
+service account (`expense-tracker-staging@expense-sheet-staging.iam.gserviceaccount.com`,
+credentials already in `functions/.env.staging`). A `spreadsheets.get` through
+that account returns the workbook and all nine of its tabs. Two other routes were
+re-tested and both still fail: the Google Drive connector in this session returns
+`Requested entity was not found`, and the **production** service account
+(`expense-sheet-functions@expense-sheet-b2db8...`) returns `403 The caller does not
+have permission`. So the read route is exactly one account, and it is the staging
+one. The old "reconnect the Drive connector" remedy is void.
+
+**The source is one tab, not one file per year.** Workbook
+`1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I`, titled `ijacwei_income收支 (archived)`,
+holds nine tabs. The expense data the captain pointed at is tab
+**`gid=1209807047`, titled `Daily`** — 1,061 rows by 749 columns. Every earlier
+reference in this entity to tab `gid=0` was wrong: `gid=0` is a tab titled `P&L`
+and is not the source. There is no "pick the right file per year" problem, because
+both years in scope sit in this one tab.
+
+**Three years are stacked vertically as bands, and 2023 is one of them.** The
+captain is right and `060`'s "no 2023 record" finding does not apply here — it was
+about the archive *folder*. The tab holds three bands of 26 data rows each:
+
+| Band | Date-header row | Column-label row | Data rows |
+|---|---|---|---|
+| **2024** | 1 | 2 | 3–28 |
+| **2023** | 31 | 32 | **33–58** |
+| 2022 | 61 | 62 | 63–88 |
+
+Rows 31–58 are exactly the 2023 band the captain named. 2022 also exists here but
+stays out of scope per the Out of Scope list below; it is `060`'s.
+
+**Each band is a day-level matrix, not a monthly one.** Reading left to right in a
+band: column A a row-kind tag, B the top-level bucket (`項目大類`), C the
+sub-category (`項目分類`), D a free-text detail label (`細項說明`), E a note column
+(`備註`, always the literal `Daily`), then from column F onward a repeating
+structure of **one month-total column followed by that month's day columns**, where
+each day occupies a *pair* of columns — `品名` (item name) and `金額` (amount) —
+with the date itself carried as a real date value in the header row above the
+`品名` column. Twelve month-total columns per band.
+
+**The taxonomy is far smaller than this entity previously claimed.** Measured over
+the whole tab:
+
+- Column A holds **two** distinct values, not four row-kinds: the band-header
+  literal `收入支出`, and `非固定支出` ("variable expense") on all 78 data rows.
+  **There are no income rows and no rental-property row-kind in this tab.** Income
+  lives in a separate `Income` tab that is not in scope.
+- Column B holds **9** top-level buckets — `食 衣 行 住 醫療 育 樂 公益 雜項` — not 25.
+- Column C holds **17** sub-categories, not 61.
+- Column D holds 8 distinct detail labels: per-person labels and per-property-unit
+  labels. This is where the rental-property distinction actually lives — on the
+  `住/家具設備` and `住/住家維修` rows, 8 rows per band — and it is a free-text
+  detail column, not a tag.
+
+**The aggregates are columns, not rows.** The earlier premise that "section totals
+and per-kind subtotals sit in the same columns as real line items" is false for
+this tab. Every one of the 78 data rows is a real line item; the aggregation is the
+twelve month-total columns. So the planned column-A row-kind filter has nothing to
+filter, and the real risk is the opposite one: a parser that walks columns
+indiscriminately sums each month twice. The discriminator is the column-label row —
+a day column's label cell is `品名` or `金額`; a month-total column's is not.
+
+**Measured size of the import.** Populated amount cells, both years in scope:
+
+| Band | Day columns | Populated amount cells | Of which text-typed | Day cells with an item name |
+|---|---|---|---|---|
+| 2024 | 365 | 764 numeric + 10 text | 10 | 59 |
+| 2023 | 363 | 846 numeric + 47 text | 47 | 43 |
+
+So the import is **roughly 1,670 rows for both years combined**, not the ~1,400 per
+year previously estimated — small enough that the app's lack of pagination is not
+the concern it looked like. The text-typed cells are plain digit strings with no
+separators or currency prefix, so parsing is `Number(String(v).trim())` — but a
+parser that accepts only `typeof v === "number"` silently drops 47 real 2023
+amounts. Item names are present on only ~7% of populated cells, so `notes` will
+mostly be assembled from the bucket / sub-category / detail columns.
+
+**Two data-integrity defects in the source, found by exercising it.**
+
+1. **December 2024 headers are damaged.** The 2024 band's day-column headers run
+   only to 2024-12-16 and contain 15 duplicated dates across early December; 16
+   calendar days of 2024 have no column at all. 2023 is clean by comparison — 362
+   distinct dates, no duplicates, spanning 2023-01-01 to 2023-12-31, 3 missing days.
+2. **The workbook does not reconcile against itself.** Checking every populated
+   row-month cell against the sum of that month's day cells: **88.1% agree within
+   1% for 2024 and 88.9% for 2023.** The mismatches cluster hard in October (7 in
+   2024, 11 in 2023). This matters because it falsifies the planned AC-2: a check
+   that reconciles the import to "the workbook's own total within 1%" would fail on
+   the source's own inconsistency rather than on any parser defect.
 
 ## Plan
 
-To be filled in at spec time. Open questions this must resolve:
+### Settled by the captain in the spec gate (cycle 1)
 
-- **Does 2023 data actually exist?** `060`'s recorded spec finding states the archive holds no 2023 record at all. The captain has since pointed at tab `gid=0` of the 2024 workbook and asked to migrate "2024, 2023". Spec settles this by inspecting the tab, not by assuming either side is right. If 2023 genuinely has no record, this feature covers 2024 only and says so.
-- **The taxonomy does not map 1:1.** The historical records carry 25 top-level buckets over 61 sub-categories with four row-kind tags (monthly, annual, irregular, rental-property). The app uses a flat `gov_category` set in `app/app/lib/categories.ts`. Spec decides what happens to buckets with no app equivalent, and whether the app's category set changes or the import approximates — this is a captain decision, not an implementer's.
-- **Rental-property and income rows.** The source tables interleave income rows and rental-property pass-through flows with household expense rows. Spec decides whether these are imported, excluded, or marked, since importing them silently distorts every total the app shows.
-- **Aggregate rows are interleaved with data rows.** Section totals and per-kind subtotals sit in the same columns as real line items; importing them double-counts. The row-kind tag in column A is the filter.
-- **Reversibility and blast radius.** The target sheets are production data in daily use. Spec states how the migration is undone, how the before/after integrity check is performed, and whether it runs against staging first.
-- **Which source file per year.** Several years have duplicate, template, and legacy `.xls` variants. Spec states the pick rule.
+- **Does 2023 exist? Yes.** Settled by the captain and then confirmed by inspection —
+  rows 33–58 of tab `gid=1209807047`. This feature covers both years. The 2024-only
+  fallback is dead.
+- **Categories are decided first; `gov_category` is deferred.** Captain: "we figure
+  out the category first, we can leave gov_category later." This turns out to be
+  free rather than a deferral, and spec should say so: `gov_category` is **not a
+  column on the Expenses tab at all**. `EXPENSES_SPEC` requires exactly
+  `id | date | amount | category_id | paid_by | created_by | notes | created_at`
+  (`functions/src/sheetSchema.ts:19-22`), and `rowToExpense` returns those eight
+  fields (`functions/src/index.ts:156-165`). `gov_category` is a property of a
+  *category* on the Categories tab (`rowToCategory`, `functions/src/index.ts:192`),
+  so it follows automatically once `category_id` is chosen. Nothing to map, nothing
+  to defer. The real work is mapping 9 buckets × 17 sub-categories onto the 24
+  category ids in `app/app/lib/categories.ts` — a much smaller job than the 25×61
+  this entity previously described.
+- **Rental-property and income rows: follow the 2026 precedent.** Captain: "follow
+  what we did for 2026." Read from the code rather than assumed, that precedent is
+  entity `008` / `scripts/migrate-2025.js`, recorded at
+  `workflow/_archive/data-migration.md`, and concretely it is:
+  - Every source bucket was mapped onto one of the **existing** 24 category ids. No
+    new categories were created; unmappable combinations went to `other`.
+  - The one rental-adjacent source bucket, `其他/房客` (tenant), was mapped to
+    `other` as an **ordinary expense row** — no flag, no exclusion, no annotation
+    (`data-migration.md:136`).
+  - **Income never arose** — the 2025 source had no income rows, so `008` set no
+    income policy. That gap is closed for this feature by the structure above: the
+    `Daily` tab has no income rows either. Income stays out of scope by fact, not
+    by decision.
+  - Dates were passed through verbatim at day level; `created_at` was derived from
+    the date with a randomised time so 1,404 rows would not share a timestamp.
+  - Row ids were sequential and deterministic (`exp_2025_0001`…) but **not**
+    idempotent — `008` states plainly that running twice creates duplicates. This
+    feature should not copy that part; the newer `exp-auto-{sub}-{date}` shape in
+    `functions/src/scheduler.ts:87` is the better precedent for re-runnability.
+
+  Applied here: the ~8 rental-property rows per band are identified by the column-D
+  detail label, and following `008` they land as ordinary expense rows with the
+  detail label preserved in `notes`. Whether the captain wants them excluded instead
+  is a smaller question than it looked, because they are 8 rows and identifiable.
+
+### The intermediate normalization sheet — accepted, with what it does and does not buy
+
+The captain proposed one: "I know [the `Daily` tab] is not the same format. I think
+we can create another sheet to make this data easy to migrate." **Take it.** Two
+concrete reasons, both from the readings above rather than from taste:
+
+- The source does not reconcile against itself (~12% of row-month cells) and
+  December 2024's headers are duplicated and truncated. Those need a human's
+  judgement, and there is nowhere in a script-only pipeline to apply it. A
+  normalization sheet is that place: the captain can see the extracted rows,
+  correct the December 2024 dates, and settle the October discrepancies **before**
+  anything is written to the app.
+- It converts a 749-column three-band matrix into a long table — one row per
+  `(year, date, bucket, sub-category, detail, item name, amount)` — which is the
+  shape the app's Expenses tab already is. The importer then becomes the same
+  row-append shape `008` and `051` have both already proven, instead of new code.
+
+**What it does not buy, stated plainly so spec does not over-credit it:** it does
+not remove the parser. Something still has to read three bands across 749 columns
+and pair day headers to `品名`/`金額` columns; the normalization sheet is where that
+parser's *output* goes instead of straight into the app. Net effect on scope is a
+second, reviewable artefact and one extra stage, not less code. It also introduces
+a new question spec must answer: whether the normalization sheet is generated by
+script into a new tab of a workbook the staging service account can write, and
+whether the captain's edits to it are re-read on import or overwritten by a
+re-generate. Getting that wrong loses her corrections.
+
+Spec should carry this as the approach with its own acceptance criteria: the
+extraction is proved against the normalization sheet, and the import is proved
+against the app.
+
+### Still open — needs the captain
+
+- **D3 — undo, blast radius, and whether staging goes first.** Uncontested and
+  unanswered. The verified constraint stands:
+  `functions/scripts/load-local-env.js` resolves `SPREADSHEET_ID` from
+  `functions/.env` or the repo-root `.env.local` and **never** from
+  `functions/.env.staging`, so no admin script can be aimed at staging today
+  without a small change. That is why AC-12 exists.
+- **D4 — date granularity.** *Still open, still hers.* She has not answered it, and
+  the readings change its shape rather than settle it: the source is **day-level
+  with real dates**, so the old option A ("one row per line item per month, dated
+  the 15th") is no longer the best available — a genuine per-day date is. The
+  remaining question for her is what to do with the days the source cannot date:
+  the 16 damaged December 2024 columns and the ~3 missing days in 2023. Options are
+  to drop them, park them on the month's last dated day, or fix them by hand in the
+  normalization sheet. The measured row count (~1,670 for both years) is now a fact
+  rather than an estimate, so the "will this slow the app" half of D4 is answered:
+  it will not.
+
+### No longer open
+
+- **Which source file per year** — moot. Both years are in one tab of one workbook.
+- **Aggregate rows interleaved with data rows** — false for this tab. The aggregates
+  are columns.
+- **Source access** — resolved; see above.
 
 
 ## Spec
 
-### Blocking precondition — source access
+> **Superseded in part by the spec gate's cycle-1 revise.** The captain's six
+> annotations and the source readings recorded under **Source: what is actually
+> there** above override this section wherever the two disagree. Specifically:
+> the blocking precondition below is cleared, D0/D1/D2 are answered, the
+> direct-parse design is displaced by the normalization sheet, and AC-2, AC-3,
+> AC-4 and AC-13 rest on premises the readings falsified. D3 and D4 survive
+> unchanged and still need the captain. The next spec cycle rewrites this
+> section; it is kept here so the revision has something to diff against.
 
-**This feature cannot enter `build` until the Google Drive connector reaches the account that owns the archive.** This is not a caveat on the 2023 question; it gates the whole feature. Every year in scope — 2024 included — is read from a workbook that is currently unreadable from this session. A build dispatched before this clears would have nothing to parse.
+### Blocking precondition — source access — CLEARED
 
-**What is broken, and the likely cause.** The connector in this session is signed in to the captain's **work** account. Reads of the 2024 workbook (`1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I`) return `Requested entity was not found`, and a title search returns only `infuseai.io` / `reccehq.com`-owned files. `060`'s spec report records that read access to both this workbook and the archive folder was confirmed "through the Google Drive connector on the captain's own account, which owns them" — so this worked in an earlier session against the same file ids. **That points at the connector's signed-in account having changed, not at the files moving or permissions being revoked.** The remedy is therefore a reconnection, not a re-share or a permissions hunt — see D0-A. The app's Firebase service account is not a second route; that workbook was never shared with it.
+**Resolved on 2026-08-31.** The captain shared the workbook with the staging
+service account, and read access was then verified rather than assumed:
+`spreadsheets.get` on `1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I` through
+`expense-tracker-staging@expense-sheet-staging.iam.gserviceaccount.com` returns the
+workbook and its nine tabs. `build` is no longer gated on access.
 
-**Exit condition.** This precondition clears when one agent has actually read tab `gid=0` and recorded, in this entity, the file id read, the tab's row-1 headers, and the distinct years found in it. That record is the input to AC-13. Until it exists, `build` waits.
+Two routes remain closed and should not be re-attempted: the Google Drive connector
+in this session still returns `Requested entity was not found` — the captain has
+confirmed the data is personal and unrelated to any work account, so there is no
+org-permissions route to chase — and the **production** service account
+`expense-sheet-functions@expense-sheet-b2db8...` returns `403 The caller does not
+have permission`. The read route is the staging service account and only that.
+
+The exit condition this precondition set has been met, against the correct tab: the
+file id, the tab structure, the column-label row and the distinct years found are
+all recorded under **Source: what is actually there**. Note that the exit condition
+named tab `gid=0`; that pointer was wrong. `gid=0` is a `P&L` tab. The source is
+`gid=1209807047`, titled `Daily`.
 
 ### Decisions needed from the captain
 
-Read these first. Each names the outcome at stake, then the ways to get there. None is resolved in this spec — approving the spec means picking one option per decision. Where a recommendation is given it is a recommendation, not a default that applies by silence.
+**Only D3 and D4 are still live.** D0, D1 and D2 were answered by the captain in the
+cycle-1 spec gate and are marked ANSWERED below rather than deleted, so the answer
+and the question it settles stay together. D3 and D4 keep their original form: she
+has not answered either, and D4 in particular is still needed.
 
-#### D0 — Does 2023 exist, and how do we look?
+#### D0 — Does 2023 exist, and how do we look? — ANSWERED
 
-**Outcome at stake:** whether this feature covers one year or two.
+**Outcome at stake:** whether this feature covers one year or two. **Answer: two.**
 
-**Status: unresolved, and blocked on access, not on judgment.** This spec was required to settle the question by inspecting tab `gid=0` of the 2024 workbook and could not — see the Blocking precondition above for the failure and its likely cause. The inspection was attempted directly, twice, against that exact file id; it was not skipped in favour of a prior recorded finding.
+The captain named the location directly — tab `gid=1209807047`, rows 31–58 — and
+that was then **confirmed by inspection, not taken on her word**: rows 33–58 are a
+complete 2023 band with 363 day columns spanning 2023-01-01 to 2023-12-31. The
+options below are all void: none of the four access remedies was needed, because the
+route turned out to be the staging service account she shared the sheet with.
 
-`060`'s recorded finding ("the archive holds no 2023 record") is **not** carried forward as settled — it was a finding about the archive *folder*, and the captain has since pointed at a *tab inside the 2024 workbook*. Those are different places. The question is genuinely open.
+The pointer in the original question was wrong in a way worth recording. It named
+tab `gid=0`; `gid=0` is a tab titled `P&L`. Every reference to `gid=0` in this
+entity has been corrected to `gid=1209807047`.
 
-- **A. Reconnect the Drive connector to the personal Google account** that owns the archive, then re-run the inspection before build starts. Cleanest; costs the captain one reconnection.
-- **B. Share the 2024 workbook with the currently-connected work account** (Viewer is enough). Fastest; puts a personal financial workbook into a work account's Drive.
-- **C. Captain pastes the structure of `gid=0`** — row-1 headers and the distinct column-A row-kind tags, structure only, no figures. Enough to settle the question without any access change.
-- **D. Ship 2024-only and treat 2023 as a follow-up.** Honest, but risks leaving on the table a year the captain explicitly asked for.
+`060`'s "the archive holds no 2023 record" finding is confirmed as inapplicable
+rather than merely uncarried: it was about the archive *folder*, and the 2023 data
+is inside a tab of a workbook in a different place.
 
-*Recommendation: A or C, resolved before build is dispatched.* Whichever is chosen, the inspection result is recorded in this entity before any write — that is AC-13, and it gates the import.
-
-#### D1 — How the 25 historical buckets land in the app's categories
+#### D1 — How the historical buckets land in the app's categories — ANSWERED
 
 **Outcome at stake:** whether a 2024 row is still recognisable as what it was, and whether the app's live Categories tab changes.
 
-The app stores one `category_id` per expense and validates it against the Categories tab on every write (`functions/src/index.ts`, `categoryIdError`). The historical records carry 25 top-level buckets over 61 sub-categories. There is no 1:1 mapping.
+**Captain: "we figure out the category first, we can leave gov_category later."**
+The four options collapse to that, and the readings shrink the problem twice over:
 
-- **A. Map onto the existing 24 categories only; anything unmappable becomes `other`.** No change to live config. But `other` swells, and the cross-year comparison the captain wants is blurred exactly where the interesting differences sit.
-- **B. Add new categories to the Categories tab for the unmapped buckets, marked `is_active: false`.** Full identity, and inactive categories stay out of the daily-entry picker. But it mutates a config both users share, and the History filter list grows.
-- **C. Map onto existing categories, and write the original bucket, sub-category and row-kind verbatim into each row's `notes`.** No live-config change at all; the original taxonomy stays recoverable. The History page already searches and displays `notes` (`app/app/history/page.tsx:86`, `:543`), so the historical bucket is searchable the day it lands.
-- **D. C, plus one new inactive category for buckets with genuinely no equivalent** — a hybrid if `other` turns out to swallow too much.
+- The premise "25 top-level buckets over 61 sub-categories" was wrong for this
+  source. The `Daily` tab carries **9 buckets over 17 sub-categories** plus a
+  free-text detail column.
+- `gov_category` needs no mapping at all. It is not a column on the Expenses tab —
+  `EXPENSES_SPEC` (`functions/src/sheetSchema.ts:19-22`) requires exactly eight
+  fields and `gov_category` is not among them. It is a property of a *category*
+  (`rowToCategory`, `functions/src/index.ts:192`), so choosing `category_id`
+  determines it. Deferring it costs nothing.
 
-*Recommendation: C, with D as the fallback if the dry-run shows more than ~15% of the year's total landing in `other`.*
+The app still stores one `category_id` per expense and validates it against the
+Categories tab on every write (`functions/src/index.ts`, `categoryIdError`), so the
+remaining job is a 9×17 mapping onto the 24 ids in `app/app/lib/categories.ts`.
+Following the `008` precedent the captain invoked in D2, that mapping uses the
+**existing** categories only, with `other` as the fallback and the source bucket,
+sub-category and detail label carried into `notes` — which the History page already
+searches and displays (`app/app/history/page.tsx:86`, `:543`). Spec writes the
+mapping table out in full; it is small enough to state exhaustively rather than
+describe.
 
-#### D2 — Rental-property flows and income rows
+#### D2 — Rental-property flows and income rows — ANSWERED
 
 **Outcome at stake:** whether every total the app shows still means "what the household spent".
 
-The source table interleaves income rows and rental-property pass-through flows with household expense rows, distinguished by the column-A row-kind tag.
+**Captain: "follow what we did for 2026."** Read from the code rather than assumed,
+that precedent is entity `008` / `scripts/migrate-2025.js`, recorded at
+`workflow/_archive/data-migration.md`. Concretely it mapped every source bucket onto
+the existing 24 category ids, sent the one rental-adjacent bucket `其他/房客`
+(tenant) to `other` as an **ordinary expense row** with no flag and no exclusion
+(`data-migration.md:136`), and never faced an income row at all. The full precedent
+is set out under **Plan → Settled by the captain**, including the one part of it not
+to copy: `008`'s row ids were not idempotent and it says so.
 
-- **A. Exclude both.** App totals stay directly comparable to today's usage. The rental and income record simply is not in the app.
-- **B. Import all expense-side rows including rental-property; exclude income.** Rental-property cost then inflates every Reports figure with no way to subtract it.
-- **C. Exclude income; import rental-property rows with their row-kind stamped in `notes`.** They are present and identifiable, but they still land in the same totals — the app has no concept of a row that is excluded from a sum.
-- **D. Import income as negative amounts.** *Not recommended and stated only to close it off:* the app sums `amount` with no sign handling anywhere (`app/app/lib/reportService.ts`), so this silently corrupts every monthly and annual total.
+The premise of the original question was also wrong. The source does **not**
+interleave income rows and rental pass-throughs distinguished by a column-A
+row-kind tag:
 
-*Recommendation: A for income — the app has no income model at all (the Expenses tab has `amount` and no type or sign column), so any import of it is a distortion dressed as data. C for rental-property, if the captain wants those rows visible; A if the priority is that the app's totals mean household spending and nothing else.*
+- Column A has two values across the whole tab — the band-header literal and
+  `非固定支出`. **There are no income rows in this tab.** Income sits in a separate
+  `Income` tab that is out of scope. So option D's danger — the app sums `amount`
+  with no sign handling anywhere (`app/app/lib/reportService.ts`) — is real but
+  moot: there is nothing to import with a sign.
+- Rental-property rows are identified by the **column-D detail label** on
+  `住/家具設備` and `住/住家維修` rows, about 8 rows per band. Following `008`, they
+  land as ordinary expense rows with that label preserved in `notes`.
 
 #### D3 — Undo, blast radius, and whether staging goes first
 
@@ -197,21 +455,40 @@ Undo mechanism:
 
 *Recommendation: A + U3. The undo is exercised on staging before production is touched (AC-6), so "reversible" is a demonstrated fact rather than a claim in a report.*
 
-#### D4 — Date granularity, and how many rows this adds
+#### D4 — Date granularity, and how many rows this adds — STILL OPEN, STILL NEEDS THE CAPTAIN
 
-**Outcome at stake:** whether the app stays fast, and whether a monthly figure can masquerade as a real transaction date.
+**Outcome at stake:** whether a synthetic date can masquerade as a real transaction date. **She has not answered this one.**
 
-The source is an annual matrix: one row per line item, twelve monthly columns. The app stores a day-level `date` and filters reports by `date.startsWith(year)` and `YYYY-MM`. There is no pagination anywhere — `GET /api` returns every expense and the client sorts and filters the whole list (`app/app/lib/historyService.ts`, `app/app/history/page.tsx`).
+Its premise has changed and its options are re-cut accordingly, but the decision is
+untouched and still hers. The source is **not** an annual matrix of twelve monthly
+columns — it is a day-level matrix carrying a real date per column. The app stores a
+day-level `date` and filters reports by `date.startsWith(year)` and `YYYY-MM`. There
+is no pagination anywhere — `GET /api` returns every expense and the client sorts and
+filters the whole list (`app/app/lib/historyService.ts`, `app/app/history/page.tsx`).
 
-- **A. One row per line item per month that has an amount, dated the 15th.** Monthly and annual reports both work. Mid-month avoids month-boundary and timezone edges, and reads less like a real transaction than the 1st (which also collides visually with subscription auto-entries). Upper bound ≈118 line items × 12 ≈ 1,400 rows per year, less blanks.
-- **B. Same, dated the 1st.** Same row count; more likely to be mistaken for a real entry.
-- **C. One row per line item per year, dated 31 December.** ≈118 rows per year. Annual reports correct, monthly reports wrong — every historical month except December shows zero.
+The "will this slow the app" half is now answered by measurement rather than
+estimate: **~1,670 rows for both years combined**, not ~1,400 per year. That is small.
+What is left is genuinely a judgement call, on the days the source cannot date — the
+16 damaged December 2024 columns and the ~3 missing days in 2023:
 
-*Recommendation: A, with the exact row count reported from `--dry-run` before any write so the size is a known number, not a surprise. If the dry-run count is large enough to slow the app noticeably, that is a finding to bring back to the captain, not something the build silently works around.*
+- **A. Use the source's real per-day date, and hand-correct the undated days in the
+  normalization sheet.** Highest fidelity; every row is a real date the captain
+  stands behind. Costs her a short pass over ~19 cells.
+- **B. Use the real date where there is one; park the undated ones on the last dated
+  day of their month.** No manual work. Those rows then carry a date that looks real
+  and is not — the exact failure mode this decision exists to prevent, confined to
+  ~19 rows.
+- **C. Use the real date where there is one; drop the undated rows and report the
+  count.** Honest and cheap; loses a fraction of December 2024.
+
+*Recommendation: A. The manual pass is small, it happens in the normalization sheet
+the captain has already asked for, and it is the only option where every date in the
+app is a date that was actually recorded. C is the acceptable fallback if she would
+rather not spend the time; B is not recommended.*
 
 ### Goal
 
-Land the captain's 2024 — and 2023 if `gid=0` proves it exists — historical expense records as ordinary rows in the app's Expenses tab, reversibly and without touching a single existing row, so those years appear in Reports alongside everyday data.
+Land the captain's 2023 and 2024 historical expense records — both confirmed present in tab `gid=1209807047` — as ordinary rows in the app's Expenses tab, reversibly and without touching a single existing row, so those years appear in Reports alongside everyday data. The rows reach the app by way of a normalization sheet the captain reviews first.
 
 ### User Stories
 
@@ -222,18 +499,22 @@ Land the captain's 2024 — and 2023 if `gid=0` proves it exists — historical 
 
 ### Edge Cases
 
-- **2023 may have no record at all.** A missing year is a gap to report, never a zero. If `gid=0` holds no 2023 rows, the import covers 2024 only and the stage report says so in as many words.
-- **Aggregate rows sit in the same columns as data rows.** Section totals and per-kind subtotals must be filtered out by the column-A row-kind tag. Importing them roughly doubles the year — this is what AC-2's 1% reconciliation catches.
-- **Rows with a blank column-A tag.** Neither data nor a recognised aggregate. Skipped and counted, never guessed at; the dry-run reports the count so an unexpected number is visible before the write.
-- **Blank month cells.** A blank may mean nothing was spent or nothing was logged. Blank and zero are both skipped — no zero-amount row is ever written, because a zero row is indistinguishable from a real free month once it is in the app.
-- **Amounts formatted as strings.** Thousands separators and occasional currency prefixes. A value that fails to parse aborts the run with the source cell reference; it never silently becomes 0.
+- ~~**2023 may have no record at all.**~~ **Closed.** 2023 is present, rows 33–58 of tab `gid=1209807047`, with 363 day columns spanning the full year. There is no 2024-only fallback to carry.
+- ~~**Aggregate rows sit in the same columns as data rows.**~~ **Wrong shape, replaced.** All 78 data rows in the tab are real line items; there are no aggregate *rows*. The aggregates are **columns** — twelve month-total columns per band, each sitting immediately before its month's day columns. A parser that walks columns indiscriminately therefore double-counts every month. The discriminator is the column-label row (`品名`/`金額` marks a day column; a month-total column's label cell is neither), not the column-A tag.
+- **The workbook disagrees with itself.** Only ~88% of populated row-month cells match the sum of their own day cells within 1%, and the mismatches cluster in October in both years. Any acceptance criterion that reconciles the import against the workbook's own totals will fail on the source rather than on the parser. The reconciliation target has to be the normalization sheet the captain has signed off, with the source-vs-source discrepancies surfaced to her there.
+- **December 2024's day headers are damaged.** They stop at 2024-12-16 and repeat 15 dates in early December; 16 calendar days of 2024 have no column at all. 2023 is nearly clean by comparison — 3 missing days, no duplicates. This is the concrete case D4 now turns on.
+- ~~**Rows with a blank column-A tag.**~~ **Does not occur.** Column A is `非固定支出` on every one of the 78 data rows.
+- **Blank day cells.** The overwhelming majority. A blank means no spending was logged that day for that line item; no row is written. No zero-valued amount cell exists in either band in scope, so there is nothing to disambiguate.
+- **Amounts stored as text.** 10 cells in 2024 and 47 in 2023 are strings rather than numbers. Measured, they are plain digit strings — no thousands separators, no currency prefix — so `Number(String(v).trim())` parses them. The trap is the opposite of the one previously feared: a parser that accepts only `typeof v === "number"` silently drops 47 real 2023 amounts rather than failing loudly. Any value that genuinely fails to parse aborts the run with the source cell reference; it never silently becomes 0.
+- **Item names are mostly absent.** Only ~7% of populated day cells carry a `品名`. `notes` is therefore assembled mainly from the bucket, sub-category and detail columns, with the item name appended when present.
 - **Uncategorised line items.** An amount with a blank bucket goes to an explicit bucket, is visible in the totals, and is counted in the dry-run — never dropped.
 - **Two users logging expenses while the import runs.** Rows are inserted at the top and shift every row index below them. Every check keys on the row `id`, never on a row index, so a concurrent manual add cannot be mistaken for an imported row or vice versa.
 - **A batch fails halfway.** `PartialWriteError` carries the ids already written; `--undo` removes exactly those. The run is then re-runnable from clean.
 - **The import is run twice.** Deterministic ids mean the second run finds every id already present and writes nothing (AC-5).
 - **Sheets API write quota.** Batches of 50, matching the existing backfill script's `WRITE_BATCH_SIZE`.
-- **Duplicate, template, and legacy `.xls` variants of a year.** Pick rule: the native Google Sheet whose title is exactly the year, owned by the captain, most recently modified; templates and drafts are excluded by name and the excluded file ids are listed in the stage report. This feature reads at most two source files, so the rule is stated and applied by hand rather than automated.
-- **The app has no income concept.** There is no sign or type column on the Expenses tab, so an income row cannot be represented without corrupting a sum. This is why D2 exists.
+- ~~**Duplicate, template, and legacy `.xls` variants of a year.**~~ **Moot.** Both years in scope are bands inside one tab of one workbook. There is no file to pick.
+- **2022 sits in the same tab.** Rows 63–88 are a complete 2022 band. The extractor reads bands by row range and must not sweep it in; a band-boundary off-by-one imports a year that is out of scope and belongs to `060`.
+- **The app has no income concept, and does not need one here.** There is no sign or type column on the Expenses tab, so an income row could not be represented without corrupting a sum — but the `Daily` tab contains no income rows. Income is a separate tab, out of scope. The hazard is real and unexercised.
 
 ### Out of Scope
 
@@ -247,19 +528,21 @@ Land the captain's 2024 — and 2023 if `gid=0` proves it exists — historical 
 
 ## Acceptance criteria
 
-Verification split: **offline** — AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-9, AC-10, AC-11, AC-12, AC-13. **Interactive** — AC-7, AC-8. No harness is built to automate AC-7 or AC-8; both are judged on a live drive of the deployed app.
+Verification split: **offline** — AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-9, AC-10, AC-11, AC-12, AC-13, AC-14. **Interactive** — AC-7, AC-8. No harness is built to automate AC-7 or AC-8; both are judged on a live drive of the deployed app.
+
+**Status after the cycle-1 revise:** AC-13 is satisfied at ideation. AC-2, AC-3 and AC-4 rest on premises the source readings falsified and are marked for recutting — see each. AC-14 is new. AC-1, AC-5, AC-6, AC-7, AC-8, AC-9, AC-10, AC-11 and AC-12 are unaffected and carry forward as written.
 
 **AC-1 — No pre-existing expense row was altered or deleted by the import.**
 Verified by: offline — the script's `--snapshot` writes the full Expenses tab before the run; `--verify` diffs it against the post-import tab and reports `0 modified, 0 deleted` among rows whose id does not begin `exp-hist-`. Falsified by: changing the writer from row-insertion to an in-place `values.update` over existing rows — the diff then reports modified rows and the check fails.
 
-**AC-2 — Each imported year's total reconciles to the workbook's own annual expense total for that year within 1%.**
-Verified by: offline — `--verify` prints computed total, source total, and variance for each year; the run fails on variance above 1%. Falsified by: removing the column-A row-kind filter so aggregate rows are summed — the computed total roughly doubles and the check fails.
+**AC-2 — Each imported year's total reconciles to the workbook's own annual expense total for that year within 1%.** — **PREMISE FALSIFIED; spec must recut this.**
+The workbook does not reconcile to itself: only ~88% of populated row-month cells match the sum of their own day cells within 1%. This criterion as written would fail on the source's inconsistency rather than on any parser defect, which makes it unfalsifiable evidence — it cannot distinguish a correct import from a broken one. The replacement should reconcile the app against the **normalization sheet the captain has approved**, and separately *report* the source-vs-source discrepancies to her rather than gating on them. *Original text, kept for the diff: Verified by: offline — `--verify` prints computed total, source total, and variance for each year; the run fails on variance above 1%. Falsified by: removing the column-A row-kind filter so aggregate rows are summed.*
 
-**AC-3 — No aggregate or untagged source row became an expense in the app.**
-Verified by: offline — `--dry-run` prints source rows classified per column-A tag beside the planned write count, and the two agree exactly. Falsified by: accepting rows with a blank column-A tag, which makes the planned count exceed the classified count.
+**AC-3 — No aggregate or untagged source row became an expense in the app.** — **PREMISE FALSIFIED; spec must recut this.**
+There are no aggregate rows and no untagged rows: column A is `非固定支出` on all 78 data rows. The real double-counting hazard is columnar — the twelve month-total columns per band — so the property worth asserting is that **no month-total column contributed an expense row**, discriminated on the column-label row (`品名`/`金額`), not on the column-A tag. A useful falsifying edit would be accepting any column from F onward regardless of its label cell, which roughly doubles the planned count.
 
-**AC-4 — Income-side source rows are absent from the app after the import.**
-Verified by: offline — `--verify` asserts zero imported rows trace to an income-side bucket, listing the income buckets it excluded. Falsified by: dropping the income-bucket exclusion, which makes the assertion report a non-zero count.
+**AC-4 — Income-side source rows are absent from the app after the import.** — **VACUOUS AS WRITTEN; spec should recut or drop.**
+The `Daily` tab contains no income rows, so an assertion that zero imported rows trace to an income bucket passes without the exclusion logic existing at all — the named falsifying edit ("dropping the income-bucket exclusion") would not change the result. If the property is worth keeping, it should assert instead that **the extractor read only rows 3–28 and 33–58 of tab `gid=1209807047`** — falsified by widening the band ranges, which pulls in the out-of-scope 2022 band at rows 63–88.
 
 **AC-5 — Running the import a second time writes nothing.**
 Verified by: offline — a second `--apply` against the same target reports `created: 0` with every candidate skipped as already present. Falsified by: generating row ids from `Date.now()` instead of the deterministic `exp-hist-{year}-{NNNN}` — the second run then writes a full duplicate set.
@@ -285,18 +568,25 @@ Verified by: offline — the generated import plan is written under the already-
 **AC-12 — The import refuses to run without an explicit target.**
 Verified by: offline — invoking the script with no `--target` exits non-zero, writes nothing, and the Expenses row count is unchanged. Falsified by: falling back to `load-local-env.js`'s resolved `SPREADSHEET_ID`, which today silently resolves to production.
 
-**AC-13 — Whether 2023 has a record is settled by inspecting tab `gid=0`, and recorded before any write.**
-Verified by: offline — the build stage report names the file id read, the tab's row-1 headers, and the distinct years found in it; `--dry-run`'s per-year counts agree with that finding, and if no 2023 rows were found the shipped scope is 2024 only. Falsified by: an import plan containing 2023 rows that the `gid=0` inspection did not find.
+**AC-13 — Whether 2023 has a record is settled by inspecting tab `gid=1209807047`, and recorded before any write.** — **SATISFIED at ideation.**
+The inspection happened and is recorded under **Source: what is actually there**: file id `1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I`, tab `gid=1209807047` titled `Daily`, read through the staging service account; the column-label row is `收入支出 | 項目大類 | 項目分類 | 細項說明 | 備註` followed by month-total and `品名`/`金額` day-column pairs; the distinct years found are **2024, 2023 and 2022**, as three stacked bands. 2023 exists, so the 2024-only fallback is void. The original criterion named tab `gid=0`, which is a `P&L` tab and not the source. Falsified by: an import plan whose rows do not come from row ranges 3–28 and 33–58 of that tab.
+
+**AC-14 — The captain approved the normalization sheet before any row was written to the app.** — *new, replacing AC-13's gating role.*
+Verified by: offline — the import refuses to run unless the normalization sheet it reads carries the captain's sign-off marker, and the stage report names the sheet and the approved revision. Falsified by: letting the import read the extractor's output directly instead of the approved sheet, which lets a re-generate silently discard her corrections to the December 2024 dates.
 
 ## Risk evidence
 
-**Riskiest unverified mechanism: reading the source workbook at all.** Exercising it failed. Both Drive-connector reads of file id `1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I` returned `Requested entity was not found`; a title search returned only work-account files, confirming the connector is authenticated to the wrong Google account. A service-account route was also attempted and is not viable — the workbook was never shared with `expense-sheet-functions@…`. Because `060` read these same file ids successfully from the captain's own account, the cause is almost certainly the connector's signed-in account rather than the files or their permissions, which makes reconnection the remedy. **This is the one thing that must be resolved before build is dispatched** — it is a stated blocking precondition at the head of the Spec, not a decision among others. Every other mechanism in this feature is already proven.
+**Reading the source workbook — was the riskiest mechanism, now exercised and proven.** The captain shared the workbook with the staging service account, and reading it through `expense-tracker-staging@expense-sheet-staging...` succeeded: nine tabs enumerated, the `Daily` tab's structure mapped, all three year bands located, and every count in **Source: what is actually there** taken from live reads. The prior diagnosis was half right — the Drive connector is authenticated to the wrong account and still returns `Requested entity was not found` — but its proposed remedy was wrong: reconnection was never needed. Note the account that works is the **staging** service account, not the production one, which returns `403 The caller does not have permission`. An admin script that resolves its credentials through `load-local-env.js` picks up the **production** key from `.env.local` and will therefore fail to read the source at all. That is a second, independent reason AC-12's explicit `--target` matters.
+
+**Riskiest remaining mechanism: trusting the source's own totals.** Exercised, and it does not hold. Reconciling every populated row-month cell against the sum of its own day cells gives 88.1% agreement within 1% for 2024 and 88.9% for 2023, clustered in October. Combined with December 2024's duplicated and truncated day headers, this means **the source cannot serve as its own correctness oracle** — which is the strongest argument for the captain's normalization sheet, and the reason AC-2 as written is unfalsifiable and must be recut.
 
 **Second risk: the bulk write. No spike needed** — the mechanism is already proven on this exact sheet by `functions/scripts/backfill-subscription-history.js` (entity 051): deterministic ids (`autoExpenseId`, `functions/src/scheduler.ts:87`), `--analyze`/`--dry-run`/`--apply` phases, batched all-or-nothing `insertDimension`+`updateCells` (`insertRowsAtTop`), skip-if-id-present idempotency, and `PartialWriteError` carrying already-written ids. This feature reuses that shape rather than inventing one.
 
 **Verified blast-radius fact:** `functions/scripts/load-local-env.js` resolves `SPREADSHEET_ID` from `functions/.env` or the repo-root `.env.local`, and never from `functions/.env.staging` — so an admin script inherits a target rather than being given one, and cannot be aimed at staging at all. AC-12 and D3-A exist because of this.
 
 ## Expected surface and tolerance
+
+> **Stale after the cycle-1 revise.** This estimate assumes a single script that parses the source and writes to the app. The normalization sheet splits that into two phases — extract-to-sheet and import-from-sheet — with a captain approval between them, so the file list and the LOC below both need redoing. The direction of the change is a little more code, not less: the parser does not go away, and a sheet writer plus an approval check are added.
 
 Estimate: **+700 net LOC across 4 files, tolerance ±30%.**
 
@@ -343,3 +633,22 @@ The mandated gid=0 inspection could not be done: the Drive connector in this ses
 Everything else is written in full. The four captain decisions (D0 taxonomy access, D1 category mapping, D2 rental/income, D3 undo and blast radius) are presented as options with recommendations, plus a fourth the checklist did not name but that materially changes the deliverable: D4, date granularity, where the choice is between roughly 1,400 rows per year with working monthly reports and roughly 118 with broken ones, in an app that has no pagination anywhere.
 
 The spec's spine is an existing precedent rather than a new design: `functions/scripts/backfill-subscription-history.js` already performs a safe bulk write against this exact sheet, so the mechanism is proven and only the source parsing is new. The one genuinely new finding is a blast-radius one — `load-local-env.js` resolves an admin script's spreadsheet target from the deploy env files and never from `functions/.env.staging`, meaning a migration script inherits its target instead of being told it. AC-12 makes refusing to run without an explicit `--target` a shipped property.
+
+## Stage Report: ideation (cycle 2)
+
+- DONE: Verify the staging service account can actually read spreadsheet 1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I now that the captain has shared it, and record what you observe; if the read still fails, say so plainly rather than assuming the share resolved it.
+  It reads. `spreadsheets.get` through `expense-tracker-staging@expense-sheet-staging.iam.gserviceaccount.com` (creds already in `functions/.env.staging`) returns the workbook `ijacwei_income收支 (archived)` and all nine tabs. Two negative controls run in the same probe: the Drive connector still returns `Requested entity was not found`, and the **production** service account returns `403 The caller does not have permission` — so the working route is specifically the staging account, which matters because `load-local-env.js` resolves the production key.
+- DONE: Read tab gid=1209807047 rows 31-58 and record structurally what is there (row-1 headers, the column-A row-kind tags present, and the distinct years found), settling the 2023 question by inspection rather than on the captain's word alone, and correct every reference that names tab gid=0.
+  2023 exists — confirmed, not accepted on her word. Tab `gid=1209807047` is titled `Daily`, 1061x749. Row 31 is a date-header row whose first cells are `Jan 2023`, `Sun, 1/1/ 2023`…; row 32 is the column-label row `收入支出 | 項目大類 | 項目分類 | 細項說明 | 備註` then month-total and `品名`/`金額` day pairs; rows 33-58 are 26 data rows. Column A holds two values tab-wide (`收入支出` band header x3, `非固定支出` x78) — not the four row-kinds assumed. Distinct years: **2024, 2023, 2022** as three stacked bands (rows 3-28 / 33-58 / 63-88). `gid=0` is a `P&L` tab, not the source; corrected at the Goal, the blocking precondition, D0, the edge cases and AC-13. Recorded in full under `## Source: what is actually there`.
+- DONE: Fold captain annotations A1-A6 into the ideation body so scope reflects them, and state plainly whether the proposed intermediate normalization sheet replaces the direct-parse design and what that does to scope, or argue against it with a concrete reason.
+  A1 tab pointer corrected everywhere and 2023 confirmed; A2 answered under Plan and D1 — and `gov_category` turns out to need no mapping at all, since it is not an Expenses column (`sheetSchema.ts:19-22`, `rowToExpense` at `index.ts:156-165`) but a Categories property (`rowToCategory`, `index.ts:192`); A3 answered by reading the `008`/`migrate-2025.js` precedent at `workflow/_archive/data-migration.md` and stating it concretely rather than copying "follow 2026" forward; A4 **accepted** with the scope effect stated plainly — it does *not* replace the parser, it relocates the parser's output to a place the captain can correct, so net scope is up not down, and it raises a new question about whether her edits survive a re-generate; A5 blocking-precondition section rewritten against the observed read; A6 folded into Out of Scope and the risk section.
+- DONE: Preserve uncontested prior work and carry D4 date granularity forward as still-open and still needing the captain, since she has not answered it.
+  051 precedent, the `load-local-env.js` blast-radius finding, AC-12, D3 and AC-1/5/6/7/8/9/10/11/12 all carried unchanged. D4 kept open and marked STILL NEEDS THE CAPTAIN; its premise changed (the source is day-level with real dates, not a monthly matrix) so its options are re-cut against the real question — what to do with the ~19 days the source cannot date — but the decision is not made for her.
+
+### Summary
+
+Access is resolved and the source is nothing like what this entity previously described. It is one tab, `Daily` (`gid=1209807047`), holding 2024, 2023 and 2022 as three stacked 26-row bands, each a **day-level** matrix of `品名`/`金額` column pairs with twelve month-total columns interleaved. The taxonomy is 9 buckets over 17 sub-categories, not 25 over 61; there are no income rows and no aggregate rows; rental property lives in a free-text detail column. Measured import size is ~1,670 rows for both years together, which retires the pagination worry.
+
+Two findings change what the spec can promise. December 2024's day headers are duplicated and truncated at 12-16, leaving 16 undated days; and the workbook does not reconcile against itself — only ~88% of populated row-month cells match the sum of their own day cells, clustered in October in both years. Together these make AC-2 unfalsifiable as written and are the concrete reason the captain's normalization sheet is the right approach: the source cannot be its own correctness oracle, so a human-reviewed intermediate is where those get settled. AC-3 and AC-4 were also written against premises that turned out false and are marked for recutting; AC-13 is satisfied here; AC-14 is proposed to carry its gating role.
+
+Caveat on reproducibility: the five probe scripts live in the gitignored `functions/backfill-reports/061-probe/` and need `functions/.env.staging`, so they are not runnable from a fresh clone. They print structure and counts only — no amounts, item names or detail labels — which is deliberate under AC-11, this being personal financial data in a public repo. Build should promote the extraction logic into a committed script with fixtures rather than depend on these.
