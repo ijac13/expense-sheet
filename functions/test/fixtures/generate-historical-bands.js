@@ -10,10 +10,11 @@ const serial = (iso) => {
   return (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000;
 };
 
-const OUT = path.resolve(
-  "/Users/ijac/Claude-ijac/expense-sheet/.worktrees/spacedock-ensign-061-migrate-2023-2024-into-app",
-  "functions/test/fixtures/historical-bands.json"
-);
+// Regenerate with: node functions/test/fixtures/generate-historical-bands.js
+// The committed JSON is the fixture the suite reads; this script is how the date
+// serials in it were computed, kept so a later change to the fixture's shape does
+// not mean hand-editing serials.
+const OUT = path.join(__dirname, "historical-bands.json");
 
 // Column plan, 0-indexed. Two months instead of twelve; three data rows instead of
 // twenty-six. Every structural quirk the live tab actually has is present.
