@@ -1270,3 +1270,71 @@ test("new ids continue from staging's own highest cat_NNN, so they cannot collid
   assert.deepEqual(syncCategories.nextCategoryIds(STAGING_CATEGORIES.map((r) => ({ id: r[0] })), 3), ["cat_026", "cat_027", "cat_028"]);
   assert.deepEqual(syncCategories.nextCategoryIds([{ id: "cat_009" }, { id: "legacy-slug" }], 2), ["cat_010", "cat_011"]);
 });
+
+test("AC-18 strengthened: a hand edit AFTER the rehearsal is caught, which the C1 digest alone cannot see", async () => {
+  // The hole this closes. `C1` is stamped by the EXTRACTOR, so it does not move when
+  // the captain corrects a date or an amount by hand. A receipt bound to C1 alone
+  // still matches after she edited three rows, and production imports content nobody
+  // rehearsed. The receipt therefore carries a second digest over the rows as read.
+  const generated = normalizationTab({ approved: true });
+  const edited = normalizationTab({ approved: true, edits: { "2024-r3-cH": { amount: "77" } } });
+
+  assert.equal(edited.digest, generated.digest, "the generation digest is BLIND to her edit — that is the hole");
+
+  const receipt = tmpFile("receipt.json");
+  const rehearsalWorld = makeWorld({ normalization: generated });
+  await importRun(rehearsalWorld, [
+    "--rehearse", "--target", "staging", "--from-sheet", NORMALIZATION_TAB,
+    "--snapshot-file", tmpFile("s.json"), "--receipt", receipt, "--hand-add-id", "manual",
+  ]);
+  const written = JSON.parse(fs.readFileSync(receipt, "utf8"));
+  assert.equal(written.approvedAtRehearsal, true);
+  assert.ok(written.contentDigest, "the receipt must record what it actually rehearsed");
+
+  // Now she edits a row and someone tries production. The generation digest matches;
+  // the content digest does not.
+  const editedWorld = makeWorld({ normalization: edited });
+  const before = expenseIds(editedWorld.production).length;
+  await assert.rejects(
+    importRun(editedWorld, [
+      "--apply", "--target", "production", "--from-sheet", NORMALIZATION_TAB,
+      "--receipt", receipt, "--snapshot-file", tmpFile("s.json"),
+    ]),
+    (err) => err instanceof ImportError && /CONTENT changed after/.test(err.message)
+  );
+  assert.equal(expenseIds(editedWorld.production).length, before, "nothing reaches production");
+
+  // And the unedited sheet passes the same gate, so the guard is discriminating
+  // rather than simply always refusing.
+  const cleanWorld = makeWorld({ normalization: generated });
+  const accepted = assertRehearsed(receipt, {
+    fromSheet: NORMALIZATION_TAB,
+    digest: generated.digest,
+    contentDigest: importer.contentDigest(parseSheetGrid([generated.header, ...generated.rows]).rows),
+  });
+  assert.equal(accepted.rowCount, 19);
+  assert.equal(cleanWorld.digest, generated.digest);
+});
+
+test("--rehearse proceeds on an unapproved sheet and records that it was unapproved", async () => {
+  // The rehearsal is what produces the evidence she reads BEFORE approving, so it
+  // cannot require her approval. It writes only to staging and restores it.
+  const world = makeWorld({ normalization: normalizationTab({ approved: false }) });
+  const receipt = tmpFile("r.json");
+  await importRun(world, [
+    "--rehearse", "--target", "staging", "--from-sheet", NORMALIZATION_TAB,
+    "--snapshot-file", tmpFile("s.json"), "--receipt", receipt, "--hand-add-id", "manual",
+  ]);
+  assert.equal(JSON.parse(fs.readFileSync(receipt, "utf8")).approvedAtRehearsal, false);
+  assert.deepEqual(expenseIds(world.staging), ["exp-001", "exp-002"], "staging restored");
+
+  // AC-14 still holds independently: production refuses on B1 whatever the receipt says.
+  await assert.rejects(
+    importRun(world, [
+      "--apply", "--target", "production", "--from-sheet", NORMALIZATION_TAB,
+      "--receipt", receipt, "--snapshot-file", tmpFile("s.json"),
+    ]),
+    (err) => err instanceof ImportError && /is not approved/.test(err.message)
+  );
+  assert.equal(importedIds(world.production).length, 0);
+});

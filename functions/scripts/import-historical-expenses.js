@@ -465,18 +465,37 @@ function candidateRow(candidate, expensesMap, categoryId) {
 }
 
 /**
- * The staging rehearsal's receipt (AC-18).
+ * A digest over the rows AS READ, including the captain's hand corrections.
  *
- * It records the DIGEST of the generation it rehearsed, not merely that a rehearsal
- * happened. Checking only for a receipt's existence would let a stale one from an
- * earlier rehearsal satisfy the gate while production imported a sheet nobody had
- * ever rehearsed.
+ * AC-18 names the sheet's `C1` digest, and that digest is stamped by the extractor —
+ * so it does NOT change when she edits a date or an amount by hand. A receipt bound
+ * to `C1` alone would therefore still match after she corrected three rows, and
+ * production would import a sheet whose content nobody had rehearsed. This second
+ * digest closes that: the receipt carries both, and both must match.
+ *
+ * Recorded as a finding rather than smuggled in — see the stage report.
  */
-function receiptFor({ target, fromSheet, digest, rowCount, undoResult, at }) {
-  return { entity: "061", target, fromSheet, digest, rowCount, undoResult, at };
+function contentDigest(rows) {
+  const canonical = rows
+    .map((r) => [r.key, r.date, r.amount, r.category_name_en, r.status].map((v) => text(v)).join(""))
+    .sort()
+    .join("\n");
+  return crypto.createHash("sha256").update(canonical, "utf8").digest("hex").slice(0, 32);
 }
 
-function assertRehearsed(receiptPath, { fromSheet, digest }) {
+/**
+ * The staging rehearsal's receipt (AC-18).
+ *
+ * It records the DIGEST of what it rehearsed, not merely that a rehearsal happened.
+ * Checking only for a receipt's existence would let a stale one from an earlier
+ * rehearsal satisfy the gate while production imported a sheet nobody had ever
+ * rehearsed.
+ */
+function receiptFor({ target, fromSheet, digest, contentDigest: content, rowCount, undoResult, approvedAtRehearsal, at }) {
+  return { entity: "061", target, fromSheet, digest, contentDigest: content, rowCount, undoResult, approvedAtRehearsal, at };
+}
+
+function assertRehearsed(receiptPath, { fromSheet, digest, contentDigest: content }) {
   if (!fs.existsSync(receiptPath)) {
     throw new ImportError(
       `No staging-rehearsal receipt at ${receiptPath}. A production import is only ` +
@@ -496,9 +515,17 @@ function assertRehearsed(receiptPath, { fromSheet, digest }) {
   }
   if (receipt.digest !== digest) {
     throw new ImportError(
-      `Receipt at ${receiptPath} rehearsed digest ${receipt.digest}, but ${JSON.stringify(fromSheet)} now ` +
-      `carries digest ${digest}. The sheet about to be imported is NOT the one that was rehearsed. ` +
-      `Re-run the staging rehearsal against this generation.`
+      `Receipt at ${receiptPath} rehearsed generation digest ${receipt.digest}, but ` +
+      `${JSON.stringify(fromSheet)} now carries ${digest}. The sheet about to be imported is NOT the ` +
+      `one that was rehearsed. Re-run the staging rehearsal against this generation.`
+    );
+  }
+  if (content !== undefined && receipt.contentDigest !== content) {
+    throw new ImportError(
+      `Receipt at ${receiptPath} rehearsed content digest ${receipt.contentDigest}, but ` +
+      `${JSON.stringify(fromSheet)}'s rows now hash to ${content}. The sheet's CONTENT changed after ` +
+      `the rehearsal — a hand correction to a date, an amount, a category or a status. The generation ` +
+      `digest cannot see that, which is why this second one exists. Re-run the staging rehearsal.`
     );
   }
   return receipt;
@@ -684,10 +711,22 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
   }
 
   const approvedSheet = await readApprovedSheet(readSheets, targets.read.spreadsheetId, args.fromSheet, {
-    // A dry-run is allowed to report on a sheet she has not signed yet — that is how
-    // she sees what it would write before approving it. It writes nothing.
-    requireApproval: phase !== "dry-run",
+    // Two phases run before she has signed anything, by design:
+    //   --dry-run  is how she sees what the import WOULD write before approving it;
+    //   --rehearse is how the evidence she needs in order to approve gets produced.
+    // Both are safe to allow: the dry-run writes nothing at all, and the rehearsal
+    // writes only to STAGING and restores it byte-for-byte. AC-14's gate is on the
+    // app of record, and `--target production --apply` still refuses without
+    // `B1 == APPROVED` whatever any receipt says.
+    requireApproval: phase !== "dry-run" && phase !== "rehearse",
   });
+  if (phase === "rehearse" && approvedSheet.control.approval !== APPROVAL_MARKER) {
+    log(
+      `[rehearse] NOTE: B1 is ${JSON.stringify(approvedSheet.control.approval)}, not ${APPROVAL_MARKER}. ` +
+      `Rehearsing an unapproved sheet is expected — the rehearsal is what she reads before approving. ` +
+      `The receipt records this, and a production import still refuses until B1 says ${APPROVAL_MARKER}.`
+    );
+  }
   const plan = planImport(approvedSheet.rows);
 
   log(
@@ -779,6 +818,7 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
       const receipt = assertRehearsed(args.receipt, {
         fromSheet: args.fromSheet,
         digest: approvedSheet.control.digest,
+        contentDigest: contentDigest(approvedSheet.rows),
       });
       log(`[apply] staging rehearsal receipt accepted: ${receipt.rowCount} rows, digest ${receipt.digest}`);
     }
@@ -924,8 +964,10 @@ async function rehearse({ args, targets, writeSheets, approvedSheet, plan, rows,
     target: "staging",
     fromSheet: args.fromSheet,
     digest: approvedSheet.control.digest,
+    contentDigest: contentDigest(approvedSheet.rows),
     rowCount: writtenIds.length,
     undoResult,
+    approvedAtRehearsal: approvedSheet.control.approval === APPROVAL_MARKER,
     at: now().toISOString(),
   });
   fs.mkdirSync(path.dirname(args.receipt), { recursive: true });
@@ -973,6 +1015,7 @@ module.exports = {
   readExpenses,
   candidateRow,
   receiptFor,
+  contentDigest,
   assertRehearsed,
   verifyAgainst,
   deleteRowsByIdPrefix,
