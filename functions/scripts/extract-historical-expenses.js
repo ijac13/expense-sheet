@@ -924,9 +924,16 @@ async function readTabGrid(sheets, spreadsheetId, tab) {
 const SHEET_WRITE_BATCH = 400;
 
 async function writeNormalizationTab(sheets, spreadsheetId, tab, grid) {
+  // Sized explicitly. A new tab defaults to 1,000 rows and this one needs 1,672, and
+  // `values.update` past a sheet's grid limits is an error rather than a growth.
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
-    requestBody: { requests: [{ addSheet: { properties: { title: tab } } }] },
+    requestBody: {
+      requests: [{ addSheet: { properties: {
+        title: tab,
+        gridProperties: { rowCount: grid.length + 10, columnCount: SHEET_COLUMNS.length },
+      } } }],
+    },
   });
 
   const lastCol = columnLetter(SHEET_COLUMNS.length - 1);
