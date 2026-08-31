@@ -1,13 +1,13 @@
 ---
 id: 061
 title: Migrate 2023–2024 Historical Expense Data Into The App
-status: spec
+status: build
 source: captain
 started: 2026-08-31T02:26:05Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-061-migrate-2023-2024-into-app
 issue:
 pr:
 mod-block:
@@ -112,6 +112,17 @@ gates:
                 id: briefing:061:spec:attempt-3:revision-1
                 digest: sha256:e12c367f18d8b4a2c9ff2994f946d5ae244344e944db7ef65afd6057eb622676
                 room-ref: ./review/spec/briefing-3
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:061:spec:3
+                briefing: briefing:061:spec:attempt-3:revision-1
+                by: person:captain
+                at: "2026-08-31T08:00:33.93587Z"
+                decision: approve
+                reason: 'Captain approved the spec and selected R1 for the staging Categories reconciliation: add the three missing production categories to staging under new ids (cat_026 Tenant, cat_027 Insurance, cat_028 Tax) and leave the staging-only test entries (Test Cat, Antkee, ScrollTest) in place. R2''s destructive overwrite is declined. Production remains the authority for category identity and is never written to. All prior rulings stand: 2022 out of scope, staging rehearsed before any production write, D4 option A at zero cost since the audit found zero undated rows. Presented in chat rather than a Subspace gate room after four consecutive gate-room presentations were terminated before returning a result; the workflow''s declared fallback was used and stated explicitly.'
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 Evaluate whether the captain's 2023 and 2024 historical expense records can be migrated into the live app, and if so, migrate them — so the app itself holds those two years instead of them living only in Google Sheets. Feasibility is judged before any write is attempted.
