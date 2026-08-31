@@ -53,6 +53,11 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+            - id: gate-attempt:061-ideation-4
+              briefing:
+                id: briefing:061:ideation:attempt-4:revision-1
+                digest: sha256:417071a5ffe7bd8f836764c0673a227aef2490bd5e1128af601677c7640d22dd
+                room-ref: ./review/ideation/briefing-4
         - id: gate:061:spec
           stage: spec
           attempts:
