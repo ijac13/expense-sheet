@@ -1208,6 +1208,10 @@ no auth change, no scheduled-behavior change, no client change.
 - Cycle 2: rework — spec rewritten against the cycle-1 revise and the ideation-cycle-2 readings; surface estimate revised from +700 LOC across 4 files to +1,050 across 6 (+50%, driven by splitting extract and import into two scripts so the captain's approval sits structurally between them); AC-2, AC-3 and AC-4 recut so each is falsifiable only by a defect in our own work; AC-15 (source variance reported, gates nothing) and AC-16 (corrections survive a re-generate) added; AC-9 and AC-10 tightened after two live readings — staging and production Categories tabs diverge from `cat_023`, and `(bucket, sub_category)` is not a unique row key; D5 (2022 in or out) raised, and D3/D4/D5 each given a recommendation plus a default so none blocks build.
 - Cycle 1: revise — captain at the spec gate (briefing:061:spec:attempt-1:revision-1, six annotations); surface 1 file/+0 net deliverable LOC vs estimate +700 across 4 files (0% — the round produced no code, only re-scoped inputs); AC narrowed: source inspection satisfied AC-13, exposed AC-2 as unfalsifiable (the workbook does not reconcile against itself — ~88% of populated row-month cells match their own day sums), and found AC-3 and AC-4 written against premises that are false for the real tab (no aggregate rows, no income rows); AC-3, AC-4 marked for recutting and AC-14 proposed to carry AC-13's gating role.
 
+### Dispatch Retries
+
+- Retry 1: build — agent-error (API error: "Your computer went to sleep mid-response"); nudged
+
 ## Stage Report: spec
 
 - FAILED: Settle whether 2023 data actually exists by inspecting tab gid=0 of the 2024 workbook (spreadsheet id 1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I) and report the finding either way
