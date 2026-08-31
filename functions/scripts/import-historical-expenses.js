@@ -63,21 +63,61 @@ const ID_PREFIX = "exp-hist-";
 const WRITE_BATCH_SIZE = 50;
 
 /**
- * `paid_by` / `created_by` for an imported row.
+ * `paid_by` / `created_by` for an imported row: **`user1`'s display name**.
  *
- * BUILD DECISION, FLAGGED FOR THE CAPTAIN — the spec does not settle this and the
- * source cannot. The `Daily` tab has no payer column: column A is a row-kind tag,
- * column D is a free-text detail label (per-person and per-property-unit), column E
- * is the literal `Daily`. So who paid a 2023 row is not recorded anywhere in the
- * source, and the `008` precedent's `誰 -> user1/user2` mapping has no column to map
- * from.
+ * CAPTAIN'S RULING, 2026-08-31. The source has no payer column — column A is a
+ * row-kind tag, C the sub-category, D a free-text detail label, E the literal
+ * `Daily` — so I first proposed a neutral `Historical` literal on the grounds that
+ * naming a payer would invent a fact. The captain ruled `user1`, and she is right:
+ * the workbook is `ijacwei_income收支`, her own personal ledger. A personal ledger
+ * has no payer column because there was only ever one payer. `user1` is therefore
+ * the recorded truth of that ledger, and `Historical` would have been the invention
+ * — a payer who never existed, sitting in every per-payer report for two years.
  *
- * Writing `user1` would invent a fact and skew every per-payer report for two whole
- * years. This literal is honest instead: Reports groups by this string, so those
- * years show one clearly-labelled `Historical` payer rather than a false attribution.
- * One line to change if the captain wants otherwise, and `--undo` makes it cheap.
+ * THE VALUE IS THE DISPLAY NAME, NOT THE ID, and that distinction is the whole
+ * hazard here. Read from the live sheets rather than assumed: `paid_by` holds only
+ * `ijac` and `wei` on both staging (453/952) and production (785/1375) — the id
+ * `user1` appears nowhere in either tab. The app writes the *name* at
+ * creation time (`resolveUserDisplayNames`, `functions/src/index.ts:242`) and
+ * Reports filters by resolving id to name before comparing
+ * (`resolvePayerName`, `app/app/lib/reportService.ts`). Writing the literal
+ * `"user1"` would have filed 1,670 rows against a third payer that matches no
+ * filter and appears in no breakdown.
+ *
+ * Resolved through the app's own `USERS` table so this cannot drift from it. A test
+ * asserts the written value equals what the app maps `user1` to, which fails if this
+ * is ever changed to the id, to `Historical`, or to anything else.
  */
-const HISTORICAL_ACTOR = "Historical";
+const HISTORICAL_ACTOR_ID = "user1";
+
+/** Mirrors `LEGACY_USER_MAP` in `functions/src/index.ts:235`. */
+const LEGACY_USER_NAMES = { user1: "ijac", user2: "wei" };
+
+let actorNameCache = null;
+
+/**
+ * `user1`'s display name, from the app's own module — never a second copy of it.
+ *
+ * Memoised: resolved once per run rather than once per row, and the resolved value is
+ * logged so a run says out loud which payer 1,670 rows are about to carry.
+ */
+function historicalActorName() {
+  if (actorNameCache !== null) return actorNameCache;
+  const compiled = path.resolve(__dirname, "..", "..", "app", ".test-build", "users.js");
+  if (fs.existsSync(compiled)) {
+    const { USERS } = require(compiled);
+    const user = USERS.find((u) => u.id === HISTORICAL_ACTOR_ID);
+    if (user?.name) {
+      actorNameCache = user.name;
+      return actorNameCache;
+    }
+  }
+  // The API's own fallback chain, in the same order it uses: the Users tab, then
+  // LEGACY_USER_MAP, then the raw id (`functions/src/index.ts:235-247`). The compiled
+  // module is absent only when `npm --prefix ../app run build:lib` has not run.
+  actorNameCache = LEGACY_USER_NAMES[HISTORICAL_ACTOR_ID] ?? HISTORICAL_ACTOR_ID;
+  return actorNameCache;
+}
 
 const DEFAULT_RECEIPT = path.join(REPORT_DIR, "061-rehearsal-receipt.json");
 
@@ -451,14 +491,14 @@ async function readApprovedSheet(sheets, spreadsheetId, tabName, { requireApprov
   return parsed;
 }
 
-function candidateRow(candidate, expensesMap, categoryId) {
+function candidateRow(candidate, expensesMap, categoryId, actor = historicalActorName()) {
   return buildWriteRow([], expensesMap, {
     id: candidate.id,
     date: candidate.date,
     amount: String(candidate.amount),
     category_id: categoryId,
-    paid_by: HISTORICAL_ACTOR,
-    created_by: HISTORICAL_ACTOR,
+    paid_by: actor,
+    created_by: actor,
     notes: candidate.notes,
     created_at: candidate.createdAt,
   });
@@ -762,9 +802,14 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
   const { grid: expensesGrid, map: expensesMap } = await readExpenses(writeSheets, targets.write.spreadsheetId);
   const existingIds = new Set(expensesGrid.slice(1).map((r) => String(r[expensesMap.index.id] ?? "")));
 
+  // Said out loud, because it is the one field with no source: 1,670 rows are about
+  // to carry this payer, and it must be the DISPLAY NAME the app stores, never the id.
+  const actor = historicalActorName();
+  log(`[actor] paid_by = created_by = ${JSON.stringify(actor)} (${HISTORICAL_ACTOR_ID}'s display name, per the captain's ruling)`);
+
   const rows = plan.candidates.map((c) => ({
     candidate: c,
-    cells: candidateRow(c, expensesMap, resolution.resolved.get(c.category_name_en)),
+    cells: candidateRow(c, expensesMap, resolution.resolved.get(c.category_name_en), actor),
   }));
 
   // --- dry-run ------------------------------------------------------------
@@ -994,7 +1039,9 @@ if (require.main === module) {
 
 module.exports = {
   ID_PREFIX,
-  HISTORICAL_ACTOR,
+  HISTORICAL_ACTOR_ID,
+  LEGACY_USER_NAMES,
+  historicalActorName,
   WRITE_BATCH_SIZE,
   DEFAULT_RECEIPT,
   PHASES,

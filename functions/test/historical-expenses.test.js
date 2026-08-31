@@ -683,9 +683,14 @@ const EXPENSES_HEADER = [
 
 // Two rows the two users logged, which the import must not touch. The second is
 // dated inside an imported year, so an undo keyed on the date year would eat it.
+//
+// `paid_by` holds the DISPLAY NAME, not the user id — read from the live tabs, which
+// contain only `ijac` and `wei` on both staging and production. An earlier draft of
+// this fixture used `user1`/`user2` here and was simply wrong about the app's own
+// storage convention.
 const PRE_EXISTING = [
-  ["exp-001", "2026-08-01", "120", "cat_003", "user1", "user1", "coffee", "2026-08-01T09:00:00.000Z", "2026-08", "120"],
-  ["exp-002", "2024-06-15", "80", "cat_003", "user2", "user2", "an old row of theirs", "2024-06-15T09:00:00.000Z", "2024-06", "80"],
+  ["exp-001", "2026-08-01", "120", "cat_003", "ijac", "ijac", "coffee", "2026-08-01T09:00:00.000Z", "2026-08", "120"],
+  ["exp-002", "2024-06-15", "80", "cat_003", "wei", "wei", "an old row of theirs", "2024-06-15T09:00:00.000Z", "2024-06", "80"],
 ];
 
 const CATEGORIES_HEADER = ["id", "name_en", "name_zh", "icon", "sort_order", "is_active", "gov_category", ""];
@@ -1337,4 +1342,96 @@ test("--rehearse proceeds on an unapproved sheet and records that it was unappro
     (err) => err instanceof ImportError && /is not approved/.test(err.message)
   );
   assert.equal(importedIds(world.production).length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// paid_by / created_by — the captain's ruling, and the id-vs-name hazard
+// ---------------------------------------------------------------------------
+
+// The app's own USERS table, compiled, so these assertions rest on the app's source
+// of truth rather than on a second copy of it here.
+const APP_USERS = (() => {
+  const compiled = path.resolve(__dirname, "..", "..", "app", ".test-build", "users.js");
+  if (!fs.existsSync(compiled)) {
+    require("child_process").execFileSync(
+      "npm", ["--prefix", path.resolve(__dirname, "..", "..", "app"), "run", "build:lib"],
+      { encoding: "utf8", stdio: "pipe" }
+    );
+  }
+  return require(compiled).USERS;
+})();
+
+test("imported rows carry user1's DISPLAY NAME, which is what the app stores — not the id", async () => {
+  const expected = APP_USERS.find((u) => u.id === "user1").name;
+
+  const world = makeWorld();
+  await importRun(world, [
+    "--apply", "--target", "staging", "--from-sheet", NORMALIZATION_TAB,
+    "--snapshot-file", tmpFile("s.json"),
+  ]);
+
+  const header = world.staging.grids.Expenses[0];
+  const iPaid = header.indexOf("paid_by");
+  const iCreated = header.indexOf("created_by");
+  const imported = world.staging.grids.Expenses.slice(1).filter((r) => r[0].startsWith(ID_PREFIX));
+  assert.equal(imported.length, 19);
+
+  for (const row of imported) {
+    // Tied to the app's table, so this fails if the constant becomes "user1",
+    // "Historical", or anything else — not merely if it differs from a literal here.
+    assert.equal(row[iPaid], expected);
+    assert.equal(row[iCreated], expected);
+  }
+  assert.equal(importer.historicalActorName(), expected);
+});
+
+test("the actor is a name the app can resolve back from an id, so the payer filter matches it", () => {
+  const actor = importer.historicalActorName();
+
+  // How Reports filters: PayerFilter carries an ID, and `resolvePayerName` turns it
+  // into a NAME before comparing against stored `paid_by`
+  // (`app/app/lib/reportService.ts`). So a stored value that is not one of the USERS
+  // names can never be matched by any filter.
+  const resolvableNames = APP_USERS.map((u) => u.name);
+  assert.ok(
+    resolvableNames.includes(actor),
+    `paid_by ${JSON.stringify(actor)} must be one of ${JSON.stringify(resolvableNames)} — ` +
+    `anything else is a payer no filter can select and no breakdown can show`
+  );
+
+  // The id is NOT such a value, which is the trap the ruling could have walked into.
+  assert.equal(resolvableNames.includes("user1"), false);
+  assert.notEqual(actor, "user1");
+  // And the value the build originally proposed is not one either.
+  assert.equal(resolvableNames.includes("Historical"), false);
+});
+
+test("falsified: writing the id instead of the name files every row against a payer no filter selects", async () => {
+  const byId = loadPatched("import-historical-expenses.js", [
+    ["  if (actorNameCache !== null) return actorNameCache;", "  return HISTORICAL_ACTOR_ID;"],
+  ]);
+
+  const world = makeWorld();
+  await byId.run(["--apply", "--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")], {
+    log: silent, env: STUB_ENV, sheetsFor: world.sheetsFor, now: () => new Date("2026-08-31T12:00:00.000Z"),
+  });
+
+  const header = world.staging.grids.Expenses[0];
+  const iPaid = header.indexOf("paid_by");
+  const imported = world.staging.grids.Expenses.slice(1).filter((r) => r[0].startsWith(ID_PREFIX));
+  assert.equal(imported[0][iPaid], "user1", "the patched run really did write the id");
+
+  // Every pre-existing row in the live sheets holds a NAME; the id joins none of them.
+  const existingPayers = new Set(
+    world.staging.grids.Expenses.slice(1)
+      .filter((r) => !r[0].startsWith(ID_PREFIX))
+      .map((r) => r[iPaid])
+  );
+  assert.ok(existingPayers.size > 0);
+  assert.equal(
+    existingPayers.has("user1"),
+    false,
+    "the id appears nowhere in the household's own rows — live staging holds only ijac and wei"
+  );
+  assert.ok(existingPayers.has(importer.historicalActorName()), "the correct actor DOES join the existing rows");
 });
