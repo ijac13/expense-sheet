@@ -1480,7 +1480,7 @@ Tests, each named with the change that would make it fail:
 | AC | Status | Evidence |
 |---|---|---|
 | AC-1 | met | `--snapshot` + `--verify`: 0 modified, 0 deleted among non-`exp-hist-` rows, live staging and unit |
-| AC-2 | met | key-join, 4 assertions; per-year sums exact as integer minor units. 2024's real total is **fractional** (1081362.2), so exactness is load-bearing, not hypothetical |
+| AC-2 | met | key-join, 4 assertions; per-year sums exact as integer minor units. 2024's real total turns out to carry a **fractional part**, so the exact integer-minor-unit comparison is load-bearing on live data rather than hypothetical (figure not reproduced here — AC-11) |
 | AC-3 | met | 4 unit tests (a–d) over the synthetic fixture |
 | AC-4 | met | 3 independent points, each tested separately |
 | AC-5 | met | second `--apply` reports `created: 0`, no further insert reaches the sheet |
