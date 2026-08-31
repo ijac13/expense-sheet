@@ -1,9 +1,9 @@
 ---
 id: 061
 title: Migrate 2023–2024 Historical Expense Data Into The App
-status: ideation
+status: spec
 source: captain
-started:
+started: 2026-08-31T02:26:05Z
 completed:
 verdict:
 score:
@@ -42,6 +42,17 @@ gates:
                 id: briefing:061:ideation:attempt-3:revision-1
                 digest: sha256:7d80892f81a50f494679959179b1c5c06fd3f727c2cd0b9cf06695db42f8038a
                 room-ref: ./review/ideation/briefing-3
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:061:ideation:3
+                briefing: briefing:061:ideation:attempt-3:revision-1
+                by: person:captain
+                at: "2026-08-31T02:24:07.567092Z"
+                decision: approve
+                reason: 'Captain approved the ideation direction: migrate 2023-2024 historical expense records into the app, feasibility judged and reported before any write. Scope bounded to those two years; all other archive years remain with 060. Spec must settle whether 2023 data exists by inspecting tab gid=0, surface the 25-bucket to flat gov_category mismatch as a captain decision rather than resolving it, and state the undo and blast-radius plan before any import.'
+              application:
+                target-stage: spec
+                state: consumed
 ---
 
 Evaluate whether the captain's 2023 and 2024 historical expense records can be migrated into the live app, and if so, migrate them — so the app itself holds those two years instead of them living only in Google Sheets. Feasibility is judged before any write is attempted.
