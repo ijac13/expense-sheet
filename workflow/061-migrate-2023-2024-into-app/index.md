@@ -1342,3 +1342,97 @@ Chasing the discrepancy to the bottom found a defect in this spec rather than in
 So the captain's option-A ruling costs her zero rows, and she should be told that plainly — the pass she committed to is empty. The residual honest caveat is unchanged and is not a decision anyone can fix: 2024-12-17 to 12-31 do not exist in the source, so that fortnight will be missing from the app.
 
 On D6, production is the category authority and staging is brought into line **additively** — R1, recommended and defaulted, with the destructive reading surfaced as R2 for her to confirm rather than assumed. The concrete reason it matters is that `Insurance`, `Tax` and `Tenant` exist on staging under no id, so a legitimate override to any of them would deadlock the pipeline at AC-18. I also corrected my own earlier overstatement of this divergence's severity: for the current mapping it resolves identically in both environments.
+
+## Implementation plan (build)
+
+Written before any code, per the build stage's "a brief implementation plan written before coding begins".
+
+Written before coding. Four scripts, one test file, one fixture, package.json entries.
+
+### 1. `functions/scripts/load-local-env.js` — `--target` plumbing (AC-17)
+
+Keep the existing single-pair behaviour untouched (other scripts depend on it), and
+add a **second, always-staging** pair plus a target-resolved pair:
+
+- `SPREADSHEET_ID_STAGING` / `GOOGLE_SERVICE_ACCOUNT_KEY_STAGING` — always from `functions/.env.staging`
+- `SPREADSHEET_ID_PRODUCTION` / `GOOGLE_SERVICE_ACCOUNT_KEY_PRODUCTION` — from `functions/.env` + root `.env.local`
+- `MIGRATION_TARGET` — from `--target` on the command line, validated `staging|production`
+
+The scripts then ask for *reads* with the staging pair and *writes* with the target
+pair. Two distinct credential objects in the same run; no global swap.
+
+### 2. `functions/scripts/extract-historical-expenses.js` (AC-3, AC-4a/b, AC-15, AC-16, AC-19)
+
+Pure core, thin IO shell.
+
+- `discoverBands(colA)` — a band's **label row** is a row whose column A is `收入支出`;
+  its date-header row is that row − 1; data rows run to the last consecutive
+  non-blank column A. No row-range constants.
+- `bandYear(dateHeaderRow)` — the single year every date serial in the header row
+  agrees on; more than one distinct year aborts.
+- `classifyColumns(labelRow, dateRow, maxCol)` — from column F:
+  - day item-name column: label `品名` **and** header carries a date serial;
+  - its amount column is the **next** column whatever its label — unless that next
+    column is itself a dated `品名` column (07-03 case), in which case the day has
+    no amount column;
+  - an amount column whose label is neither `金額` nor blank aborts;
+  - month-total column: header carries a date, label is not `品名` and is not a
+    claimed amount column.
+- `accountForBand(...)` — AC-19: every numeric-ish cell in columns F+ is a
+  day-amount, a day-item-name or a month-total. Unclaimed columns holding
+  numeric-ish cells abort naming the columns. Reproduces 775+5+312=1092 (2024) and
+  895+11+312=1218 (2023).
+- `parseAmount(v)` — `Number(String(v).trim())`; accepts text-stored digits;
+  non-finite aborts with the cell reference. Never coerces to 0.
+- `mapCategory(bucket, sub)` — the 17-pair table → `name_en` (never `cat_NNN`).
+- `emitRows(...)` — one row per populated day-amount cell, keyed
+  `{year}-r{sourceRow}-c{amountColumnLetter}`. Rows dated outside the band's
+  declared year abort (AC-4b).
+- `varianceReport(...)` — 24 year-months, workbook month-total column vs the sum of
+  that month's day cells; exit code independent of contents (AC-15).
+- `--generate --into <tab> [--carry-from <tab>]` — refuses to write over an existing
+  tab; carry-forward keyed on `key`, gen_* shadow columns detect captain edits,
+  unreconcilable keys abort, vanished keys become `status=orphaned` (AC-16).
+- `--fixture <json>` for offline runs.
+
+### 3. `functions/scripts/import-historical-expenses.js` (AC-1, AC-2, AC-4c, AC-5, AC-6, AC-9, AC-10, AC-12, AC-14, AC-18)
+
+- `--target` required, no default (AC-12). `--from-sheet` required, no default (AC-14).
+- Reads the normalization tab with **staging** creds always; writes with the
+  target's creds.
+- Refuses unless `B1 === "APPROVED"` (AC-14).
+- Pre-write `resolveCategories()` against the **target's own** Categories tab; any
+  unresolved `name_en` exits non-zero before the first write (AC-9).
+- Ids `exp-hist-{year}-{NNNN}`, NNNN the 1-based index within the year over
+  `status=include` rows sorted by `key` — deterministic, so a second run writes
+  nothing (AC-5).
+- notes = `{bucket} | {sub} | {detail}[ | {item}] | key={key}` (AC-10).
+- `--snapshot`, `--apply`, `--verify`, `--undo`, `--rehearse`.
+- `--rehearse` (staging only) runs snapshot → apply → verify → hand-add → undo →
+  diff and writes the receipt (AC-18); `--target production --apply` refuses without
+  a receipt whose digest matches the sheet's `C1`.
+- Writes reuse `backfill-subscription-history.js`'s batched all-or-nothing
+  `insertDimension`+`updateCells` shape and its `PartialWriteError`.
+
+### 4. `functions/scripts/sync-staging-categories.js` (AC-20)
+
+Additive only. Reads production Categories as the reference (production creds,
+read-only scope), reads staging's, adds the missing `name_en` values under new ids
+after staging's highest `cat_NNN`. `--dry-run` / `--apply` / `--undo`; a receipt
+records exactly the ids added so undo removes exactly those. Asserts afterwards that
+every pre-existing staging id keeps its original `name_en`.
+
+### 5. Tests — `functions/test/historical-expenses.test.js` + `functions/test/fixtures/historical-bands.json`
+
+Synthetic three-band fixture (invented numbers, AC-11) reproducing the structure:
+identical A–C columns in all three bands, interleaved month-total columns, a
+blank-labelled amount column holding data (the `MI` shape), a day whose next column
+is another dated `品名` (the 07-03 shape), text-stored amounts, duplicated empty
+December headers, an inconsistent month total.
+
+Each test names the falsifying change the spec's AC declares.
+
+### Stop line
+
+No production write. The stage ends at the staging rehearsal plus a generated
+normalization sheet awaiting the captain's `APPROVED` in B1.
