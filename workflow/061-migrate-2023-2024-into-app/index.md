@@ -103,6 +103,10 @@ gates:
                 id: briefing:061:spec:attempt-2:revision-1
                 digest: sha256:808aafe377df446f0779a9765c3137f45324ddf933965224f1476f781af9070b
                 room-ref: ./review/spec/briefing-2
+              withdrawal:
+                by: agent:first-officer
+                at: "2026-08-31T05:24:38.739839Z"
+                reason: 'Entity changed after binding: commit 1ae4a21 corrects the D4 arithmetic, recuts AC-3 after finding its discriminator silently dropped three real expense records in column MI, adds AC-19 as a whole-band accounting assertion, records that 10 cells in 2024 and 47 in 2023 store amounts as text, and folds D6. The bound Briefing predates all of it. Captain closed the presentation without deciding; rebinding on the corrected spec.'
 ---
 
 Evaluate whether the captain's 2023 and 2024 historical expense records can be migrated into the live app, and if so, migrate them — so the app itself holds those two years instead of them living only in Google Sheets. Feasibility is judged before any write is attempted.
