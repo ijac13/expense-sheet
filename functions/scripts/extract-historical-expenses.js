@@ -672,7 +672,12 @@ function extract(grid, { years = IN_SCOPE_YEARS } = {}) {
       monthTotalColumns: classification.monthTotalCols.length,
       unclassifiedColumns: classification.unclassifiedCols.length,
       accounting,
-      distinctDates: new Set(bandRows.filter((r) => r.date).map((r) => r.date)).size,
+      // Two different measures, both worth reporting. The first is the spec's
+      // figure (2024: 351, 2023: 365) — how many calendar days the band has a
+      // column for, after the 15 duplicated December 2024 dates collapse. The
+      // second is how many of those days anything was actually spent on.
+      distinctDayColumnDates: new Set(classification.days.map((d) => d.iso).filter(Boolean)).size,
+      distinctDatesWithSpending: new Set(bandRows.filter((r) => r.date).map((r) => r.date)).size,
       rows: bandRows.length,
       undatedRows: bandRows.filter((r) => r.status === "undated").length,
     });
@@ -977,8 +982,8 @@ function summarise(result, log) {
       `numeric cells; UNACCOUNTED ${a.unaccounted}`
     );
     log(
-      `[band] ${band.year}: emitted ${band.rows} rows, ${band.distinctDates} distinct dates, ` +
-      `${band.undatedRows} undated`
+      `[band] ${band.year}: emitted ${band.rows} rows; ${band.distinctDayColumnDates} distinct dated day ` +
+      `columns, of which ${band.distinctDatesWithSpending} carry spending; ${band.undatedRows} undated`
     );
   }
   for (const b of result.skippedBands) {
