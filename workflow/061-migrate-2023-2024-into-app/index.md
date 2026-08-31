@@ -93,6 +93,14 @@ To be filled in at spec time. Open questions this must resolve:
 
 ## Spec
 
+### Blocking precondition — source access
+
+**This feature cannot enter `build` until the Google Drive connector reaches the account that owns the archive.** This is not a caveat on the 2023 question; it gates the whole feature. Every year in scope — 2024 included — is read from a workbook that is currently unreadable from this session. A build dispatched before this clears would have nothing to parse.
+
+**What is broken, and the likely cause.** The connector in this session is signed in to the captain's **work** account. Reads of the 2024 workbook (`1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I`) return `Requested entity was not found`, and a title search returns only `infuseai.io` / `reccehq.com`-owned files. `060`'s spec report records that read access to both this workbook and the archive folder was confirmed "through the Google Drive connector on the captain's own account, which owns them" — so this worked in an earlier session against the same file ids. **That points at the connector's signed-in account having changed, not at the files moving or permissions being revoked.** The remedy is therefore a reconnection, not a re-share or a permissions hunt — see D0-A. The app's Firebase service account is not a second route; that workbook was never shared with it.
+
+**Exit condition.** This precondition clears when one agent has actually read tab `gid=0` and recorded, in this entity, the file id read, the tab's row-1 headers, and the distinct years found in it. That record is the input to AC-13. Until it exists, `build` waits.
+
 ### Decisions needed from the captain
 
 Read these first. Each names the outcome at stake, then the ways to get there. None is resolved in this spec — approving the spec means picking one option per decision. Where a recommendation is given it is a recommendation, not a default that applies by silence.
@@ -101,7 +109,7 @@ Read these first. Each names the outcome at stake, then the ways to get there. N
 
 **Outcome at stake:** whether this feature covers one year or two.
 
-**Status: unresolved, and blocked on access, not on judgment.** This spec was required to settle the question by inspecting tab `gid=0` of the 2024 workbook (`1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I`) and could not. The Google Drive connector in this session is signed in to the captain's **work** account, not the personal account that owns the archive. `get_file_metadata` and `read_file_content` on that exact file id both returned `Requested entity was not found`, and a title search returned only files owned by the `infuseai.io` / `reccehq.com` accounts. The app's Firebase service account is not a second route: that workbook was never shared with it.
+**Status: unresolved, and blocked on access, not on judgment.** This spec was required to settle the question by inspecting tab `gid=0` of the 2024 workbook and could not — see the Blocking precondition above for the failure and its likely cause. The inspection was attempted directly, twice, against that exact file id; it was not skipped in favour of a prior recorded finding.
 
 `060`'s recorded finding ("the archive holds no 2023 record") is **not** carried forward as settled — it was a finding about the archive *folder*, and the captain has since pointed at a *tab inside the 2024 workbook*. Those are different places. The question is genuinely open.
 
@@ -253,7 +261,7 @@ Verified by: offline — the build stage report names the file id read, the tab'
 
 ## Risk evidence
 
-**Riskiest unverified mechanism: reading the source workbook at all.** Exercising it failed. Both Drive-connector reads of file id `1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I` returned `Requested entity was not found`; a title search returned only work-account files, confirming the connector is authenticated to the wrong Google account. A service-account route was also attempted and is not viable — the workbook was never shared with `expense-sheet-functions@…`. **This is the one thing that must be resolved before build is dispatched** (D0). Every other mechanism in this feature is already proven.
+**Riskiest unverified mechanism: reading the source workbook at all.** Exercising it failed. Both Drive-connector reads of file id `1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I` returned `Requested entity was not found`; a title search returned only work-account files, confirming the connector is authenticated to the wrong Google account. A service-account route was also attempted and is not viable — the workbook was never shared with `expense-sheet-functions@…`. Because `060` read these same file ids successfully from the captain's own account, the cause is almost certainly the connector's signed-in account rather than the files or their permissions, which makes reconnection the remedy. **This is the one thing that must be resolved before build is dispatched** — it is a stated blocking precondition at the head of the Spec, not a decision among others. Every other mechanism in this feature is already proven.
 
 **Second risk: the bulk write. No spike needed** — the mechanism is already proven on this exact sheet by `functions/scripts/backfill-subscription-history.js` (entity 051): deterministic ids (`autoExpenseId`, `functions/src/scheduler.ts:87`), `--analyze`/`--dry-run`/`--apply` phases, batched all-or-nothing `insertDimension`+`updateCells` (`insertRowsAtTop`), skip-if-id-present idempotency, and `PartialWriteError` carrying already-written ids. This feature reuses that shape rather than inventing one.
 
@@ -283,7 +291,7 @@ Semantics this may change: **stored data only** — new rows in the production E
 ## Stage Report: spec
 
 - FAILED: Settle whether 2023 data actually exists by inspecting tab gid=0 of the 2024 workbook (spreadsheet id 1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I) and report the finding either way
-  Access blocker, not a judgment call: `get_file_metadata` and `read_file_content` on that file id both returned `Requested entity was not found`, and a Drive title search returned only `infuseai.io`/`reccehq.com`-owned files — the connector is signed in to the captain's work account, not the personal account that owns the archive. A service-account route was probed and rejected too (the workbook was never shared with `expense-sheet-functions@…`). Two follow-up Drive searches were then blocked by the permission classifier. Escalated to the first officer with three concrete unblock options; carried into the spec as decision D0 and as AC-13, which gates the import on that inspection.
+  The inspection was attempted directly against that file id, not skipped in favour of 060's record: `get_file_metadata` and `read_file_content` both returned `Requested entity was not found`, and a Drive title search returned only `infuseai.io`/`reccehq.com`-owned files — the connector is signed in to the captain's work account, not the personal account that owns the archive. A service-account route was probed and rejected too (the workbook was never shared with `expense-sheet-functions@…`). Two follow-up Drive searches were then blocked by the permission classifier. Escalated to the first officer with three concrete unblock options. Per the FO's follow-up direction, the spec now states the likely cause — 060 read these same ids successfully from the captain's own account, so the connector's signed-in account changed rather than the files moving or permissions being revoked, which makes reconnection the remedy — and carries the access dependency as a top-of-spec **Blocking precondition** with an explicit exit condition, not as a footnote. It also remains D0 and AC-13.
 - DONE: do NOT carry 060's recorded "no 2023 record in the archive" forward as settled
   D0 states explicitly that 060's finding was about the archive *folder* while the captain pointed at a *tab inside the 2024 workbook*, and treats the question as open rather than closed either way.
 - DONE: if 2023 has no record say so and scope this feature to 2024 only
@@ -301,7 +309,7 @@ Semantics this may change: **stored data only** — new rows in the production E
 
 ### Summary
 
-The mandated gid=0 inspection could not be done: the Drive connector in this session is authenticated to the captain's work Google account, not the personal account that owns the archive, and both direct reads of the workbook returned "not found". That is escalated rather than guessed around — the 2023 question stays open in the spec as decision D0 and as AC-13, which blocks the import until the tab is actually read.
+The mandated gid=0 inspection could not be done: the Drive connector in this session is authenticated to the captain's work Google account, not the personal account that owns the archive, and both direct reads of the workbook returned "not found". That is escalated rather than guessed around — the 2023 question stays open in the spec as decision D0 and as AC-13, which blocks the import until the tab is actually read. The access dependency is stated at the head of the Spec as a blocking precondition on `build`, because it gates every year in scope and not only 2023: 2024 is read from the same unreadable workbook.
 
 Everything else is written in full. The four captain decisions (D0 taxonomy access, D1 category mapping, D2 rental/income, D3 undo and blast radius) are presented as options with recommendations, plus a fourth the checklist did not name but that materially changes the deliverable: D4, date granularity, where the choice is between roughly 1,400 rows per year with working monthly reports and roughly 118 with broken ones, in an app that has no pagination anywhere.
 
