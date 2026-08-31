@@ -1,7 +1,7 @@
 ---
 id: 061
 title: Migrate 2023–2024 Historical Expense Data Into The App
-status: build
+status: verify
 source: captain
 started: 2026-08-31T02:26:05Z
 completed:
