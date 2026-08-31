@@ -12,7 +12,10 @@ const COL = (letters) => {
 };
 
 function parseRange(range) {
-  const [tab, a1] = range.split("!");
+  const [rawTab, a1] = range.split("!");
+  // A tab name containing a space or a digit must be quoted in a real A1 range
+  // (`'Migration 2023-2024'!A:P`), so strip the quotes the caller correctly added.
+  const tab = /^'.*'$/.test(rawTab) ? rawTab.slice(1, -1) : rawTab;
   const [from, to] = a1.split(":");
   const m = (s) => {
     const g = /^([A-Z]+)(\d+)?$/.exec(s);

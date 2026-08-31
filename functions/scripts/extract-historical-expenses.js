@@ -722,7 +722,16 @@ function sheetGridFor(rows, generatedAt) {
   const control = [CONTROL_ROW_MARKER, "", controlCellValue(generatedAt, digest)];
   while (control.length < SHEET_COLUMNS.length) control.push("");
   const header = SHEET_COLUMNS.slice();
-  const body = rows.map((r) => SHEET_COLUMNS.map((c) => String(r[c] ?? "")));
+  // A `gen_x` shadow defaults to this run's own `x`. It is what makes a later hand
+  // edit DETECTABLE: the carry-forward compares her value against the shadow, so a
+  // sheet written without shadows would read every value as unedited and silently
+  // discard her whole manual pass on the next re-generate.
+  const body = rows.map((r) =>
+    SHEET_COLUMNS.map((c) => {
+      if (c.startsWith("gen_")) return String(r[c] ?? r[c.slice(4)] ?? "");
+      return String(r[c] ?? "");
+    })
+  );
   return { grid: [control, header, ...body], digest };
 }
 
@@ -786,6 +795,11 @@ function carryForward(freshRows, priorRows) {
     if (!prior) return { ...fresh };
 
     const out = { ...fresh };
+    // Pin THIS run's extraction as the shadow before her values land on top, or the
+    // next re-generate would compare her carried value against itself and conclude
+    // she never edited anything.
+    for (const col of SHADOWED_COLUMNS) out[`gen_${col}`] = fresh[col] ?? "";
+
     for (const col of EDITABLE_COLUMNS) {
       const priorValue = prior[col] ?? "";
       const priorGenerated = SHADOWED_COLUMNS.includes(col) ? (prior[`gen_${col}`] ?? "") : "";
