@@ -53,6 +53,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:061:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:061-spec-1
+              briefing:
+                id: briefing:061:spec:attempt-1:revision-1
+                digest: sha256:abca4c9b38f58691ae7f05e182a108d8d000a17306a278fcf26c41fe8bc7397c
+                room-ref: ./review/spec/briefing-1
 ---
 
 Evaluate whether the captain's 2023 and 2024 historical expense records can be migrated into the live app, and if so, migrate them — so the app itself holds those two years instead of them living only in Google Sheets. Feasibility is judged before any write is attempted.
