@@ -1,7 +1,7 @@
 ---
 id: 061
 title: Migrate 2023–2024 Historical Expense Data Into The App
-status: spec
+status: ideation
 source: captain
 started: 2026-08-31T02:26:05Z
 completed:
@@ -61,6 +61,27 @@ gates:
                 id: briefing:061:spec:attempt-1:revision-1
                 digest: sha256:abca4c9b38f58691ae7f05e182a108d8d000a17306a278fcf26c41fe8bc7397c
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:061:spec:1
+                briefing: briefing:061:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-08-31T02:56:31.369792Z"
+                decision: revise
+                reason: |-
+                    Captain rendered revise in the spec gate room with six annotations. The direction is accepted; the spec must be reworked against six concrete captain inputs, four of which change the deliverable.
+
+                    1. 2023 EXISTS, and the tab pointer changes. Captain: "check row 31-58, these are 2023" in tab gid=1209807047 — not gid=0, which the spec and AC-13 both named. AC-13 and decision D0 must be rewritten against the correct tab and against a settled answer rather than an open question.
+
+                    2. ACCESS ROUTE CHANGED. Captain: "I just shared this sheet to staging service account." The spec rejected the service-account route on the grounds the workbook was never shared with it; that is now false. The remedy is no longer a Drive connector reconnection. Re-verify read access through the staging service account and rewrite the blocking-precondition section accordingly.
+
+                    3. D1 CATEGORY MAPPING, answered: "we figure out the category first, we can leave gov_category later." Categories are settled first; the flat gov_category mapping is deferred rather than resolved in this feature. Collapse D1's four options to this.
+
+                    4. D2 RENTAL AND INCOME ROWS, answered: "follow what we did for 2026." Adopt the existing current-year treatment rather than inventing one. Spec must state what that treatment concretely is, read from the code, not assumed.
+
+                    5. FORMAT AND APPROACH CHANGE. Captain: "I know [gid=1209807047] is not the same format. I think we can create another sheet to make this data easy to migrate." An intermediate normalization sheet is proposed instead of parsing the source matrix directly. This displaces a substantial part of the parser design and must be specced as the approach, with its own acceptance criteria, or argued against explicitly.
+
+                    6. Context: the data is personal, unrelated to any work account. Confirms the account-mismatch diagnosis and rules out an org-permissions route.
 ---
 
 Evaluate whether the captain's 2023 and 2024 historical expense records can be migrated into the live app, and if so, migrate them — so the app itself holds those two years instead of them living only in Google Sheets. Feasibility is judged before any write is attempted.
