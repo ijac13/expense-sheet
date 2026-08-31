@@ -117,7 +117,10 @@ This feature blocks `060-historical-expense-analysis`: the captain chose migrati
   two source-integrity defects recorded below — damaged December 2024 headers, and
   a workbook that disagrees with its own month totals about 12% of the time. Neither
   blocks the migration; both mean the import cannot be proved by reconciling to the
-  workbook alone.
+  workbook alone. The header damage was probed at the captain's request and turns
+  out to sit entirely in **empty** columns: every one of the 1,667 rows in scope
+  carries a real date. The cost is a real one but different — 2024-12-17 to 12-31
+  simply do not exist in the source, so that fortnight will be missing from the app.
 - An intermediate normalization sheet the captain can read and correct, holding one
   row per dated line item for 2023 and 2024, before anything is written to the app.
 - 2023 and 2024 expense records present in the app, attributed to the correct
@@ -128,10 +131,10 @@ This feature blocks `060-historical-expense-analysis`: the captain chose migrati
 ### Out of Scope
 
 - Years other than 2023 and 2024. **2022 is present in the same tab** (rows 63–88)
-  and is deliberately left there — that is decision **D5**, recommended and
-  defaulted to *out*, and reversible with a `--years` flag if the captain wants it
-  in. The remaining archive years are inventoried and analysed by `060`, not
-  imported here.
+  and is deliberately left there — the captain **ruled** it out of scope (**D5**).
+  It is not specced, not imported, and not offered as a flag; the band is read only
+  so the extractor knows where 2023 ends. The remaining archive years are
+  inventoried and analysed by `060`, not imported here.
 - The other eight tabs of the source workbook, including its separate `Income` tab.
 - The growth analysis itself — that is `060`'s deliverable.
 - Any new app UI for browsing historical years. This feature lands data, not screens.
@@ -229,10 +232,48 @@ mostly be assembled from the bucket / sub-category / detail columns.
 
 **Two data-integrity defects in the source, found by exercising it.**
 
-1. **December 2024 headers are damaged.** The 2024 band's day-column headers run
-   only to 2024-12-16 and contain 15 duplicated dates across early December; 16
-   calendar days of 2024 have no column at all. 2023 is clean by comparison — 362
-   distinct dates, no duplicates, spanning 2023-01-01 to 2023-12-31, 3 missing days.
+1. **December 2024 headers are damaged — and the damaged region is empty.** The
+   2024 band's day-column headers run only to 2024-12-16 and repeat 15 December
+   dates across adjacent column pairs; 16 calendar days of 2024 have no column at
+   all. 2023 is nearly clean — 362 distinct dates, no duplicates, spanning
+   2023-01-01 to 2023-12-31, 3 missing days.
+
+   **The captain asked whether those days hold records. They do not** — checked
+   directly, per column, by `probe-undated-days.js`:
+
+   | | 2024 | 2023 |
+   |---|---|---|
+   | Day column pairs | 365 | 362 |
+   | Distinct header dates | 350 | 362 |
+   | Populated amount cells | 774 | 893 |
+   | Day columns with no parseable date | **0** | **0** |
+   | Duplicated dates | 15 | 0 |
+   | Populated cells in any duplicate column | **0** | — |
+   | **Rows with an untrustworthy date** | **0 of 774** | **0 of 893** |
+
+   All 30 columns involved in the 15 duplicated December dates are **completely
+   empty** — both members of every pair, zero populated cells. And a missing
+   calendar day has no column at all, so it can hold no cell by construction. So
+   **every one of the 1,667 rows in scope carries a real, unique, trustworthy
+   date**, and 0.00% of either year's total sits behind a date we would have to
+   invent. This is what dissolves D4.
+
+   **The real fidelity limit, which is different and worth her seeing:**
+   2024-12-17 through 2024-12-31 have no columns, so the app will show **no
+   spending for the last fifteen days of December 2024**. No import can recover
+   that — the data was never entered in the workbook. 2024's imported annual total
+   is short by whatever was spent in that fortnight. The same holds, far more
+   narrowly, for 2024-06-16 and for 2023-06-16, 2023-07-01, 2023-07-03. That
+   2024-06-16 and 2023-06-16 are both absent suggests a sheet-construction
+   artefact rather than data loss.
+
+   *Cross-check worth recording, per this entity's discipline of not inheriting
+   unread facts:* this probe pairs day columns strictly (label `金額` immediately
+   preceded by label `品名`) and independently reproduces the earlier probe's
+   amount-cell counts **exactly** — 774 = 764 numeric + 10 text, 893 = 846 + 47.
+   It differs on one number: 362 day-column pairs for 2023 where the earlier scan
+   reported 363. The amount totals agreeing exactly means no data sits in the
+   disputed column, so nothing in scope turns on it.
 2. **The workbook does not reconcile against itself.** Checking every populated
    row-month cell against the sum of that month's day cells: **88.1% agree within
    1% for 2024 and 88.9% for 2023.** The mismatches cluster hard in October (7 in
@@ -315,24 +356,24 @@ writes over an existing tab; and her corrections are keyed to source cell
 coordinates, so they carry forward into the new tab rather than being matched by
 position.
 
-### Three decisions carried to the spec gate — each with a default
+### The three carried decisions — two ruled on, one dissolved by a probe
 
-The ideation gate put three questions to the captain and she left all three
-unanswered. They are **not** re-opened here as blank questions. Each now carries a
-concrete recommendation **and a stated default that applies if she says nothing**,
-so the spec gate is a confirm-or-correct rather than another open round:
+The ideation gate put three questions to the captain. She has since ruled on two,
+and turned the third back into a question for us, which a probe has now answered.
+**None is open:**
 
-| # | Question | Recommendation | Default if unanswered |
-|---|---|---|---|
-| **D3** | Undo, blast radius, staging first? | Staging first, both undo mechanisms | **A + U3** |
-| **D4** | Dates for the ~19 undated days | Real per-day dates; hand-correct in the normalization sheet | **A, falling back to C** — never B |
-| **D5** | Is 2022 in or out? | Out | **Out** |
+| # | Question | Status |
+|---|---|---|
+| **D3** | Undo, blast radius, staging first? | **RULED: staging first.** Requires the `--target` plumbing to be built here — AC-17, AC-18 |
+| **D4** | Dates for the ~19 undated days | **DISSOLVED by probe.** Those columns hold zero records; every imported row has a real date |
+| **D5** | Is 2022 in or out? | **RULED: out.** The band guard now enforces a ruling, not just an accident — AC-4 |
 
-Full statements, options and evidence are under **Spec → Decisions needed from the
-captain**. The defaults are chosen so that **no decision blocks `build`**: if the
-captain confirms nothing, build proceeds on the defaults and the result is
-conservative in every case — it rehearses before it writes, it drops a date rather
-than inventing one, and it imports less rather than more.
+Full statements and evidence are under **Spec → Decisions needed from the captain**.
+
+**D4 is worth reading even though it dissolved**, because the probe found something
+she should see that the original question did not ask about: 2024-12-17 to 12-31
+have no columns in the source at all, so the app will show no spending for the last
+fortnight of December 2024. That is a limit of the workbook, not of the import.
 
 ### No longer open
 
@@ -347,9 +388,10 @@ than inventing one, and it imports less rather than more.
 > **Rewritten in spec cycle 2.** The captain's six cycle-1 annotations and the
 > source readings under **Source: what is actually there** are folded in.
 > AC-2, AC-3 and AC-4 are recut against the real source; the normalization sheet
-> is specced as the approach with its own criteria; D3, D4 and the new D5 each
-> carry a recommendation and a default. Nothing in this section is now known to
-> rest on a falsified premise.
+> is specced as the approach with its own criteria. The captain has since ruled on
+> D3 (staging first) and D5 (2022 out), and asked back on D4, which a probe then
+> dissolved — those three are folded in here as settled, not as open questions.
+> Nothing in this section is now known to rest on a falsified premise.
 
 ### Blocking precondition — source access — CLEARED
 
@@ -529,12 +571,11 @@ So the extractor must key on the source row number, never on the taxonomy pair.
 
 ### Decisions needed from the captain
 
-**D3, D4 and D5 are live, and each carries a default.** D0, D1 and D2 were answered by the captain in the
+**D3, D4 and D5 are all settled.** D0, D1 and D2 were answered by the captain in the
 cycle-1 spec gate and are marked ANSWERED below rather than deleted, so the answer
-and the question it settles stay together. D3, D4 and D5 were all put to her at the
-ideation gate and all three came back unanswered, so each is restated below with a
-recommendation **and a default that applies if she says nothing** — none of them
-blocks `build`.
+and the question it settles stay together. D3 and D5 have since been **ruled** by
+the captain; D4 she turned back into a question, which a probe has answered.
+**Nothing here is open, and nothing blocks `build`.**
 
 #### D0 — Does 2023 exist, and how do we look? — ANSWERED
 
@@ -606,7 +647,7 @@ row-kind tag:
   `住/家具設備` and `住/住家維修` rows, about 8 rows per band. Following `008`, they
   land as ordinary expense rows with that label preserved in `notes`.
 
-#### D3 — Undo, blast radius, and whether staging goes first — RECOMMENDED A + U3, DEFAULT A + U3
+#### D3 — Undo, blast radius, and whether staging goes first — RULED: STAGING FIRST
 
 **Outcome at stake:** the live data two people use daily.
 
@@ -628,98 +669,147 @@ Undo mechanism:
 - **U2. Copy the whole spreadsheet before the import; restore by hand if it goes wrong.** Coarse — restoring also throws away every expense either user logged after the snapshot.
 - **U3. Both.** U1 as the routine reversal, U2 as the floor under it.
 
-*Recommendation: **A + U3**. The undo is exercised on staging before production is touched (AC-6), so "reversible" is a demonstrated fact rather than a claim in a report.*
+**The captain ruled: A + U3 — staging first.** Option B is closed. What follows is
+therefore not a recommendation but the work the ruling requires, specced rather than
+assumed away.
 
-***Default if unanswered: A + U3.*** It is the conservative branch — it rehearses
-apply *and* undo against data nobody depends on before the first production write —
-and it costs ~15–25 LOC in `load-local-env.js`. Choosing B instead is the change
-that needs her word, because B makes the first real write the first real test.
+##### The ruling has a cost, and it is build work, not configuration
 
-Two blast-radius notes she should see either way, whichever branch she picks:
+**Staging-first is not currently possible.** `functions/scripts/load-local-env.js`
+resolves `SPREADSHEET_ID` from `functions/.env` or the repo-root `.env.local` and
+**never** from `functions/.env.staging`. So no admin script can be aimed at staging
+today. Choosing staging-first therefore *requires* that plumbing to be built as part
+of this feature. It is required work with its own criterion — **AC-17** — not a
+prerequisite someone else supplies.
 
-- **Generating the normalization sheet touches staging regardless.** It adds a tab
-  to the staging expense spreadsheet even if the import target is production. That
-  is additive and reversible (`deleteSheet`, exercised), and inert to the app — but
-  it means "production only" is not "staging untouched".
-- **The captain's archive workbook is never written**, on any branch. Read-only
-  throughout, and the spec deliberately puts the normalization tab elsewhere so that
-  stays true.
+**And the credential path and the target path have to be reasoned about together**,
+because they do not move in step. Verified: the **production** service account gets
+`403 The caller does not have permission` on the archive workbook, and only the
+**staging** account can read it. So:
 
-#### D4 — Date granularity, and how many rows this adds — RECOMMENDED A, DEFAULT A FALLING BACK TO C
+| Phase | Reads | With | Writes | With |
+|---|---|---|---|---|
+| extract | archive workbook | **staging creds always** | normalization tab, staging spreadsheet | **staging creds always** |
+| import | normalization tab, staging spreadsheet | **staging creds always** | target Expenses tab | **the target's creds** |
+
+The extractor is staging-only in both directions, on every run. The importer holds
+**two credential sets at once** whenever `--target production` — staging to read the
+sheet, production to write the rows. A `--target` flag that switches one global
+credential pair would break the read side and is the obvious wrong implementation;
+AC-17's falsifier names it.
+
+That two-credential requirement makes `load-local-env.js` a larger change than the
+earlier ~15–25 LOC estimate, which assumed one swappable pair. Revised to **~30–50
+LOC** in the surface estimate below.
+
+##### The staging rehearsal is a precondition of any production write
+
+Not a recommended sequence — an enforced one, **AC-18**. The full rehearsal is
+snapshot → apply → verify → hand-add a row → undo → diff against snapshot, run
+against staging, and `--target production --apply` refuses to run until it has
+completed against **the same normalization sheet** that production is about to
+import.
+
+Two blast-radius notes that survive the ruling:
+
+- **Generating the normalization sheet touches staging by design.** It adds a tab to
+  the staging expense spreadsheet. Additive, reversible (`deleteSheet`, exercised),
+  and inert to the app, which reads tabs by name.
+- **The captain's archive workbook is never written.** Read-only throughout, on
+  every phase and every target.
+
+#### D4 — Date granularity, and the undated days — ANSWERED BY PROBE: THERE ARE NO RECORDS THERE
 
 **Outcome at stake:** whether a synthetic date can masquerade as a real transaction date.
 
-Its premise changed and its options are re-cut accordingly. The decision is still
-hers, but it no longer blocks: the default below needs nothing from her. The source is **not** an annual matrix of twelve monthly
-columns — it is a day-level matrix carrying a real date per column. The app stores a
-day-level `date` and filters reports by `date.startsWith(year)` and `YYYY-MM`. There
-is no pagination anywhere — `GET /api` returns every expense and the client sorts and
-filters the whole list (`app/app/lib/historyService.ts`, `app/app/history/page.tsx`).
+**The captain declined to decide blind and asked back: "is there any expense
+records?"** That was the right question, and it had never been asked of the data.
+It has now been, per column, by `probe-undated-days.js`. **The answer is no.**
 
-The "will this slow the app" half is now answered by measurement rather than
-estimate: **~1,670 rows for both years combined**, not ~1,400 per year. That is small.
-What is left is genuinely a judgement call, on the days the source cannot date — the
-16 damaged December 2024 columns and the ~3 missing days in 2023:
+- **Day columns with data but no parseable date: 0, in both years.** There is no
+  such thing as an undated row in this source.
+- **The 15 duplicated December 2024 dates occupy 30 columns. All 30 are empty** —
+  both members of every pair, zero populated cells.
+- **The 16 missing 2024 days and 3 missing 2023 days have no column at all**, so
+  they can hold no cell by construction.
+- **Rows with an untrustworthy date: 0 of 774 for 2024, 0 of 893 for 2023.** The
+  share of either year's total sitting behind a date we would have to invent is
+  **0.00%**.
 
-- **A. Use the source's real per-day date, and hand-correct the undated days in the
-  normalization sheet.** Highest fidelity; every row is a real date the captain
-  stands behind. Costs her a short pass over ~19 cells.
-- **B. Use the real date where there is one; park the undated ones on the last dated
-  day of their month.** No manual work. Those rows then carry a date that looks real
-  and is not — the exact failure mode this decision exists to prevent, confined to
-  ~19 rows.
-- **C. Use the real date where there is one; drop the undated rows and report the
-  count.** Honest and cheap; loses a fraction of December 2024.
+Full table under **Source: what is actually there → defect 1**.
 
-*Recommendation: **A**. The manual pass is small, it happens in the normalization
-sheet she has already asked for, and it is the only option where every date in the
-app is a date that was actually recorded.*
+**So D4 dissolves.** Options A, B and C were a trade between fidelity, the captain's
+time, and dropped rows — and the quantity being traded turns out to be zero. Every
+one of the 1,667 rows carries a real, unique date taken from its own column header.
 
-***Default if unanswered: A, falling back automatically to C — never B.*** The
-extractor marks every row it cannot date `status=undated` and leaves `date` blank.
-She may fill those in; she does not have to. At import time, any row still
-`status=undated` is **excluded and reported by count**. So A happens if she spends
-the ten minutes, C happens if she does not, and neither needs an answer from her in
-advance. B — parking an undated row on the month's last dated day — is not
-implemented at all, so the failure this decision exists to prevent cannot occur by
-default, by drift, or by a later flag.
+*Resolution: option A, at zero cost to her.* Real per-day dates throughout, no
+manual pass, because there is nothing to correct. **Option B is not implemented at
+all** — the extractor has no code path that assigns a date a cell did not carry — so
+the failure this decision existed to prevent cannot occur by drift or by a later
+flag. The `status=undated` path is still built, as a guard rather than a workflow: if
+the extractor ever meets a day column holding data with no date, it marks the row and
+excludes it rather than guessing. On this data it will mark nothing.
 
-The blank-date rows are the *only* thing the ~19 undated days cost. Every other row
-in both years carries a real date from its own column header.
+##### The thing she should see instead
 
-#### D5 — Is 2022 in or out of scope? — RECOMMENDED OUT, DEFAULT OUT
+The probe found a different fact, which the original question did not ask about and
+which no decision can fix:
+
+**2024-12-17 through 2024-12-31 do not exist in the source.** No columns, so no
+data — the fortnight was never entered. The app will therefore show no spending for
+the last fifteen days of December 2024, and 2024's imported annual total is short by
+whatever was spent then. The same applies far more narrowly to 2024-06-16, and to
+2023-06-16, 2023-07-01 and 2023-07-03.
+
+This is a fidelity limit of the workbook, not of the import, and no option under D4
+would have recovered it. It is stated here so the first time she notices a thin
+December is now and not after the import. If she wants those days, the only route is
+entering them by hand — in the normalization sheet before import, or in the app
+afterwards. Nothing in this spec depends on which.
+
+The other half of the original D4 — "how many rows does this add" — is answered by
+measurement: **1,667 rows for both years**, small enough that the app's lack of
+pagination is not a concern (`GET /api` returns every expense and the client filters
+the whole list — `app/app/lib/historyService.ts`, `app/app/history/page.tsx`).
+
+#### D5 — Is 2022 in or out of scope? — RULED: OUT
 
 **Outcome at stake:** whether this feature lands two years or three, and whether it
 takes work away from `060`.
 
-This one only became a question when the source turned out to be one tab holding
-three stacked bands. 2022 sits at rows 63–88, complete, in the same shape, with
-identical columns A–C. It was never *excluded* on evidence; it was excluded because
-the ideation gate bounded scope to 2023–2024 before anyone knew 2022 was sitting
-right there.
+**The captain ruled: 2022 is out of scope.** It is not specced, not imported, and
+not offered as a flag. The band at rows 63–88 is read only so the extractor knows
+where the 2023 band ends.
 
-- **Out (recommended).** The captain approved a two-year scope at the ideation gate,
-  and the remaining archive years belong to `060`. Importing 2022 here would take a
-  year out of `060`'s inventory without `060` having specced it.
-- **In.** Costs roughly one more band's worth of rows and a second pass over the
-  normalization sheet. It buys a third year in Reports now instead of after `060`.
+This became a question only when the source turned out to be one tab holding three
+stacked bands — 2022 was never excluded on evidence, it was excluded because the
+ideation gate bounded scope before anyone knew it was sitting there. The ruling
+closes that: 2022 belongs to `060`, which owns the archive years.
 
-*Recommendation: **out**. **Default if unanswered: out.***
+##### The band-boundary guard is now enforcing a ruling, not avoiding an accident
 
-**The honest part of this recommendation:** deferring 2022 costs almost nothing to
-reverse. The extractor discovers all three bands anyway — it has to, in order to
-know where the 2023 band ends — so adding 2022 later is a `--years 2022` flag and
-one more normalization-sheet review, not a rewrite. That asymmetry is why "out" is
-the low-regret answer rather than merely the cautious one.
+This raises the stakes on the guard rather than lowering them. A row-range slip
+would contaminate live financial data **across two features** — it would put rows in
+the app that `060` still counts as unimported, so both features' records would be
+wrong and neither would show it.
 
-**This is also where the band-boundary risk lives, and it is not a cosmetic one.**
-Columns A, B and C are **byte-identical across all three bands** — verified, the
-same 26 rows in the same order in 2024, 2023 and 2022. So if a row-range slip pulled
-2022 rows in, *nothing in the taxonomy would look wrong*. The rows would be
-well-formed, correctly categorised, and silently attributed to the wrong year. The
-only discriminator is the date in each band's own header row. AC-4 is written
-against exactly that, and the guard was exercised: rows 1 / 31 / 61 yield years
-2024 / 2023 / 2022 with no cross-year contamination in any of them.
+**And the slip would be invisible.** Verified: columns A, B and C are
+**byte-identical** across all three bands — the same 26 rows, same buckets, same
+sub-categories, in the same order, in 2024, 2023 and 2022. Contaminating rows would
+be well-formed, correctly categorised, and wrong only in their year. No taxonomy
+check, no category check, no row-count sanity check would catch them.
+
+Three things make the guard hold, and AC-4 asserts all three:
+
+1. **No hard-coded row ranges.** The extractor discovers bands from column A's
+   `收入支出` / `非固定支出` structure. There is no range constant to get wrong.
+2. **Each band is labelled from the dates in its own header row**, and selected by
+   year. Exercised on the live tab: header rows 1 / 31 / 61 yield exactly one year
+   each — 2024 / 2023 / 2022 — with no cross-year contamination in any of them.
+3. **Every row's own date is checked at the app boundary.** `--verify` asserts zero
+   imported rows carry a date outside 2023 and 2024. This is the backstop that holds
+   whatever the cause — a band bug, a mapping bug, or a hand edit in the
+   normalization sheet.
 
 ### Goal
 
@@ -737,7 +827,7 @@ Land the captain's 2023 and 2024 historical expense records — both confirmed p
 - ~~**2023 may have no record at all.**~~ **Closed.** 2023 is present, rows 33–58 of tab `gid=1209807047`, with 363 day columns spanning the full year. There is no 2024-only fallback to carry.
 - ~~**Aggregate rows sit in the same columns as data rows.**~~ **Wrong shape, replaced.** All 78 data rows in the tab are real line items; there are no aggregate *rows*. The aggregates are **columns** — twelve month-total columns per band, each sitting immediately before its month's day columns. A parser that walks columns indiscriminately therefore double-counts every month. The discriminator is the column-label row (`品名`/`金額` marks a day column; a month-total column's label cell is neither), not the column-A tag.
 - **The workbook disagrees with itself.** Only ~88% of populated row-month cells match the sum of their own day cells within 1%, and the mismatches cluster in October in both years. Any acceptance criterion that reconciles the import against the workbook's own totals will fail on the source rather than on the parser. The reconciliation target has to be the normalization sheet the captain has signed off, with the source-vs-source discrepancies surfaced to her there.
-- **December 2024's day headers are damaged.** They stop at 2024-12-16 and repeat 15 dates in early December; 16 calendar days of 2024 have no column at all. 2023 is nearly clean by comparison — 3 missing days, no duplicates. This is the concrete case D4 now turns on.
+- **December 2024's day headers are damaged, but the damage sits in empty columns.** They stop at 2024-12-16 and repeat 15 dates in early December; 16 calendar days of 2024 have no column at all. Probed per column: all 30 columns behind the duplicated dates are empty, and no day column in either year holds data without a date. So there is no undated-row case to handle — 0 of 774 rows in 2024 and 0 of 893 in 2023. The extractor still carries a `status=undated` guard for a day column with data and no date; on this source it marks nothing. The residual cost is that 2024-12-17 to 12-31 are absent from the source entirely and cannot be imported.
 - ~~**Rows with a blank column-A tag.**~~ **Does not occur.** Column A is `非固定支出` on every one of the 78 data rows.
 - **Blank day cells.** The overwhelming majority. A blank means no spending was logged that day for that line item; no row is written. No zero-valued amount cell exists in either band in scope, so there is nothing to disambiguate.
 - **Amounts stored as text.** 10 cells in 2024 and 47 in 2023 are strings rather than numbers. Measured, they are plain digit strings — no thousands separators, no currency prefix — so `Number(String(v).trim())` parses them. The trap is the opposite of the one previously feared: a parser that accepts only `typeof v === "number"` silently drops 47 real 2023 amounts rather than failing loudly. Any value that genuinely fails to parse aborts the run with the source cell reference; it never silently becomes 0.
@@ -755,7 +845,7 @@ Land the captain's 2023 and 2024 historical expense records — both confirmed p
 
 ### Out of Scope
 
-- Years other than 2023 and 2024 — decision **D5**, defaulted to *out*. The rest of the archive stays with `060`.
+- Years other than 2023 and 2024 — the captain **ruled** 2022 out (**D5**). The rest of the archive stays with `060`.
 - Writing to the captain's archive workbook. It is read-only throughout; the normalization sheet lives in the staging expense spreadsheet instead.
 - Creating any category. The mapping targets the 22 `name_en` values common to both live Categories tabs (AC-9).
 - `gov_category`. It is a property of a category, not of an expense row, so choosing `category_id` settles it.
@@ -768,7 +858,14 @@ Land the captain's 2023 and 2024 historical expense records — both confirmed p
 
 ## Acceptance criteria
 
-Verification split: **offline** — AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-9, AC-10, AC-11, AC-12, AC-13, AC-14, AC-15, AC-16. **Interactive** — AC-7, AC-8. No harness is built to automate AC-7 or AC-8; both are judged on a live drive of the deployed app.
+Verification split: **offline** — AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-9, AC-10, AC-11, AC-12, AC-13, AC-14, AC-15, AC-16, AC-17, AC-18. **Interactive** — AC-7, AC-8. No harness is built to automate AC-7 or AC-8; both are judged on a live drive of the deployed app.
+
+**Captain rulings folded in:** AC-4 is strengthened to three independent enforcement
+points because it now carries the D5 ruling that 2022 stays with `060`. AC-17 and
+AC-18 are new and exist because staging-first was ruled: AC-17 builds the `--target`
+plumbing that makes staging reachable at all, AC-18 makes the staging rehearsal a
+precondition of any production write. D4 dissolved on a probe and needs no criterion
+— there are no undated rows to have a policy about.
 
 **Status after the cycle-2 rewrite:** AC-2, AC-3 and AC-4 are **recut** — each now
 asserts a property of *our* work that the source's own inconsistency cannot falsify.
@@ -810,16 +907,17 @@ Falsified by: accepting every column from F onward regardless of its label cell 
 so a row-kind filter has nothing to filter and a test of it would pass no matter what
 the code did. The double-counting hazard in this tab is columnar.
 
-**AC-4 — No row dated outside 2023 or 2024 reached the app, and the extractor derived its band ranges from the sheet rather than being handed row numbers.** — *recut; supersedes "income-side source rows are absent", which was vacuous — the tab has no income rows, so it passed whether or not any exclusion logic existed.*
-Verified by: offline, in two parts. (a) `--verify` asserts every row whose id begins `exp-hist-` has a `date` starting `2023-` or `2024-`, and reports the count of any others as a number that must be `0`. (b) A unit test over the committed synthetic fixture asserts the extractor **discovers** the three bands from column A's `收入支出` / `非固定支出` structure, labels each from the dates in its own header row, and emits rows for the two in-scope years only.
-Falsified by: replacing the year-based band selector with a positional one ("take the first three bands") — the fixture then emits its 2022 band, (b) fails on the band count and (a) fails with a non-zero out-of-range date count.
+**AC-4 — No row dated outside 2023 or 2024 can reach the app, enforced at three independent points.** — *recut and strengthened; supersedes "income-side source rows are absent", which was vacuous — the tab has no income rows, so it passed whether or not any exclusion logic existed. Now enforces the captain's D5 ruling that 2022 stays with `060`.*
+Verified by: offline, in three parts, each of which fails independently. (a) A unit test over the committed synthetic fixture asserts the extractor **discovers** bands from column A's `收入支出` / `非固定支出` structure — no row-range constant exists in the source — labels each band from the dates in its own header row, and emits rows for 2023 and 2024 only. (b) The extractor asserts, per emitted row, that the row's own date falls in its band's declared year, and aborts naming the row otherwise. (c) `--verify` asserts every row whose id begins `exp-hist-` has a `date` starting `2023-` or `2024-`, reporting the count of any others as a number that must be `0`.
+Falsified by: replacing the year-based band selector with a positional one ("take the first three bands") — the fixture then emits its 2022 band and (a) fails on the band count, (b) fails on the first 2022-dated row, and (c) fails with a non-zero out-of-range count. A single edit trips all three, which is the point: (c) also holds against causes (a) and (b) cannot see, such as a hand edit to a date in the normalization sheet.
 
-*Why the year and not the row range:* columns A–C are byte-identical across all
-three bands, so a row-range slip produces well-formed, correctly categorised rows
-attributed to the wrong year — invisible to every check except a date one. The guard
-was exercised against the live tab: header rows 1 / 31 / 61 yield exactly one year
-each (2024 / 2023 / 2022), so a year assertion is a real discriminator here and not
-a hopeful one.
+*Why three points and not one:* a slip here corrupts **two** features at once —
+rows land in the app that `060` still counts as unimported, so both records are
+wrong and neither shows it. And the slip is invisible to everything except a date
+check: columns A–C are byte-identical across all three bands, so contaminating rows
+are well-formed and correctly categorised. The band-year discriminator was exercised
+against the live tab — header rows 1 / 31 / 61 give exactly one year each, no
+cross-year contamination — so (a) rests on a measured property, not a hoped-for one.
 
 **AC-5 — Running the import a second time writes nothing.**
 Verified by: offline — a second `--apply` against the same target reports `created: 0` with every candidate skipped as already present. Falsified by: generating row ids from `Date.now()` instead of the deterministic `exp-hist-{year}-{NNNN}` — the second run then writes a full duplicate set.
@@ -870,6 +968,18 @@ Falsified by: making the extractor exit non-zero when a variance exceeds a thres
 Verified by: offline — three assertions against a scripted sequence on the staging spreadsheet: (a) `--generate` into an existing tab name exits non-zero and mutates nothing; (b) after editing a `date`, an `amount`, a `category_name_en` and a `status` in tab v1, `--generate --into v2 --carry-from v1` produces a v2 carrying all four edits **and leaves v1 byte-identical**; (c) a key whose source cell was blanked appears in v2 with `status=orphaned` rather than being absent.
 Falsified by: matching carried-forward edits on the normalization sheet's row index instead of on `key` — insert or drop one row in v2 and every edit after it lands on the wrong expense, which (b) catches because the four edited values arrive on the wrong keys.
 
+**AC-17 — `--target staging` aims the run at staging, while the source is always read with the staging service account regardless of target.** — *new; this is the plumbing the captain's staging-first ruling requires, and it is build work in this feature.*
+Verified by: offline — a test asserts that with `--target staging` the resolved write id equals `functions/.env.staging`'s `SPREADSHEET_ID` and **not** whatever `load-local-env.js` resolves from `functions/.env` / `.env.local`; that with `--target production` the resolved write id is the production one **while the archive-workbook and normalization-sheet reads still use the staging credentials**; and that the two credential sets are distinct objects in the same run.
+Falsified by: implementing `--target` as a single swappable credential pair — `--target production` then reads the archive workbook with the production service account, which returns `403 The caller does not have permission` on that workbook, so the run cannot read its own source. The test fails on the read, not on the write, which is the failure mode a write-only test would miss.
+
+*Why this is required rather than optional:* staging-first is impossible without it.
+`load-local-env.js` reads `functions/.env` and the repo-root `.env.local` only, never
+`functions/.env.staging`, so no admin script can be aimed at staging today.
+
+**AC-18 — No production write happens before a completed staging rehearsal of the same normalization sheet.**
+Verified by: offline — the staging rehearsal (snapshot → apply → verify → hand-add a row → undo → diff) writes a receipt under the gitignored `functions/backfill-reports/` recording the target, the normalization sheet name, its `C1` digest, the row count and the undo result. `--target production --apply` reads that receipt and refuses — non-zero, nothing written, Expenses row count unchanged — if it is absent, or if its digest does not match the sheet about to be imported. A test drives production-apply with no receipt, and again with a receipt whose digest belongs to a different sheet; both must refuse.
+Falsified by: dropping the digest comparison and checking only that a receipt exists — a stale receipt from an earlier rehearsal then satisfies the gate, and production imports a sheet that was never rehearsed. The second test case catches exactly that.
+
 ## Risk evidence
 
 **Reading the source workbook — was the riskiest mechanism, now exercised and proven.** The captain shared the workbook with the staging service account, and reading it through `expense-tracker-staging@expense-sheet-staging...` succeeded: nine tabs enumerated, the `Daily` tab's structure mapped, all three year bands located, and every count in **Source: what is actually there** taken from live reads. The prior diagnosis was half right — the Drive connector is authenticated to the wrong account and still returns `Requested entity was not found` — but its proposed remedy was wrong: reconnection was never needed. Note the account that works is the **staging** service account, not the production one, which returns `403 The caller does not have permission`. An admin script that resolves its credentials through `load-local-env.js` picks up the **production** key from `.env.local` and will therefore fail to read the source at all. That is a second, independent reason AC-12's explicit `--target` matters.
@@ -883,7 +993,9 @@ Two negative results from the same probe round change the design rather than jus
 
 **Second riskiest, and the one that would have shipped silently: category ids are not portable between environments.** Read live rather than taken from `DEFAULT_CATEGORIES` — staging and production Categories tabs both use `cat_NNN` and **disagree from `cat_023` onward** (`Test Cat / Antkee / ScrollTest` vs `Tenant / Insurance / Tax`). A mapping table built and rehearsed on staging would therefore file production rows under wrong categories while every id-exists check still passed. This is why the mapping resolves `name_en` at run time against the target's own tab (AC-9), and why D3's staging rehearsal cannot substitute for a production pre-flight.
 
-**Third: the band-boundary guard.** Exercised. Columns A–C are byte-identical across all three bands, so taxonomy cannot discriminate them; the date-header rows can. Rows 1 / 31 / 61 yield exactly one year each — 2024 / 2023 / 2022 — with no cross-year contamination, so AC-4's year assertion is a real discriminator on the live data and not just on a fixture.
+**Third: the band-boundary guard, now enforcing the captain's D5 ruling.** Exercised. Columns A–C are byte-identical across all three bands, so taxonomy cannot discriminate them; the date-header rows can. Rows 1 / 31 / 61 yield exactly one year each — 2024 / 2023 / 2022 — with no cross-year contamination, so AC-4's year assertion is a real discriminator on the live data and not just on a fixture. AC-4 now enforces it at three independent points, because a slip corrupts `060`'s records as well as this feature's and would be invisible to every non-date check.
+
+**Fourth: the undated December 2024 days — probed at the captain's request, and they hold nothing.** She declined to decide D4 blind and asked whether those days contain records. Checked per column: **0 day columns with data and no date, in either year**; all 30 columns behind the 15 duplicated December dates are empty; missing calendar days have no column at all. **0 of 774 rows in 2024 and 0 of 893 in 2023 have an untrustworthy date.** D4 dissolves — there is nothing to trade. The probe independently reproduced the earlier scan's amount-cell counts exactly (774 = 764+10, 893 = 846+47) using stricter column pairing, which also cross-validates the `品名`/`金額` discriminator AC-3 rests on. It disagrees with the earlier scan on one number — 362 day-column pairs for 2023 against 363 — and since the amount totals match exactly, no data sits in the disputed column.
 
 **Fourth: trusting the source's own totals.** Exercised, and it does not hold. Reconciling every populated row-month cell against the sum of its own day cells gives 88.1% agreement within 1% for 2024 and 88.9% for 2023, clustered in October. Combined with December 2024's duplicated and truncated day headers, this means **the source cannot serve as its own correctness oracle** — which is the strongest argument for the captain's normalization sheet, and the reason AC-2 as written is unfalsifiable and must be recut.
 
@@ -896,14 +1008,17 @@ Two negative results from the same probe round change the design rather than jus
 Redone for the two-phase normalization-sheet approach. The parser does not go away;
 a sheet writer, a carry-forward and an approval check are added.
 
-Estimate: **+1,050 net LOC across 6 files, tolerance ±30%** (so 735–1,365).
+Estimate: **+1,120 net LOC across 6 files, tolerance ±30%** (so 784–1,456).
 
 - `functions/scripts/extract-historical-expenses.js` — new, ~350–450 LOC. Band discovery, day-column pairing, amount parsing, mapping to `name_en`, `--generate` / `--into` / `--carry-from`, the variance report.
 - `functions/scripts/import-historical-expenses.js` — new, ~300–400 LOC. Reads an `APPROVED` sheet by explicit name, resolves `name_en` against the target's live tab, `--dry-run` / `--apply` / `--verify` / `--undo` / `--snapshot`, batched writes reusing `backfill-subscription-history.js`'s shape.
 - `functions/test/historical-expenses.test.js` — new, ~250 LOC over **synthetic** fixtures. Covers AC-3, AC-4(b), AC-5, AC-10, AC-15, AC-16.
 - `functions/test/fixtures/historical-bands.json` — new, ~80 LOC. Three synthetic bands reproducing the source's structure with invented numbers (AC-11).
-- `functions/scripts/load-local-env.js` — ~15–25 LOC for `--target staging|production`.
+- `functions/scripts/load-local-env.js` — **~30–50 LOC** for `--target staging|production`. Revised up from ~15–25: the earlier figure assumed one swappable credential pair, but the importer needs **two at once** — staging to read the normalization sheet and the archive workbook, the target's own to write. AC-17.
 - `functions/package.json` — 6–8 script entries.
+
+The staging-rehearsal receipt (AC-18) adds ~40 LOC spread across the importer and
+its test rather than a file of its own.
 
 Two scripts rather than one is deliberate: the captain's approval sits between them,
 and a single script with a phase flag makes it possible to run straight through that
@@ -920,12 +1035,15 @@ no auth change, no scheduled-behavior change, no client change.
 - **Carry-forward rehearsal on the staging spreadsheet, offline:** generate v1 → hand-edit four cells → `--generate --into v2 --carry-from v1` → assert the four edits arrived on the right keys and v1 is unchanged → blank a source cell and assert `status=orphaned`. Covers AC-16. Uses the mechanism already proven by `probe-staging-addsheet.js`.
 - **Dry-run, offline:** `--dry-run --target staging --from-sheet ...` prints per-year planned row counts, the `key`-join result, the `status=undated` exclusion count, and the resolved `name_en` → `cat_NNN` table for that target. Covers AC-2, AC-4(a), AC-13, AC-14.
 - **Apply + undo rehearsal on staging, offline:** snapshot → apply → verify → add one row by hand → undo → diff against snapshot. Covers AC-1, AC-6, AC-9, AC-12.
-- **Production pre-flight, offline, non-negotiable even if D3-B is chosen:** resolve every mapped `name_en` against **production's** Categories tab and abort on any miss, before the first production write. The staging rehearsal cannot cover this — the two tabs diverge from `cat_023`.
+- **Target plumbing, offline:** a test asserting `--target staging` resolves the staging write id (not `load-local-env.js`'s), that `--target production` still reads source and normalization sheet with **staging** credentials, and that the two credential sets coexist. Covers AC-17. This is the ruling's build cost.
+- **Rehearsal gate, offline:** drive `--target production --apply` with no receipt, and again with a receipt whose digest belongs to a different sheet; both must refuse without writing. Covers AC-18.
+- **Production pre-flight, offline:** resolve every mapped `name_en` against **production's** Categories tab and abort on any miss, before the first production write. The staging rehearsal cannot cover this — the two tabs diverge from `cat_023`.
 - **Live drive, interactive:** deployed staging — Reports → Annual stepped back to each imported year, then add/see/delete one expense and open History, confirming the extra `Migration 2023-2024` tab is inert. Covers AC-7 and AC-8; repeated against production after deploy.
-- **Cost:** unit tests are seconds. The carry-forward and apply/undo rehearsals are the expensive steps; both depend on D3-A. Under D3-B there is no apply rehearsal and production is the first write — the carry-forward rehearsal still runs, because the normalization sheet lives on staging either way.
+- **Cost:** unit tests are seconds. The carry-forward and apply/undo rehearsals are the expensive steps, and the captain's staging-first ruling makes both mandatory rather than optional. There is no cheaper branch to fall back to — that is the cost the ruling buys, and AC-18 is what stops it being skipped under time pressure.
 
 ### Feedback Cycles
 
+- Cycle 2b: captain rulings folded in mid-stage — 2022 ruled OUT (D5) and the band guard strengthened from one enforcement point to three, because a slip now corrupts `060`'s records as well as this feature's; staging-first ruled (D3), which converts the `--target` plumbing from optional to required build work with AC-17, adds AC-18 making the staging rehearsal a precondition of any production write, and surfaces that the importer needs two credential sets at once (the production service account gets 403 on the source workbook); D4 turned back by the captain as "is there any expense records?" and answered by probe — **there are none**, 0 of 774 rows in 2024 and 0 of 893 in 2023 have an untrustworthy date, so D4 dissolves. Surface estimate +1,050 → +1,120 LOC (`load-local-env.js` revised ~15–25 → ~30–50 for the two-credential requirement).
 - Cycle 2: rework — spec rewritten against the cycle-1 revise and the ideation-cycle-2 readings; surface estimate revised from +700 LOC across 4 files to +1,050 across 6 (+50%, driven by splitting extract and import into two scripts so the captain's approval sits structurally between them); AC-2, AC-3 and AC-4 recut so each is falsifiable only by a defect in our own work; AC-15 (source variance reported, gates nothing) and AC-16 (corrections survive a re-generate) added; AC-9 and AC-10 tightened after two live readings — staging and production Categories tabs diverge from `cat_023`, and `(bucket, sub_category)` is not a unique row key; D5 (2022 in or out) raised, and D3/D4/D5 each given a recommendation plus a default so none blocks build.
 - Cycle 1: revise — captain at the spec gate (briefing:061:spec:attempt-1:revision-1, six annotations); surface 1 file/+0 net deliverable LOC vs estimate +700 across 4 files (0% — the round produced no code, only re-scoped inputs); AC narrowed: source inspection satisfied AC-13, exposed AC-2 as unfalsifiable (the workbook does not reconcile against itself — ~88% of populated row-month cells match their own day sums), and found AC-3 and AC-4 written against premises that are false for the real tab (no aggregate rows, no income rows); AC-3, AC-4 marked for recutting and AC-14 proposed to carry AC-13's gating role.
 
@@ -1003,3 +1121,28 @@ The three recut criteria now rest on references we control — the approved norm
 Four mechanisms were exercised this cycle rather than assumed, and two of them changed the design. The normalization sheet's host was proven by running `addSheet` → write → read back → `deleteSheet` against the staging expense spreadsheet; the same probe round found the **Drive API disabled** on the staging project (killing the standalone-workbook route) and found no non-mutating way to test write permission on the captain's archive workbook, so the design routes around it and keeps that workbook read-only. Separately, reading both live Categories tabs showed staging and production **diverge from `cat_023`** (`Test Cat/Antkee/ScrollTest` vs `Tenant/Insurance/Tax`), which would have shipped silently: a staging-derived id table files production rows under wrong categories while every id-exists check still passes. AC-9 now resolves `name_en` against the target's own tab, and D3 gains a production pre-flight no staging rehearsal can substitute for.
 
 Surface estimate rose from +700 LOC across 4 files to +1,050 across 6, tolerance ±30%. The increase is deliberate: extract and import are two scripts rather than one phase-flagged script, so the captain's approval sits structurally between them and AC-14 cannot be bypassed by a flag. Two probe scripts were added under the gitignored `functions/backfill-reports/061-probe/`; like the existing five they print structure only, never amounts or item names, per AC-11.
+
+## Stage Report: spec (cycle 2b — captain rulings)
+
+- DONE: 2022 — OUT OF SCOPE. Keep the band-boundary guard and make it stronger
+  D5 rewritten from a recommendation to a ruling: 2022 is not specced, not imported, and **not offered as a flag** (the earlier "reversible with `--years`" escape hatch is removed). AC-4 goes from one enforcement point to three, each independently falsifiable — band discovery from column A's structure with no row-range constant, a per-row date-in-declared-year assertion in the extractor, and a post-import assertion that zero `exp-hist-` rows fall outside 2023/2024. The third holds against causes the first two cannot see, including a hand edit to a date in the normalization sheet. Rationale recorded: a slip corrupts `060`'s records as well as this feature's, and is invisible to every non-date check because columns A–C are byte-identical across all three bands.
+- DONE: D3 — STAGING GOES FIRST, with the plumbing cost specced rather than assumed away
+  D3 rewritten as a ruling; option B closed. The `--target` work is now required build work with its own criterion (AC-17), and the staging rehearsal is an enforced precondition of any production write (AC-18) via a receipt whose digest must match the sheet production is about to import — falsified by checking only that a receipt exists, which lets a stale one through.
+- DONE: note the wrinkle — the credential path and the target path have to be reasoned about together
+  Specced as a table rather than a caveat. The extractor is staging-only in both directions on every run; the importer holds **two credential sets at once** whenever `--target production`, because the production service account gets `403` on the archive workbook and only staging can read it. AC-17's falsifier is precisely the naive implementation — one swappable credential pair — which fails on the *read* side, where a write-only test would miss it. Surface estimate for `load-local-env.js` revised ~15–25 → ~30–50 LOC accordingly; total +1,050 → +1,120.
+- DONE: D4 — PROBE FIRST and answer factually: do the undated columns contain data?
+  Probed per column (`probe-undated-days.js`, gitignored). **They contain nothing.** Day columns holding data with no parseable date: **0 in both years**. All 30 columns behind the 15 duplicated December 2024 dates are empty — both members of every pair. Missing calendar days have no column at all, so can hold no cell by construction. Rows with an untrustworthy date: **0 of 774 (2024), 0 of 893 (2023)**; share of either year's total behind an invented date: **0.00%**.
+- DONE: If they are empty, D4 largely dissolves and you should say so plainly
+  Said plainly. D4 is marked ANSWERED BY PROBE, its three options retired as a trade whose quantity is zero, and no acceptance criterion was written for it — there are no undated rows to have a policy about. Resolution is option A at zero cost to her: real per-day dates throughout, no manual pass. Option B remains unimplemented so the synthetic-date failure cannot occur by drift.
+- DONE: Structure and counts only, no amounts or item names, per AC-11
+  The probe prints counts and percentage shares only; no amount, item name or detail label is printed or committed. It lives in the gitignored `functions/backfill-reports/061-probe/` (`git check-ignore` confirms).
+- DONE: Where your spec rests on a fact, check that the entity says someone actually read it
+  Applied to my own probe rather than only to inherited claims. The new probe reproduces the earlier scan's amount-cell counts **exactly** (774 = 764+10, 893 = 846+47) using stricter `品名`/`金額` pairing — which independently cross-validates the discriminator AC-3 rests on — and **disagrees** with it on one number: 362 day-column pairs for 2023 against the recorded 363. Recorded as a disagreement rather than smoothed over; since the amount totals match exactly, no data sits in the disputed column.
+
+### Summary
+
+Two rulings folded in and one question answered by going and looking. The 2022 ruling raised the guard rather than relaxing it — AC-4 now enforces at three independent points, because the failure it prevents corrupts two features at once and is invisible to every check except a date check.
+
+The staging-first ruling had a cost the spec now carries explicitly instead of assuming away: staging is not reachable today, so the `--target` plumbing is required build work (AC-17), and the rehearsal is an enforced precondition rather than a recommended sequence (AC-18). The subtlety worth flagging is the credential/target coupling — because only the staging service account can read the source workbook, the importer must hold two credential sets at once when targeting production. The obvious implementation of `--target`, one swappable pair, breaks the read side; AC-17's falsifier names exactly that, and fails on the read rather than the write.
+
+D4 dissolved. The captain was right to refuse to decide blind: the undated December 2024 columns hold **zero** records, so every one of the 1,667 rows in scope carries a real, unique date and there is nothing to trade. What the probe did surface is a different fact she should see — 2024-12-17 to 12-31 have no columns in the source at all, so the app will show no spending for that fortnight and no import can recover it. That is a limit of the workbook, not of this feature, and it is now stated where she will read it rather than discovered after the import.
