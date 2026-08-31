@@ -103,9 +103,10 @@ function loadPatched(scriptName, replacements) {
     );
     patched = patched.replace(from, to);
   }
-  // Relative requires would not resolve from a temp directory.
-  patched = patched.replace(/require\("\.\/([\w-]+)"\)/g, (_m, mod) =>
-    `require(${JSON.stringify(path.join(SCRIPTS, mod))})`
+  // Relative requires would not resolve from a temp directory — neither the
+  // sibling scripts nor the compiled `../lib/` modules.
+  patched = patched.replace(/require\("(\.\.?\/[\w./-]+)"\)/g, (_m, rel) =>
+    `require(${JSON.stringify(path.resolve(SCRIPTS, rel))})`
   );
   const file = tmpFile(`patched-${scriptName}`);
   fs.writeFileSync(file, patched, "utf8");
@@ -647,4 +648,625 @@ test("AC-17: a missing staging credential fails before any target is contacted",
 test("resolveTargets refuses an absent or unknown target", () => {
   assert.throws(() => resolveTargets({ target: null, env: STUB_ENV }), TargetError);
   assert.throws(() => resolveTargets({ target: "prod", env: STUB_ENV }), TargetError);
+});
+
+// ---------------------------------------------------------------------------
+// The importer and the staging Categories reconciliation
+// ---------------------------------------------------------------------------
+
+const importer = require(path.join(SCRIPTS, "import-historical-expenses.js"));
+const syncCategories = require(path.join(SCRIPTS, "sync-staging-categories.js"));
+
+const {
+  ID_PREFIX,
+  ImportError,
+  buildNotes,
+  parseNotes,
+  planImport,
+  historicalId,
+  minorUnits,
+  resolveCategoryNames,
+  diffSnapshot,
+  snapshotOf,
+  verifyAgainst,
+  assertRehearsed,
+} = importer;
+
+const NORMALIZATION_TAB = "Migration 2023-2024";
+
+// Production's Expenses tab carries the captain's `month` / `amount value` helper
+// columns — unknown to EXPENSES_SPEC, and they must survive untouched.
+const EXPENSES_HEADER = [
+  "id", "date", "amount", "category_id", "paid_by", "created_by", "notes", "created_at",
+  "month", "amount value",
+];
+
+// Two rows the two users logged, which the import must not touch. The second is
+// dated inside an imported year, so an undo keyed on the date year would eat it.
+const PRE_EXISTING = [
+  ["exp-001", "2026-08-01", "120", "cat_003", "user1", "user1", "coffee", "2026-08-01T09:00:00.000Z", "2026-08", "120"],
+  ["exp-002", "2024-06-15", "80", "cat_003", "user2", "user2", "an old row of theirs", "2024-06-15T09:00:00.000Z", "2024-06", "80"],
+];
+
+const CATEGORIES_HEADER = ["id", "name_en", "name_zh", "icon", "sort_order", "is_active", "gov_category", ""];
+
+/** Staging's tab: agrees with production on cat_001-cat_022, diverges after. */
+const STAGING_CATEGORIES = [
+  ["cat_003", "Groceries", "食材", "🥕", "3", "true", "food_beverage_tobacco", ""],
+  ["cat_012", "Equipment", "家具設備", "🛋️", "12", "true", "miscellaneous", ""],
+  ["cat_022", "Other", "雜項", "📦", "22", "true", "miscellaneous", ""],
+  ["cat_023", "Test Cat", "測試", "🧪", "23", "true", "", ""],
+  ["cat_024", "Antkee", "螞蟻", "🐜", "24", "true", "", ""],
+  ["cat_025", "ScrollTest", "捲動", "📜", "25", "true", "", ""],
+];
+
+/** Production's: the same ids carrying different meanings from cat_023 on. */
+const PRODUCTION_CATEGORIES = [
+  ["cat_003", "Groceries", "食材", "🥕", "3", "true", "food_beverage_tobacco", ""],
+  ["cat_012", "Equipment", "家具設備", "🛋️", "12", "true", "miscellaneous", ""],
+  ["cat_022", "Other", "雜項", "📦", "22", "true", "miscellaneous", ""],
+  ["cat_023", "Tenant", "房客", "🏠", "23", "true", "miscellaneous", ""],
+  ["cat_024", "Insurance", "保險", "🛡️", "24", "true", "insurance_financial", ""],
+  ["cat_025", "Tax", "稅金", "🧾", "25", "true", "miscellaneous", ""],
+];
+
+/**
+ * A normalization tab as the extractor would have written it, optionally with the
+ * captain's approval marker and per-key hand edits applied.
+ */
+function normalizationTab({ approved = true, edits = {}, rows = null } = {}) {
+  const source = rows ?? extract(grid()).rows;
+  const { grid: sheet, digest } = sheetGridFor(source, "2026-08-31T00:00:00.000Z");
+  if (approved) sheet[0][1] = "APPROVED";
+  const keyAt = SHEET_COLUMNS.indexOf("key");
+  for (const [key, changes] of Object.entries(edits)) {
+    const row = sheet.find((r, i) => i >= 2 && r[keyAt] === key);
+    assert.ok(row, `no such key on the tab: ${key}`);
+    for (const [col, value] of Object.entries(changes)) {
+      row[SHEET_COLUMNS.indexOf(col)] = value;
+    }
+  }
+  return { header: sheet[0], rows: sheet.slice(1), digest };
+}
+
+function makeWorld({ normalization = normalizationTab(), stagingCategories = STAGING_CATEGORIES } = {}) {
+  const staging = makeSheets({
+    Expenses: { header: EXPENSES_HEADER, rows: PRE_EXISTING.map((r) => r.slice()) },
+    Categories: { header: CATEGORIES_HEADER, rows: stagingCategories.map((r) => r.slice()) },
+    [NORMALIZATION_TAB]: { header: normalization.header, rows: normalization.rows },
+  });
+  const production = makeSheets({
+    Expenses: { header: EXPENSES_HEADER, rows: PRE_EXISTING.map((r) => r.slice()) },
+    Categories: { header: CATEGORIES_HEADER, rows: PRODUCTION_CATEGORIES.map((r) => r.slice()) },
+  });
+  return {
+    staging,
+    production,
+    digest: normalization.digest,
+    sheetsFor: async (pair) => (pair.name === "production" ? production.sheets : staging.sheets),
+  };
+}
+
+const expenseIds = (stub) => stub.grids.Expenses.slice(1).map((r) => r[0]);
+const importedIds = (stub) => expenseIds(stub).filter((id) => id.startsWith(ID_PREFIX));
+
+async function importRun(world, argv, opts = {}) {
+  return importer.run(argv, {
+    log: opts.log ?? silent,
+    env: STUB_ENV,
+    sheetsFor: world.sheetsFor,
+    now: opts.now ?? (() => new Date("2026-08-31T12:00:00.000Z")),
+    ...opts.extra,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// AC-12 / AC-14 — the two gates that have no default
+// ---------------------------------------------------------------------------
+
+test("AC-12: the import refuses to run without an explicit target, and writes nothing", async () => {
+  const world = makeWorld();
+  const before = expenseIds(world.staging).length;
+
+  await assert.rejects(
+    importRun(world, ["--dry-run", "--from-sheet", NORMALIZATION_TAB]),
+    (err) => /No --target given/.test(err.message) && /never infers a target/.test(err.message)
+  );
+
+  assert.equal(expenseIds(world.staging).length, before, "the Expenses row count must be unchanged");
+  // The falsifier AC-12 names: falling back to load-local-env's resolved
+  // SPREADSHEET_ID, which today is PRODUCTION's.
+  assert.equal(expenseIds(world.production).length, before);
+  assert.equal(world.staging.requests.filter((r) => r.startsWith("UPDATECELLS")).length, 0);
+});
+
+test("AC-14: an unapproved sheet stops the import, and the row count is unchanged", async () => {
+  const world = makeWorld({ normalization: normalizationTab({ approved: false }) });
+  const before = expenseIds(world.staging).length;
+
+  await assert.rejects(
+    importRun(world, ["--apply", "--target", "staging", "--from-sheet", NORMALIZATION_TAB]),
+    (err) => err instanceof ImportError && /is not approved/.test(err.message) && /"APPROVED"/.test(err.message)
+  );
+
+  assert.equal(expenseIds(world.staging).length, before);
+  assert.equal(importedIds(world.staging).length, 0);
+});
+
+test("AC-14: --from-sheet has no default, so a re-generate cannot substitute a tab she never approved", async () => {
+  const world = makeWorld();
+  await assert.rejects(
+    importRun(world, ["--apply", "--target", "staging"]),
+    (err) => err instanceof ImportError && /--from-sheet/.test(err.message) && /no default/.test(err.message)
+  );
+  assert.equal(importedIds(world.staging).length, 0);
+});
+
+test("a dry-run reports on an unapproved sheet — that is how she sees it before approving — and writes nothing", async () => {
+  const world = makeWorld({ normalization: normalizationTab({ approved: false }) });
+  const result = await importRun(world, ["--dry-run", "--target", "staging", "--from-sheet", NORMALIZATION_TAB]);
+  assert.equal(result.wouldWrite, 19);
+  assert.equal(importedIds(world.staging).length, 0);
+  assert.equal(world.staging.requests.filter((r) => r.startsWith("UPDATECELLS")).length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// AC-9 — the pre-write category resolution
+// ---------------------------------------------------------------------------
+
+test("AC-9: an unresolvable category name refuses BEFORE the first write, naming it", async () => {
+  // `Insurance` exists on production and on staging under no id at all — exactly the
+  // override that would deadlock the pipeline without D6's reconciliation.
+  const world = makeWorld({ normalization: normalizationTab({ edits: { "2024-r3-cH": { category_name_en: "Insurance" } } }) });
+
+  await assert.rejects(
+    importRun(world, ["--apply", "--target", "staging", "--from-sheet", NORMALIZATION_TAB]),
+    (err) => {
+      assert.match(err.message, /do not exist on staging's Categories tab: Insurance/);
+      assert.match(err.message, /Available there:/);
+      assert.match(err.message, /Test Cat/, "the refusal must list what the target does have");
+      return true;
+    }
+  );
+
+  // The all-or-nothing property the pre-write check buys. Resolving lazily per row
+  // would have written every row up to the first unresolved name and aborted
+  // halfway, leaving a partial import for AC-1's diff to report.
+  assert.equal(importedIds(world.staging).length, 0, "not one row may be written before every name resolves");
+  assert.equal(world.staging.requests.filter((r) => r.startsWith("INSERT Expenses")).length, 0);
+});
+
+test("AC-9: resolution is by name and never by id, because the same id means different things", () => {
+  const staging = STAGING_CATEGORIES.map((r) => ({ id: r[0], name_en: r[1] }));
+  const production = PRODUCTION_CATEGORIES.map((r) => ({ id: r[0], name_en: r[1] }));
+
+  // cat_023 exists on both, so an id-keyed mapping "resolves" and files the row
+  // under Test Cat on staging and Tenant on production. The write succeeds; the row
+  // is simply wrong. That is the failure this is designed against.
+  assert.equal(staging.find((c) => c.id === "cat_023").name_en, "Test Cat");
+  assert.equal(production.find((c) => c.id === "cat_023").name_en, "Tenant");
+
+  assert.deepEqual(resolveCategoryNames(["Tenant"], staging).unresolved, ["Tenant"]);
+  assert.deepEqual(resolveCategoryNames(["Tenant"], production).unresolved, []);
+  assert.equal(resolveCategoryNames(["Tenant"], production).resolved.get("Tenant"), "cat_023");
+  // Folded, so a casing difference between the two tabs is not a false miss.
+  assert.equal(resolveCategoryNames(["groceries"], staging).resolved.get("groceries"), "cat_003");
+});
+
+test("AC-9: a duplicate name_en on the target aborts rather than resolving to one of two ids", () => {
+  const withDuplicate = [...STAGING_CATEGORIES.map((r) => ({ id: r[0], name_en: r[1] })), { id: "cat_099", name_en: "Groceries" }];
+  assert.deepEqual(resolveCategoryNames(["Groceries"], withDuplicate).duplicates, ["Groceries"]);
+});
+
+// ---------------------------------------------------------------------------
+// AC-1 / AC-5 / AC-2 / AC-10 — apply and verify
+// ---------------------------------------------------------------------------
+
+test("AC-1 + AC-2 + AC-10: apply then verify — nothing pre-existing touched, sums exact, provenance parses", async () => {
+  const world = makeWorld();
+  const snapshotFile = tmpFile("snap.json");
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", snapshotFile];
+
+  await importRun(world, ["--snapshot", ...base]);
+  const applied = await importRun(world, ["--apply", ...base]);
+  assert.equal(applied.created, 19);
+
+  const { result } = await importRun(world, ["--verify", ...base]);
+  assert.equal(result.passed, true);
+  assert.equal(result.importedCount, 19);
+  assert.equal(result.unmatchedCount, 0);
+  assert.equal(result.missingCount, 0);
+  assert.equal(result.duplicatedCount, 0);
+  assert.equal(result.outOfRangeCount, 0);
+  assert.equal(result.unparseableNotesCount, 0);
+  // AC-1's number, and it is a diff against a snapshot rather than an assertion.
+  assert.equal(result.snapshotDiff.preExistingModified.length, 0);
+  assert.equal(result.snapshotDiff.preExistingDeleted.length, 0);
+  assert.equal(result.snapshotDiff.foreignAdded.length, 0);
+  // AC-9's other half: no category was created.
+  assert.equal(result.categoriesBefore, result.categoriesAfter);
+
+  // AC-2: per-year sums EQUAL, not within a tolerance.
+  assert.equal(result.yearSums[2024].equal, true);
+  assert.equal(result.yearSums[2023].equal, true);
+  assert.equal(result.yearSums[2024].expectedMinor, 184000);
+  assert.equal(result.yearSums[2023].expectedMinor, 49500);
+
+  // AC-1's falsifier is a WRITE SHAPE, so assert the shape: rows arrive by
+  // insertion, never by an in-place update over existing rows.
+  assert.ok(world.staging.requests.some((r) => r.startsWith("INSERT Expenses")));
+  assert.equal(world.staging.requests.filter((r) => r === "UPDATE Expenses!A2:J3").length, 0);
+  assert.deepEqual(
+    world.staging.grids.Expenses.slice(1).filter((r) => !r[0].startsWith(ID_PREFIX)).map((r) => r[0]),
+    ["exp-001", "exp-002"]
+  );
+  // The captain's unknown helper columns survive on the rows that had them.
+  assert.equal(world.staging.grids.Expenses.find((r) => r[0] === "exp-001")[9], "120");
+
+  // AC-10: four fields, the key among them.
+  const imported = world.staging.grids.Expenses.slice(1).filter((r) => r[0].startsWith(ID_PREFIX));
+  for (const row of imported) {
+    const parsed = parseNotes(row[6]);
+    assert.ok(parsed, `notes must parse: ${row[6]}`);
+    assert.ok(parsed.key.length > 0);
+    assert.equal(typeof parsed.bucket, "string");
+    assert.equal(typeof parsed.sub_category, "string");
+    assert.equal(typeof parsed.detail, "string");
+  }
+});
+
+test("AC-5: a second apply against the same target writes nothing", async () => {
+  const world = makeWorld();
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+
+  const first = await importRun(world, ["--apply", ...base]);
+  assert.equal(first.created, 19);
+  const inserts = world.staging.requests.filter((r) => r.startsWith("INSERT Expenses")).length;
+
+  const second = await importRun(world, ["--apply", ...base]);
+  assert.equal(second.created, 0, "every candidate must be found already present");
+  assert.equal(second.skipped, 19);
+  assert.equal(
+    world.staging.requests.filter((r) => r.startsWith("INSERT Expenses")).length,
+    inserts,
+    "no further insertion may reach the sheet"
+  );
+  assert.equal(importedIds(world.staging).length, 19, "not a duplicate set");
+});
+
+test("AC-5 falsified: a Date.now()-based id writes a full duplicate set on the second run", () => {
+  // The id is what carries idempotency, so the falsification is at the id function.
+  const deterministic = [historicalId(2024, 1), historicalId(2024, 1)];
+  assert.equal(deterministic[0], deterministic[1]);
+  assert.equal(deterministic[0], "exp-hist-2024-0001");
+
+  const rows = extract(grid()).rows;
+  const planA = planImport(rows);
+  const planB = planImport([...rows].reverse());
+  assert.deepEqual(
+    planA.candidates.map((c) => `${c.id}:${c.key}`),
+    planB.candidates.map((c) => `${c.id}:${c.key}`),
+    "ids are keyed to the source cell, so re-sorting the tab cannot renumber them"
+  );
+});
+
+test("AC-2 falsified: rounding amounts on write breaks the exact per-year sum a 1% tolerance would have absorbed", async () => {
+  const withFraction = normalizationTab({ edits: { "2024-r3-cH": { amount: "100.50" } } });
+  const rounding = loadPatched("import-historical-expenses.js", [
+    ["    amount: String(candidate.amount),", "    amount: String(Math.round(Number(candidate.amount))),"],
+  ]);
+
+  const world = makeWorld({ normalization: withFraction });
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+  const opts = { log: silent, env: STUB_ENV, sheetsFor: world.sheetsFor, now: () => new Date("2026-08-31T12:00:00.000Z") };
+
+  await rounding.run(["--apply", ...base], opts);
+  await assert.rejects(
+    rounding.run(["--verify", ...base], opts),
+    (err) => /Verification failed/.test(err.message)
+  );
+
+  // The same sheet through the unrounded importer verifies clean, so the failure is
+  // the rounding and not the fixture.
+  const honest = makeWorld({ normalization: withFraction });
+  const honestOpts = { ...opts, sheetsFor: honest.sheetsFor };
+  const honestBase = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s2.json")];
+  await importer.run(["--apply", ...honestBase], honestOpts);
+  const { result } = await importer.run(["--verify", ...honestBase], honestOpts);
+  assert.equal(result.passed, true);
+  assert.equal(result.yearSums[2024].expectedMinor % 100, 50, "the fixture really does carry a fractional amount");
+});
+
+test("AC-10 falsified: dropping the key from the notes template costs AC-2 its only join handle", () => {
+  const row = { bucket: "食", sub_category: "食材", detail: "unit-alpha", item_name: "", key: "2024-r3-cH" };
+  const notes = buildNotes(row);
+  assert.equal(notes, "食 | 食材 | unit-alpha | key=2024-r3-cH");
+  const parsed = parseNotes(notes);
+  assert.deepEqual(parsed, { bucket: "食", sub_category: "食材", detail: "unit-alpha", item_name: "", key: "2024-r3-cH" });
+
+  // Without the key the parse yields three fields and returns null, so AC-2 and
+  // AC-10 fail TOGETHER rather than AC-2 silently degrading to a row count.
+  assert.equal(parseNotes("食 | 食材 | unit-alpha"), null);
+  // An item name occupies a fourth segment before the key.
+  assert.equal(parseNotes(buildNotes({ ...row, item_name: "rice" })).item_name, "rice");
+});
+
+test("AC-4c: verify catches a date hand-edited outside 2023-2024, which the extractor's own guards cannot see", async () => {
+  const world = makeWorld({ normalization: normalizationTab({ edits: { "2024-r3-cH": { date: "2022-01-01" } } }) });
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+
+  // planImport excludes it by year rather than writing it — the first line of defence.
+  const applied = await importRun(world, ["--apply", ...base]);
+  assert.equal(applied.created, 18, "the 2022-dated row is excluded, not written");
+
+  // And if one did reach the tab, verify reports it as a non-zero count.
+  const { grid: expensesGrid, map } = { grid: world.staging.grids.Expenses, map: null };
+  assert.equal(
+    expensesGrid.slice(1).filter((r) => r[0].startsWith(ID_PREFIX) && r[1].startsWith("2022-")).length,
+    0
+  );
+
+  const smuggled = verifyAgainst({
+    expenses: [
+      EXPENSES_HEADER,
+      ["exp-hist-2022-0001", "2022-01-01", "5", "cat_003", "h", "h", "食 | 食材 |  | key=2022-rX-cA", "x"],
+    ],
+    map: require("../lib/sheetSchema").buildColumnMap([EXPENSES_HEADER], require("../lib/sheetSchema").EXPENSES_SPEC),
+    approved: [{ key: "2022-rX-cA", status: "include", date: "2022-01-01", amount: "5" }],
+    plan: { candidates: [], perYear: {}, sheetRowCount: 1 },
+    categories: { live: STAGING_CATEGORIES.map((r) => ({ id: r[0], name_en: r[1] })), countBefore: null },
+    snapshot: null,
+  });
+  assert.equal(smuggled.outOfRangeCount, 1);
+  assert.ok(smuggled.findings.some((f) => f.label === "AC-4c out-of-range date"));
+  assert.equal(smuggled.passed, false);
+});
+
+// ---------------------------------------------------------------------------
+// AC-6 / AC-18 — the rehearsal and the gate it produces
+// ---------------------------------------------------------------------------
+
+test("AC-6 + AC-18: the staging rehearsal runs snapshot -> apply -> verify -> hand-add -> undo -> diff and writes a receipt", async () => {
+  const world = makeWorld();
+  const receipt = tmpFile("receipt.json");
+  const result = await importRun(world, [
+    "--rehearse", "--target", "staging", "--from-sheet", NORMALIZATION_TAB,
+    "--snapshot-file", tmpFile("s.json"), "--receipt", receipt, "--hand-add-id", "manual-under-test",
+  ]);
+
+  assert.deepEqual(
+    result.steps.map((s) => s.step),
+    ["snapshot", "apply", "verify", "hand-add", "undo", "diff", "restore", "receipt"]
+  );
+  assert.equal(result.writtenIds.length, 19);
+  assert.equal(result.verification.passed, true);
+
+  // AC-6: staging is back exactly as it was found.
+  assert.deepEqual(expenseIds(world.staging), ["exp-001", "exp-002"]);
+  assert.equal(importedIds(world.staging).length, 0);
+
+  const written = JSON.parse(fs.readFileSync(receipt, "utf8"));
+  assert.equal(written.target, "staging");
+  assert.equal(written.fromSheet, NORMALIZATION_TAB);
+  assert.equal(written.digest, world.digest);
+  assert.equal(written.rowCount, 19);
+});
+
+test("AC-6 falsified: an undo matching on the date year eats the row a user added by hand", async () => {
+  const byYear = loadPatched("import-historical-expenses.js", [
+    [
+      `    if (String(row[idAt] ?? "").startsWith(prefix)) targetRowIndexes.push(i);`,
+      `    if (String(row[map.index.date] ?? "").startsWith("2024-")) targetRowIndexes.push(i);`,
+    ],
+  ]);
+  const world = makeWorld();
+  const opts = { log: silent, env: STUB_ENV, sheetsFor: world.sheetsFor, now: () => new Date("2026-08-31T12:00:00.000Z") };
+
+  await assert.rejects(
+    byYear.run([
+      "--rehearse", "--target", "staging", "--from-sheet", NORMALIZATION_TAB,
+      "--snapshot-file", tmpFile("s.json"), "--receipt", tmpFile("r.json"), "--hand-add-id", "manual-under-test",
+    ], opts),
+    (err) => /did NOT survive the undo|pre-existing row\(s\) deleted/.test(err.message),
+    "the rehearsal must fail when undo stops keying on the id prefix"
+  );
+
+  // And concretely: exp-002 is dated 2024-06-15 and belongs to the household.
+  assert.equal(PRE_EXISTING[1][1], "2024-06-15");
+});
+
+test("AC-18: a production apply refuses with no receipt, and refuses again on a stale digest", async () => {
+  const world = makeWorld();
+  const receipt = tmpFile("receipt.json");
+  const base = ["--apply", "--target", "production", "--from-sheet", NORMALIZATION_TAB, "--receipt", receipt, "--snapshot-file", tmpFile("s.json")];
+  const before = expenseIds(world.production).length;
+
+  await assert.rejects(
+    importRun(world, base),
+    (err) => err instanceof ImportError && /No staging-rehearsal receipt/.test(err.message)
+  );
+  assert.equal(expenseIds(world.production).length, before, "nothing written to production");
+
+  // A receipt from an earlier rehearsal of a DIFFERENT generation. Existence alone
+  // must not satisfy the gate — that is the whole falsifier.
+  fs.writeFileSync(receipt, JSON.stringify({
+    entity: "061", target: "staging", fromSheet: NORMALIZATION_TAB,
+    digest: "0".repeat(32), rowCount: 19, at: "2026-08-30T00:00:00.000Z",
+  }), "utf8");
+
+  await assert.rejects(
+    importRun(world, base),
+    (err) => err instanceof ImportError && /is NOT the one that was rehearsed/.test(err.message)
+  );
+  assert.equal(expenseIds(world.production).length, before);
+  assert.equal(world.production.requests.filter((r) => r.startsWith("INSERT Expenses")).length, 0);
+});
+
+test("assertRehearsed also rejects a receipt for a different sheet, and one from a production run", () => {
+  const file = tmpFile("r.json");
+  const write = (o) => fs.writeFileSync(file, JSON.stringify(o), "utf8");
+
+  write({ target: "staging", fromSheet: "Migration v2", digest: "abc" });
+  assert.throws(() => assertRehearsed(file, { fromSheet: NORMALIZATION_TAB, digest: "abc" }), /rehearsed sheet/);
+
+  write({ target: "production", fromSheet: NORMALIZATION_TAB, digest: "abc" });
+  assert.throws(() => assertRehearsed(file, { fromSheet: NORMALIZATION_TAB, digest: "abc" }), /not a staging rehearsal/);
+
+  write({ target: "staging", fromSheet: NORMALIZATION_TAB, digest: "abc", rowCount: 1 });
+  assert.equal(assertRehearsed(file, { fromSheet: NORMALIZATION_TAB, digest: "abc" }).rowCount, 1);
+});
+
+test("--rehearse refuses to run against production", async () => {
+  const world = makeWorld();
+  await assert.rejects(
+    importRun(world, ["--rehearse", "--target", "production", "--from-sheet", NORMALIZATION_TAB]),
+    (err) => err instanceof ImportError && /rehearsal on\s+production is not a rehearsal|runs against staging only/.test(err.message)
+  );
+  assert.equal(expenseIds(world.production).length, 2);
+});
+
+test("the snapshot diff keys on the row id, because an insert at the top shifts every index", () => {
+  const map = require("../lib/sheetSchema").buildColumnMap([EXPENSES_HEADER], require("../lib/sheetSchema").EXPENSES_SPEC);
+  const before = snapshotOf([EXPENSES_HEADER, ...PRE_EXISTING], map);
+  const after = snapshotOf(
+    [EXPENSES_HEADER, ["exp-hist-2024-0001", "2024-01-01", "1", "cat_003", "h", "h", "n", "t"], ...PRE_EXISTING],
+    map
+  );
+  const diff = diffSnapshot(before, after);
+  assert.deepEqual(diff.modified, [], "a positional diff would report both pre-existing rows as modified");
+  assert.deepEqual(diff.deleted, []);
+  assert.deepEqual(diff.importedAdded, ["exp-hist-2024-0001"]);
+  assert.deepEqual(diff.foreignAdded, []);
+});
+
+test("planImport counts every row it does not write, rather than dropping it quietly", () => {
+  const rows = extract(grid()).rows;
+  const doctored = rows.map((r, i) => {
+    if (i === 0) return { ...r, status: "undated", date: "" };
+    if (i === 1) return { ...r, status: "orphaned" };
+    if (i === 2) return { ...r, status: "exclude" };
+    if (i === 3) return { ...r, status: "" };
+    if (i === 4) return { ...r, date: "2022-05-05" };
+    return r;
+  });
+  const plan = planImport(doctored);
+  assert.equal(plan.candidates.length, rows.length - 5);
+  assert.equal(plan.excluded.undated.length, 1);
+  assert.equal(plan.excluded.orphaned.length, 1);
+  assert.equal(plan.excluded.excludeStatus.length, 1);
+  assert.equal(plan.excluded.otherStatus.length, 1);
+  assert.equal(plan.excluded.outOfScopeYear.length, 1);
+  const accounted = plan.candidates.length + Object.values(plan.excluded).reduce((n, a) => n + a.length, 0);
+  assert.equal(accounted, plan.sheetRowCount, "every sheet row is either written or counted as excluded");
+});
+
+test("an include row with no usable date stops the run rather than being silently skipped", () => {
+  const rows = extract(grid()).rows;
+  const bad = rows.map((r, i) => (i === 0 ? { ...r, date: "" } : r));
+  assert.throws(() => planImport(bad), (err) => err instanceof ImportError && /not YYYY-MM-DD/.test(err.message));
+});
+
+// ---------------------------------------------------------------------------
+// AC-20 — the additive staging Categories reconciliation (R1)
+// ---------------------------------------------------------------------------
+
+async function syncRun(world, argv, opts = {}) {
+  return syncCategories.run(argv, {
+    log: opts.log ?? silent,
+    env: STUB_ENV,
+    sheetsFor: world.sheetsFor,
+    now: () => new Date("2026-08-31T12:00:00.000Z"),
+  });
+}
+
+test("AC-20: R1 adds the three missing production names under NEW ids and leaves the test entries alone", async () => {
+  const world = makeWorld();
+  const receipt = tmpFile("cats.json");
+
+  const dry = await syncRun(world, ["--dry-run", "--receipt", receipt]);
+  assert.deepEqual(dry.plan.additions.map((a) => [a.newId, a.name_en]), [
+    ["cat_026", "Tenant"],
+    ["cat_027", "Insurance"],
+    ["cat_028", "Tax"],
+  ], "the captain's R1, exactly: cat_026 Tenant, cat_027 Insurance, cat_028 Tax");
+  assert.equal(world.staging.grids.Categories.length, 1 + STAGING_CATEGORIES.length, "--dry-run writes nothing");
+
+  const applied = await syncRun(world, ["--apply", "--receipt", receipt]);
+  assert.deepEqual(applied.addedIds, ["cat_026", "cat_027", "cat_028"]);
+
+  const after = world.staging.grids.Categories.slice(1);
+  // The assertion that fails under the destructive reading of "make it the same".
+  for (const [id, name] of [["cat_023", "Test Cat"], ["cat_024", "Antkee"], ["cat_025", "ScrollTest"]]) {
+    const row = after.find((r) => r[0] === id);
+    assert.ok(row, `${id} must still exist`);
+    assert.equal(row[1], name, `${id} must still mean ${name} — the captain declined R2`);
+  }
+  // Every production name now resolves on staging, which is all the rehearsal needs.
+  for (const row of PRODUCTION_CATEGORIES) {
+    assert.ok(after.some((r) => r[1] === row[1]), `${row[1]} must resolve on staging`);
+  }
+  // Production is the reference, never a target.
+  assert.deepEqual(world.production.grids.Categories.slice(1), PRODUCTION_CATEGORIES);
+  assert.equal(world.production.requests.filter((r) => !r.startsWith("GET")).length, 0);
+
+  // Reversible: undo removes exactly the ids it recorded.
+  await syncRun(world, ["--undo", "--receipt", receipt]);
+  assert.deepEqual(
+    world.staging.grids.Categories.slice(1).map((r) => r[0]),
+    STAGING_CATEGORIES.map((r) => r[0]),
+    "the tab is back to its recorded pre-run state"
+  );
+});
+
+test("AC-20 falsified: implementing the reconciliation as an overwrite fails the pre-existing-name assertion", () => {
+  const staging = STAGING_CATEGORIES.map((r) => ({ id: r[0], name_en: r[1], cells: r }));
+  const production = PRODUCTION_CATEGORIES.map((r) => ({ id: r[0], name_en: r[1], cells: r }));
+
+  // R2, the destructive reading: overwrite cat_023-cat_025 so staging matches
+  // production byte-for-byte. Three categories somebody may be using change meaning
+  // rather than breaking, and any staging expense filed under them silently moves.
+  const overwritten = staging.map((row) => {
+    const prod = production.find((p) => p.id === row.id);
+    return prod ? { ...row, name_en: prod.name_en } : row;
+  });
+
+  const problems = syncCategories.assertAdditive({
+    preExisting: staging.map((r) => ({ id: r.id, name_en: r.name_en })),
+    stagingAfter: overwritten,
+    productionBefore: production,
+    productionAfter: production,
+    addedIds: [],
+  });
+  assert.equal(problems.length, 3);
+  assert.ok(problems.some((p) => /cat_023 was "Test Cat", is now "Tenant"/.test(p)));
+  assert.ok(problems.some((p) => /cat_024/.test(p)));
+  assert.ok(problems.some((p) => /cat_025/.test(p)));
+});
+
+test("AC-20: the additive assertions also catch a deletion and a production write", () => {
+  const staging = STAGING_CATEGORIES.map((r) => ({ id: r[0], name_en: r[1], cells: r }));
+  const production = PRODUCTION_CATEGORIES.map((r) => ({ id: r[0], name_en: r[1], cells: r }));
+
+  const deleted = syncCategories.assertAdditive({
+    preExisting: staging.map((r) => ({ id: r.id, name_en: r.name_en })),
+    stagingAfter: staging.filter((r) => r.id !== "cat_024"),
+    productionBefore: production,
+    productionAfter: production,
+    addedIds: [],
+  });
+  assert.ok(deleted.some((p) => /cat_024 \(Antkee\) was DELETED/.test(p)));
+
+  const touchedProduction = syncCategories.assertAdditive({
+    preExisting: [],
+    stagingAfter: staging,
+    productionBefore: production,
+    productionAfter: production.map((r) => ({ ...r, cells: [...r.cells, "changed"] })),
+    addedIds: [],
+  });
+  assert.ok(touchedProduction.some((p) => /production's Categories tab CHANGED/.test(p)));
+});
+
+test("new ids continue from staging's own highest cat_NNN, so they cannot collide", () => {
+  assert.deepEqual(syncCategories.nextCategoryIds(STAGING_CATEGORIES.map((r) => ({ id: r[0] })), 3), ["cat_026", "cat_027", "cat_028"]);
+  assert.deepEqual(syncCategories.nextCategoryIds([{ id: "cat_009" }, { id: "legacy-slug" }], 2), ["cat_010", "cat_011"]);
 });
