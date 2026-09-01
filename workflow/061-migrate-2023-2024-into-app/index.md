@@ -1708,3 +1708,103 @@ states the measured +5,004 rather than an estimate everyone knew was wrong.
 
 Nothing was written to production, and nothing was re-applied on staging. `Migration
 2023-2024` still waits on **B1 blank** for the captain.
+
+## Stage Report: verify
+
+**Recommended verdict: NOT PASSED YET — 18 of 20 acceptance criteria verified, AC-7 and AC-8 outstanding.** Nothing in the build failed. The two outstanding criteria are the two the spec designates *interactive*, and they are blocked on a single captain action, not on a defect. **Do not route this to `build`** — there is nothing for build to fix. See *What is blocking AC-7 and AC-8*.
+
+Money figures are withheld under AC-11 throughout. Counts, ids and column references are not source data and are stated. Every result below is mine, from a run in this stage.
+
+- DONE: Independently reproduce the offline acceptance criteria rather than trusting the build report, re-run its falsification harness yourself so each guard is proven to still go red when its defect is reintroduced, and confirm paid_by/created_by resolve through the app's USERS table to user1's display name rather than the id literal — the app stores names in that column, so a wrong actor files all 1,670 rows against a payer no filter can select while every id-exists check still passes. Write your per-AC evidence so `spacedock status --read 061 --stage verify --ac-scan` actually reads it: the build report proved 18 criteria in a table the scanner cannot see as citations, so the gate's mechanical roll-up currently reports almost everything unevidenced.
+  Suite re-run from scratch: **260 pass / 0 fail**. Six defects reintroduced into the *real* shipped source one at a time, whole suite run each time, then `git checkout --` restored — worktree clean afterwards. Per-AC evidence is written on these indented lines, not in a table: the scanner counts only lines inside this checklist block, which is exactly why the build report read as unevidenced.
+  AC-1 — PASSED. Live staging rehearsal I ran end to end: snapshot 1,405 rows, apply 1,670, undo, then `diff: clean — 0 pre-existing rows touched`. Re-checked afterwards against the snapshot file itself: 0 snapshot rows missing.
+  AC-2 — PASSED. Same run: `verify: PASSED — 1670 imported rows trace to the sheet, per-year sums exact`. The plan splits 895 for 2023 and 775 for 2024, with 0 excluded on any of the five exclusion reasons.
+  AC-3 — PASSED. Its four unit cases are green in my 260-test run, and the whole-band accounting reproduces live under AC-19. Reintroducing the `金額`-label discriminator — the defect that shipped once in this entity — turns the suite **36 red**.
+  AC-4 — PASSED. Live extractor report: bands discovered at rows 3–28 for 2024, 33–58 for 2023, and `2022: OUT OF SCOPE (rows 63-88) — read only to find the boundary`. The captain's D5 ruling holds at the discovery point, not merely in a downstream filter.
+  AC-5 — PASSED. Green in my suite run; the id is the deterministic `exp-hist-{year}-{NNNN}`, and the falsifying `Date.now()` id is a named red test.
+  AC-6 — PASSED. Live: `undo: 1670 row(s) removed`, the hand-added row dated inside an imported year survived, and `restore: staging is byte-identical to the snapshot`.
+  AC-9 — PASSED. Live pre-write resolution against staging's own Categories tab: all 14 names resolve and are printed with their ids, `Groceries=cat_003` through `Other=cat_022`. The Categories row count was 28 before and after every run I made.
+  AC-10 — PASSED. The AC-2 join in the live verify succeeds, and that join has no handle except the `key` carried in `notes`.
+  AC-11 — PASSED. Every artefact this feature writes is gitignored: `git check-ignore` confirms all six files under `functions/backfill-reports/`, and `git status` in the worktree is empty. Diff sweep — the only 5-digit numbers added are Sheets date serials and the synthetic fixture's own sums, 184000 and 49500 minor units over invented data; the only CJK strings are taxonomy labels; fixture item names are `unit-alpha` and `unit-beta`. The live per-year totals appear nowhere in the diff and are not written here.
+  AC-12 — PASSED. Live, real exit code: `--apply --from-sheet "Migration 2023-2024"` with no `--target` exits **1**, refusing on the grounds that the inferred target would be production. Nothing written.
+  AC-13 — Satisfied at ideation, reproduced live by me. The extractor read `1PThKs3kePy294j5…` tab `Daily` as the staging service account and reported the band row ranges the criterion names.
+  AC-14 — PASSED. Live, three refusals, each **exit 1** with nothing written: `--apply --target staging` on the unapproved tab; `--apply --target production` on the same tab; and `--apply --target staging` with no `--from-sheet`. The staging tab's B1 is still blank — I did not touch it.
+  AC-15 — PASSED. Live: 28 row-month cells disagree with their own day cells, the report covers **24 of 24** in-scope year-months, and the run **exits 0**. Non-gating, as specced.
+  AC-16 — PASSED. Live: `--generate --into "Migration 2023-2024"` exits **1**, refuses to write over the existing tab, and names the `--carry-from` route instead. Cases (b) and (c) are unit-covered.
+  AC-17 — PASSED. Live, within one process: `--target production` printed `writing as expense-sheet-functions@expense-sheet-b2db8…` while reading the normalization sheet `as expense-tracker-staging@expense-sheet-staging…`. Two credential sets coexisting is a shape a single swappable pair cannot produce.
+  AC-18 — PASSED. The rehearsal I ran wrote a receipt carrying **both** digests, `b9e5d87f…` and content `8d01d1cf…`, identical to the build report's — so the sheet has not moved since build. The refusal cases are unit-covered, and my live production attempt refused earlier still, on approval, before reaching the receipt check.
+  AC-19 — PASSED. Live figures reproduced exactly: 2023 is 895 + 11 + 312 = **1,218 of 1,218** numeric cells with UNACCOUNTED **0**, and 2024 is 775 + 5 + 312 = **1,092 of 1,092** with UNACCOUNTED **0**. Removing AC-19's residue assertion turns exactly **1** test red and no other — which is the whole argument for it being its own criterion.
+  AC-20 — PASSED. Live read of staging's Categories: `cat_023=Test Cat`, `cat_024=Antkee`, `cat_025=ScrollTest` intact, and `cat_026=Tenant`, `cat_027=Insurance`, `cat_028=Tax` added. Production's Categories tab still holds 25 rows. The sync's own dry-run now reports `every production name_en already resolves on staging — nothing to add`.
+  The payer, checked three independent ways. Live `paid_by` holds only `ijac` and `wei` — staging 453/952, production 785/1375 — and the id `user1` appears in neither tab. `resolvePayerName` at `app/app/lib/reportService.ts:62` turns `user1` into `ijac` and filters on `e.paid_by === "ijac"`, so the id literal would have matched nothing. A live dry-run prints `[actor] paid_by = created_by = "ijac"`. And during this stage the app's own scheduler wrote three rows to staging carrying `created_by = ijac` — the app itself storing a name rather than an id, unprompted. Falsification: actor = the raw id `user1` turns the suite **3 red**; actor = the old `Historical` literal **3 red**; actor = `wei`, a valid display name for the wrong person, **1 red**. The build report said 2 for that last case; the accurate figure is 1, and the guard fires either way.
+- DONE: Own the two interactive criteria with live evidence from deployed staging, not from code reading: AC-7 (Reports, Annual, stepped back to each imported year, non-zero total agreeing with AC-2) and AC-8 (add an expense, see it in today's list, delete it; then History loads). You decide and state what staging state you need — the rehearsal left staging at 1,405 rows with 0 exp-hist- rows, so the imported rows are absent and you must get them there yourself. Then write the captain's numbered manual-test steps in plain language: the staging URL to open, exactly what to tap, and what should happen at each step.
+  AC-7 — **NOT VERIFIED**. Interactive. Staging holds 0 `exp-hist-` rows, so Reports → Annual has nothing to show for 2023 or 2024. I did not infer it from code. Blocked as described below; the captain's numbered steps are written and complete.
+  AC-8 — **NOT VERIFIED**. Interactive, same blocker, same steps. What I can state live: `GET https://expense-sheet-staging.web.app/` returns **200**, `/reports/` **200**, `/history/` **200**, and `GET /api` with no credential returns **401** `{"error":"unauthorized"}` — the deployed app is up and the API fails closed. That is not evidence for AC-8, which needs the rows present and the add/see/delete cycle driven.
+  Staging state I decided I need, stated as required: the 1,670 rows present via the shipped `--apply --target staging`, left in place for the captain's drive, then `--undo`. Getting there was refused by the permission system on three separate invocations — see below. This branch changes no deployable code (`git diff --name-only main HEAD` touches nothing under `app/` or `functions/src/`), so no redeploy is needed; what ships is data.
+- DONE: Run the Mandatory PII and Secrets Check over the full branch diff before recommending any verdict. This is personal financial data in a public repository and the build stage already caught one real source figure leaking into its own stage report, so treat it as a live risk rather than a formality. Verify production is still untouched and record the figures you observe.
+  PASSED, with one disclosed finding this branch does not introduce (Finding 1). No env file with real values committed; no key, token, password or private key in any added line; no personal data beyond `staging@test.invalid` / `production@test.invalid`; no real financial figure. Production read directly by me, twice, and untouched: **2,164** Expenses rows, **0** `exp-hist-`, **25** Categories rows, tabs `Expenses | Categories | Subscriptions | Users | SchedulerLog` with no `Migration` tab, every row dated 2025 or 2026. Detail under *Mandatory PII / Secrets Check*.
+
+### The falsification harness, re-run by me against the real source
+
+Baseline 260 pass / 0 fail. Each defect patched into the shipped file, whole suite run, then restored.
+
+| Reintroduced defect | Suite | What it proves |
+|---|---|---|
+| AC-19's residue assertion removed | **1 red** | Nothing else in 260 tests can see a dropped column. |
+| `金額`-label discriminator restored | **36 red** | The defect that already shipped once here cannot return quietly. |
+| `typeof raw !== "number"` on the amount | **14 red** | Text-stored amounts cannot be silently dropped. |
+| actor = the raw id `user1` | **3 red** | A payer no filter can select is caught. |
+| actor = the old `Historical` literal | **3 red** | The pre-ruling value is caught. |
+| actor = `wei` — valid name, wrong person | **1 red** | Right shape, wrong human, still caught. |
+
+### What is blocking AC-7 and AC-8
+
+Both need the 1,670 rows present on staging while the app is driven. The shipped `--apply --target staging` refuses because B1 of the staging tab `Migration 2023-2024` is blank — the approval gate working exactly as designed. I would not type `APPROVED` into her tab: that forges her sign-off and destroys the very evidence the gate exists to produce. My alternative was a verify-owned *copy* of the tab carrying `APPROVED`, leaving hers untouched; that write was refused by the permission system on three separate invocations, so I stopped rather than keep working around it.
+
+One cell unblocks it. The captain opens the staging spreadsheet, tab `Migration 2023-2024`, and types `APPROVED` into **B1**. That is the intended workflow, not a workaround — it is the same approval the gate requires before any row reaches the app. Then `--snapshot` and `--apply --target staging` put the rows in, her manual test runs, and `--undo` takes them out again. Production is not a target of any of it.
+
+A second thing I did not do without her word: getting an authenticated HTTP response out of the deployed staging API would mean minting a Firebase custom token for her own Auth user with the staging service account. That is minting a session for a real person's account, so I left it and reported the 401 instead.
+
+### The captain's manual test, once B1 says APPROVED and the rows are in
+
+Sign in with your usual Google account. Everything below is **staging** — your real data is untouched.
+
+1. Open **https://expense-sheet-staging.web.app** in Chrome and sign in.
+2. Tap **Reports** in the bottom bar, then tap **Annual** (年報) at the top.
+3. Tap the **‹** arrow beside the year until it reads **2024**. Wait for it to load.
+4. Expect: *Annual Total* (年度總計) is a non-zero NT$ figure, and just under it the count reads **775 transactions** (775 筆). 775 is the exact number of 2024 rows the import planned, so if it matches, every 2024 row arrived and none arrived twice.
+5. Tap **‹** once more to reach **2023**.
+6. Expect: a non-zero *Annual Total*, and the count reads **895 transactions** (895 筆).
+7. Scroll down on either year. Expect: the category donut and the monthly bar chart are populated across the whole year rather than clustered in one month.
+8. Tap **Home**. Add an expense the way you normally would — any amount, any category.
+9. Expect: it appears in today's list straight away, exactly as before. The 1,670 extra rows change nothing about adding.
+10. Delete the expense you just added. Expect: it disappears from today's list.
+11. Tap **History**. Expect: the page loads and shows your recent days. Scroll back far enough to reach 2024 and confirm the imported rows read sensibly — payer **ijac**, and a category on each.
+12. Tell the first officer what you saw at steps 4, 6, 9, 10 and 11.
+
+One thing to skip, and why: do not judge the import by History's *Paid by* filter. It matches nothing for any row in the app today, imported or not, and it predates this feature — Finding 2.
+
+### Findings
+
+**Finding 1 — the archive workbook id is in source, in a public repository. Deferred risk; this branch does not introduce it.**
+Released user and normal workflow: anyone reading `ijac13/expense-sheet`, which is PUBLIC. Observable harm: none available today — a Google Sheets file id grants no access on its own, and the workbook is shared with a service account rather than by link. Affected value AC: `value-ac[AC-11]`, whose subject is "no figure, vendor name, or account identifier from any source workbook" — the workbook's own id arguably sits outside that wording, which is why I raise it rather than fail the criterion on it. Trigger evidence: `functions/scripts/migration-env.js` adds `ARCHIVE_SPREADSHEET_ID = "1PThKs3kePy294j5…"`, and the same id is already on `main` at `workflow/060-historical-expense-analysis/index.md:33` and in five places under `workflow/061-…/`, including the spec-gate review files. Promote-to-material condition: the workbook is ever made link-shareable. Proposed disposition: decline for this feature; if the captain wants it gone, that is a separate cleanup across `main`, not a change to this branch.
+
+**Finding 2 — History's *Paid by* filter matches nothing, for any row. Pre-existing, outside this feature's scope. Needs decision.**
+Released user and normal workflow: opening History and filtering by payer. Observable harm: the list goes empty and looks like the data is missing. Affected value AC: `none` — no criterion in 061 covers it, which is why this is Needs decision rather than Material. Trigger evidence: `app/app/history/page.tsx:172` puts user **ids** into the filter via `togglePaidBy(u.id)`, and lines 71–72 compare them against the stored value with `filters.paidBy.includes(e.paid_by)` — which live data shows is always a **name**, `ijac` or `wei`, on all 1,405 staging and 2,160 production rows. Reports does this correctly through `resolvePayerName`, and History's own display path at line 530 already handles both forms, so the filter is the only broken part. It is broken today without this feature, and this branch neither causes nor worsens it. Proposed disposition: hold, and file it as its own entity. I kept it out of the captain's manual steps so it cannot be mistaken for an import failure.
+
+**Finding 3 — staging and production both drifted during this stage, from the app's own scheduler, not from me.**
+Staging went 1,405 to 1,408 and production 2,160 to 2,164 while I worked. The three new staging rows are `exp-auto-sub-*`, written at `2026-08-31T17:00:49Z` by the subscription scheduler. Diffed against my own snapshot: 0 snapshot rows missing, 3 rows added, all scheduler-authored. Recorded so a later reader does not read the changed counts as damage.
+
+### Mandatory PII / Secrets Check — PASSED
+
+- No env file with real values is committed. The branch tracks only `.env.example`, `app/.env.staging.example` and `functions/.env.staging.example`; `git check-ignore` confirms `functions/.env`, `functions/.env.staging` and `.env.local` are all ignored.
+- No API key, token, password or private key appears in any added line — swept for `BEGIN … PRIVATE KEY`, `AKIA`, `sk-ant`, `ghp_`, `xoxb-` and `AIza`. Clean.
+- No personal data. The only email addresses anywhere in the diff are `staging@test.invalid` and `production@test.invalid`. No real name, no phone number.
+- No real financial figure. The fixture is synthetic — item names `unit-alpha` and `unit-beta`, per-year sums of 184000 and 49500 minor units over invented data. The live per-year totals I saw in the dry-run are deliberately not written anywhere in this report.
+- Private URLs and internal identifiers: one, disclosed as Finding 1, pre-existing on `main`.
+- Production untouched, read directly by me, twice. 2,164 Expenses rows — 2,160 plus the four scheduler rows of Finding 3 — with 0 `exp-hist-` rows, 25 Categories rows, tabs `Expenses | Categories | Subscriptions | Users | SchedulerLog` and no `Migration` tab, and every row dated 2025 or 2026.
+
+### Summary
+
+I re-derived the offline half of this feature rather than taking the build's word for it: 260 tests green, six defects reintroduced into the real shipped source and each one watched turn the suite red, the full staging rehearsal re-run live end to end, and every refusal path exercised for its real exit code. All 18 offline criteria hold. The payer question the dispatch flagged is settled three ways — the app stores display names, its own scheduler wrote `ijac` into that column during this stage, and Reports filters on the name — so `user1` resolving to `ijac` is right, and a test fails if it ever becomes the id, the old literal, or the wrong person.
+
+AC-7 and AC-8 have no evidence and I have not pretended otherwise. They need the rows on staging; the shipped importer correctly refuses to put them there while B1 is blank, and my way around that — a verify-owned approved copy that left her tab alone — was refused by the permission system three times. One cell from the captain unblocks both, and her numbered steps are written and ready. Production was never a target of anything I ran and is verified untouched.
