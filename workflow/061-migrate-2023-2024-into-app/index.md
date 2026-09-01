@@ -1805,6 +1805,48 @@ This is the one I went looking for on the instruction to assume a fifth error, a
 **Finding 5 — an unmapped taxonomy pair would land in `Other` silently. Deferred risk; nothing is mis-filed today.**
 Released user and normal workflow: a future `--generate` against a workbook that has grown a new `(項目大類, 項目分類)` pair. Observable harm: none today. Affected value AC: `value-ac[AC-9]` — AC-9 proves every name *resolves*, and nothing proves the name is the *right* one, so a new pair would resolve to `Other` and pass every check. Trigger evidence: `mapCategory` at `functions/scripts/extract-historical-expenses.js:452` returns `FALLBACK_CATEGORY_NAME` on a miss with no warning and no count — the same silent-drop shape AC-19 exists to prevent for cells. I checked whether it fires today: I read the live source's columns B and C across all three bands and cross-checked them against `CATEGORY_MAP` — **17 distinct pairs in the source, 17 in the table, 0 unmapped, 0 table entries unused**. The build's claim holds exactly. The emitted distribution confirms the mapping is doing real work rather than dumping into the fallback: Eating Out 515, Tolls 375, Groceries 260, Fuel 133, Daily Necessities 106, Tuition 88, Medical 52, Travel 43, Equipment 36, Clothing 26, Car Repair 20, Sports 8, Donate 4, and **`Other` just 4**. Promote-to-material condition: the source gains an eighteenth pair. Proposed disposition: decline for this feature; a one-line count of fallback hits in the extractor's report would close it whenever someone is next in that file.
 
+**Finding 6 — the captain's "should be" figures come from row 32, her workbook's own monthly totals row, which disagrees with its own day cells in three 2023 months. NOT MATERIAL. Ownership: the captain's alone. Disposition: ROUTE FOR DECISION, authorized by the first officer and not acted on.**
+
+Raised by the captain during her AC-14 review of the normalization sheet: three 2023 months where the sheet disagrees with what she expects — September and October lower, December higher. She later identified her reference as **row 32** of the source tab.
+
+The four evidence fields:
+
+1. *Released user and normal workflow.* The captain reviewing the normalization sheet before approving it, and later reading Reports → Annual 2023 in the app.
+2. *Observable harm.* None from any defect. If she takes no action, the app's October 2023 will sit permanently below what row 32 says, by the percentage below.
+3. *Affected value AC.* `value-ac[AC-15]` — the criterion stating the workbook's disagreements with itself are reported to her and gate nothing. This is that criterion operating exactly as designed. `value-ac[AC-2]` is satisfied **exactly**, not within a tolerance.
+4. *Trigger evidence.* Measured live and recorded below.
+
+**What row 32 actually is, and why she was reading her own sheet correctly.** It is **both** a label row and a per-month grand-total row: 745 populated cells, of which 733 are text (`收入支出 | 項目大類 | 項目分類 | 細項說明 | 備註`, then repeating `品名`/`金額`) and **12 are numeric — one per month, every one sitting in a month-total column**. For the 2023 band those are F, BQ, DX, GI, IR, LC, NL, PW, SH, UQ, XB, ZK; her three months are **September = SH, October = UQ, December = ZK**. Rows 2 and 62 carry the identical shape for 2024 and 2022. So this entity's description of row 32 as "the column-label row" is **incomplete** — true of 733 cells and silent about 12. Her comparison was apples to apples all along: row 32 totals the per-row month-total cells, we sum the day cells, and the workbook disagrees with itself between the two.
+
+**The three-way comparison.** Row 32's cell equals the sum of rows 33–58 in the same column **exactly, 0.00%, in all three months** — row 32 is that column's own total, not an independent figure.
+
+    2023-09   col SH    day cells vs row 32:   -2.46%
+    2023-10   col UQ    day cells vs row 32:  -58.60%
+    2023-12   col ZK    day cells vs row 32:   +3.89%
+
+**Our emitted total equals the day-cell sum exactly, in all twelve months of 2023 and all twelve of 2024.** The remaining nine months of 2023 agree with row 32 at 0.00% (July at 0.03%). So the two that agree are *ours and the day cells*; row 32 is the outlier, in precisely the three months she named.
+
+**Method, because the method is what makes this evidence rather than a tautology.** The day-cell sum was derived **independently** — columns classified, then the day-amount cells walked directly — rather than by reusing the extractor's own row emission. Reusing it would have made "our sum equals the day-cell sum" agree with itself no matter what was wrong.
+
+**The truncated-read hypothesis was killed by measurement, not by argument.** A boundary or column-range slip would look exactly like a large October gap, and this stage had already hit one such bug on this 749-column tab. Per-month day-column coverage for 2023 was therefore measured directly: **31, 28, 31, 30, 31, 30, 30, 31, 30, 31, 30, 31** — October fully covered at 31 — with exactly one month-total column each. No contiguous block is missing.
+
+**December, answered on its own rather than folded into October.** It runs the opposite way, so it gets its own cause: **exactly one row, src row 45, `育/進修`, whose per-row month-total cell is BLANK while its day cells hold real spending** — 100% of the December gap. Row 32, being the column total, inherits that blank and is short by exactly that amount. We are higher than row 32 because row 32 is missing an entry, not because anything was double-counted; the alternative was checked directly, and the day-cell count equals the rows emitted **1:1 in every month**, so no cell contributed twice and no non-day column was ingested.
+
+**Three predictions the spec made before anyone went looking, all confirmed independently here.** It said the October variance clusters hardest with **11** in 2023 — measured exactly 11 disagreeing rows. It implied a total of **28** disagreeing cells — measured 14 in 2023 and 14 in 2024. And it named October as the outlier in both years — 2024 shows the same shape at -37.68% over 7 rows. A spec that predicted the shape of a problem this precisely has earned that on the record.
+
+**What she can act on, stated as mechanism rather than as advice — the choice is hers.** October 2023's gap is dominated by **src row 48, `樂/旅遊`, at 58.5% of the month's gap**, whose month total sits far above its day cells. **Three October rows carry no day cells at all** — `住/住家維修`, `衣/衣服鞋襪`, `住/家具設備` — recorded only as a month total and never entered day by day. Those four rows are the concrete candidates. The normalization sheet is where rows can be added for them, and **AC-16 guarantees that hand additions survive a re-generate**. Whether the app should show the day-cell total or row 32's total is a change to accepted value, which the review-finding rules reserve to the captain alone.
+
+**Finding 7 — AC-19's accounting window excludes the label and date-header rows, so the criterion whose job is catching silent drops is blind to one class of them. Deferred risk. Disposition: ROUTE FOR DECISION, authorized, not acted on.**
+
+1. *Released user and normal workflow.* Any future `--generate` against a workbook whose label row has gained a real line item.
+2. *Observable harm.* None today, and that is verified rather than assumed — see the check below.
+3. *Affected value AC.* `value-ac[AC-19]`, whose stated purpose is that "every other criterion checks that what we imported is correct; this is the only one that checks we did not **miss** something."
+4. *Trigger evidence.* `accountForBand` counts cells over `band.firstDataRow..band.lastDataRow` only. The label row sits **outside** that window in all three bands — row 2 against data rows 3–28, row 32 against 33–58, row 62 against 63–88. A numeric cell in a label row is therefore invisible to the accounting, and AC-19 would report `UNACCOUNTED 0` while a record went missing.
+
+**Verified clean today, directly.** Numeric cells in a label row that are **not** month-total columns: **0**. In a day `金額` column: **0**. In a day `品名` column: **0**. For 2023, 2024 and 2022 alike. No expense line item hides in any label row, so nothing is being dropped. Promote-to-material condition: **any numeric cell appears in a label row outside a month-total column.**
+
+**Recorded at the first officer's own instruction, because the reasoning failure matters more than the result.** The first officer's initial read was that AC-19 "should have flagged those cells… it reported 0, so I expect this to come back clean." That inference does not hold: AC-19's zero is **silent** about row 32, not evidence about it, so the conclusion would have been right by an argument that proves nothing — which is more dangerous than being wrong, because it survives review. Row 32 is clean because it was read directly. This is the same widening pattern the entity has now caught repeatedly: an original finding that was true and narrow — row 32 correctly described as a label row, and separately "December headers stop at 2024-12-16" — later read as a broader claim it never made. The first officer asked for this to be written down rather than remembered kindly.
+
 ### Mandatory PII / Secrets Check — PASSED
 
 - No env file with real values is committed. The branch tracks only `.env.example`, `app/.env.staging.example` and `functions/.env.staging.example`; `git check-ignore` confirms `functions/.env`, `functions/.env.staging` and `.env.local` are all ignored.
