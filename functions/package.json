@@ -23,7 +23,18 @@
     "backfill:apply:dry-run": "npm run build && node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --apply --dry-run",
     "backfill:apply": "npm run build && node -r ./scripts/load-local-env.js scripts/backfill-subscription-history.js --apply",
     "migrate:category-ids:dry-run": "npm run build && npm --prefix ../app run build:lib && node -r ./scripts/load-local-env.js scripts/normalize-category-ids.js --dry-run",
-    "migrate:category-ids": "npm run build && npm --prefix ../app run build:lib && node -r ./scripts/load-local-env.js scripts/normalize-category-ids.js"
+    "migrate:category-ids": "npm run build && npm --prefix ../app run build:lib && node -r ./scripts/load-local-env.js scripts/normalize-category-ids.js",
+    "hist:extract:report": "node -r ./scripts/load-local-env.js scripts/extract-historical-expenses.js --report",
+    "hist:extract:generate": "node -r ./scripts/load-local-env.js scripts/extract-historical-expenses.js --generate",
+    "hist:staging-categories:dry-run": "npm run build && node -r ./scripts/load-local-env.js scripts/sync-staging-categories.js --dry-run",
+    "hist:staging-categories": "npm run build && node -r ./scripts/load-local-env.js scripts/sync-staging-categories.js --apply",
+    "hist:staging-categories:undo": "npm run build && node -r ./scripts/load-local-env.js scripts/sync-staging-categories.js --undo",
+    "hist:import:dry-run": "npm run build && node -r ./scripts/load-local-env.js scripts/import-historical-expenses.js --dry-run",
+    "hist:import:rehearse": "npm run build && node -r ./scripts/load-local-env.js scripts/import-historical-expenses.js --rehearse --target staging",
+    "hist:import:snapshot": "npm run build && node -r ./scripts/load-local-env.js scripts/import-historical-expenses.js --snapshot",
+    "hist:import:apply": "npm run build && node -r ./scripts/load-local-env.js scripts/import-historical-expenses.js --apply",
+    "hist:import:verify": "npm run build && node -r ./scripts/load-local-env.js scripts/import-historical-expenses.js --verify",
+    "hist:import:undo": "npm run build && node -r ./scripts/load-local-env.js scripts/import-historical-expenses.js --undo"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
