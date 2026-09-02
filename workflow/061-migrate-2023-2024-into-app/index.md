@@ -9,8 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-061-migrate-2023-2024-into-app
 issue:
-pr:
-mod-block:
+pr: "#32"
+mod-block: merge:pr-merge
 gates:
     version: 1
     records:
@@ -131,6 +131,17 @@ gates:
                 id: briefing:061:verify:attempt-1:revision-1
                 digest: sha256:7de93b92cef3ff789b1e327909fdb9a7b9b09200b622680a8102edf9c001a2b7
                 room-ref: ./review/verify/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:061:verify:1
+                briefing: briefing:061:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-02T09:46:09.809051Z"
+                decision: approve
+                reason: 'Captain approved the verify gate for merge, conditional on verifying no exposure of her 2023-2024 expense figures to the repository or the PR, and with the stated intent that the data subsequently be imported into the production sheet. Exposure verified independently by the first officer before recording: her six reported figures and their comma-formatted variants appear nowhere in the branch diff, the entity file, any branch commit message, or any tracked repo content; the only 4+ digit numbers the branch adds are years, Sheets date serials, time constants, id suffixes and transparently synthetic fixture values, and every report artefact is under the gitignored functions/backfill-reports/. The PR body remains an unwritten exposure surface and will be presented to her for approval before anything reaches GitHub, per the pr-merge mod''s approval guardrail. Verdict PASSED, 20 of 20, with AC-7 and AC-8 closed by her own drive of deployed staging.'
+              application:
+                target-stage: done
+                state: pending
 ---
 
 Evaluate whether the captain's 2023 and 2024 historical expense records can be migrated into the live app, and if so, migrate them — so the app itself holds those two years instead of them living only in Google Sheets. Feasibility is judged before any write is attempted.
