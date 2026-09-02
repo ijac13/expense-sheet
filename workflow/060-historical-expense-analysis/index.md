@@ -26,6 +26,11 @@ gates:
                 by: agent:first-officer
                 at: "2026-08-28T13:37:21.134116Z"
                 reason: Captain changed scope before rendering a decision. The bound Briefing asserts "No historical row is ever written into the app" and lists migration under exclusions, matching the entity's twice-stated no-migration constraint. The captain now asks that 2023 and 2024 data be migrated into the app, that feasibility be evaluated, and that the report analysis cover 2006-2025 rather than 2024 plus one baseline year. The Briefing no longer states the captain's scope.
+            - id: gate-attempt:060-ideation-2
+              briefing:
+                id: briefing:060:ideation:attempt-2:revision-1
+                digest: sha256:0684e0d8fdc454cf1a5869cae04183eeab83b1d3b0ef862727baa5bf6cce50c5
+                room-ref: ./review/ideation/briefing-2
 ---
 
 The captain's question, in her own words: **why are 2023 and 2024 roughly half of 2025?**
