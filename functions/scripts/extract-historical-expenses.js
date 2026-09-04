@@ -873,11 +873,15 @@ function extract(grid, { years = IN_SCOPE_YEARS } = {}) {
  *
  * One row per in-scope-year monthly payment, `category_name_en` fixed to
  * `"Mortgage"` directly — the House tab carries no A-C taxonomy to map through
- * `CATEGORY_MAP`. A row with exactly one of D/J populated aborts naming the row
- * rather than guessing (the edge case a missing schedule cell would otherwise be);
- * a row with BOTH blank is ordinary schedule padding (the read range is wider than
- * the 240-row schedule) and is silently skipped, same as a day column with nothing
- * in it.
+ * `CATEGORY_MAP`. A row with a usable date OUTSIDE the requested years is skipped
+ * silently, whatever shape the rest of it is in — this run does not speak for
+ * another year (live proof: row 125 of the 2014-2034 schedule is dated 2024-11-15
+ * with column J genuinely blank, and is none of this run's business when only 2022
+ * is requested). Only an IN-SCOPE row with exactly one of D/J populated, or a
+ * row whose date cannot be determined at all, aborts naming the row rather than
+ * guessing. A row with BOTH blank is ordinary schedule padding (the read range is
+ * wider than the 240-row schedule) and is silently skipped, same as a day column
+ * with nothing in it.
  */
 function extractMortgageRows(houseGrid, { years = IN_SCOPE_YEARS } = {}) {
   const yearsSet = new Set(years);
@@ -893,6 +897,14 @@ function extractMortgageRows(houseGrid, { years = IN_SCOPE_YEARS } = {}) {
     if (dEmpty && jEmpty) return; // schedule padding — nothing here
 
     const ref = `${HOUSE_TAB}!D${sourceRow}/J${sourceRow}`;
+    const iso = dEmpty ? null : parseHeaderDate(dateRaw);
+    const year = iso !== null ? Number(iso.slice(0, 4)) : null;
+
+    // Out of scope: skip silently, whatever shape the rest of the row is in. Only
+    // checked once the year is actually known — a row this run cannot attribute to
+    // any year (D blank or unparseable) falls through to the strict checks below.
+    if (year !== null && !yearsSet.has(year)) return;
+
     if (dEmpty !== jEmpty) {
       throw new ExtractError(
         `${ref}: ` +
@@ -902,13 +914,9 @@ function extractMortgageRows(houseGrid, { years = IN_SCOPE_YEARS } = {}) {
         `. Refusing to guess a mortgage row from half its data.`
       );
     }
-
-    const iso = parseHeaderDate(dateRaw);
     if (iso === null) {
       throw new ExtractError(`${ref}: column D holds ${JSON.stringify(dateRaw)}, which does not parse as a date.`);
     }
-    const year = Number(iso.slice(0, 4));
-    if (!yearsSet.has(year)) return; // out of scope — not this run's job
 
     const amount = parseAmount(amountRaw, ref);
 

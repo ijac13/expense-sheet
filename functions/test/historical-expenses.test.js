@@ -796,6 +796,17 @@ test("a House-tab row with an amount but no date aborts naming the row", () => {
   );
 });
 
+test("an out-of-scope-year row with exactly one of D/J populated is skipped silently, never aborting a run that never asked about it", () => {
+  // Live finding: row 125 of the real 240-row schedule is dated 2024-11-15 with
+  // column J genuinely blank — a real gap, but in a year this run (--years 2022)
+  // never requested. It must not block a 2022-only extraction.
+  const g = houseGrid();
+  const serial2024_11_15 = (Date.UTC(2024, 10, 15) - Date.UTC(1899, 11, 30)) / 86400000;
+  g.push([serial2024_11_15, "", "", "", "", "", ""]); // D populated, J blank
+  const { rows } = extractMortgageRows(g, { years: [2022] });
+  assert.equal(rows.length, 12, "the out-of-range partial row must not abort the 2022 extraction");
+});
+
 test("AC-6: the House-tab reader's range is bounded to D5:J255 and never requests column A, B or C", async () => {
   const stub = makeSheets({ House: { header: [], rows: houseGrid() } });
   await extractor.readHouseGrid(stub.sheets);
