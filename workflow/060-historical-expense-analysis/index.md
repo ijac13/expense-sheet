@@ -1,15 +1,15 @@
 ---
 id: "060"
 title: Historical Expense Analysis — Understand How to Spend Less Again
-status: verify
+status: done
 source: captain
 started: 2026-09-02T10:20:26Z
-completed:
-verdict:
+completed: 2026-09-04T11:12:57Z
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-060-historical-expense-analysis
 issue:
-pr:
+pr: local-merge:97ed7e60a4f322020e5fb4c12c6ff3a007cc95be
 gates:
     version: 1
     records:
@@ -78,6 +78,18 @@ gates:
                 id: briefing:060:verify:attempt-1:revision-1
                 digest: sha256:2ae5677c1e0dc35af862415ca90b88a0ccaefaba007237bff1987d5952d7d58a
                 room-ref: ./review/verify/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:060:verify:1
+                briefing: briefing:060:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-04T11:11:57.698068Z"
+                decision: approve
+                reason: Captain approved the verify gate. Verdict PASSED 6/6, independently re-derived by a fresh agent from a genuinely clean state, no app code touched at any point, report.md never opened for writing, exhaustive money-figure sweep across all 13 commits this entity has ever made. No staging walkthrough applies — report-only entity, no app surface, two live production API reads stand in as live evidence. Babies left open as designed.
+              application:
+                target-stage: done
+                state: consumed
+mod-block:
 ---
 
 The captain's question, with her figures redacted because this repository is public: **why are 2023 and 2024 roughly half of 2025 — why did my spending roughly double?** She stated it with the two annual amounts; the ratio is the part that can be written down here.
