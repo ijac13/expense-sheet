@@ -1,13 +1,13 @@
 ---
 id: 062
 title: Migrate 2022 Historical Expense Data Into The App
-status: spec
+status: build
 source: captain
 started: 2026-09-04T01:11:34Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-062-migrate-2022-into-app
 issue:
 pr:
 mod-block:
@@ -50,6 +50,17 @@ gates:
                 id: briefing:062:spec:attempt-1:revision-1
                 digest: sha256:397aaee1de89bca3a6c4012cf72a81680bfe71c42508c1ec0ea0341b860ba3da
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:062:spec:1
+                briefing: briefing:062:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-04T03:35:36.181967Z"
+                decision: approve
+                reason: 'Captain approved the spec: two-source 2022 import extending 061''s tooling, both critical questions (formula-error pattern, date span) verified live rather than assumed, three real defects found and speced with falsifiable ACs before any build work, and the shared undo-scoping fix protecting 061''s live production rows. Surface +700 LOC/5 files, tolerance +/-35%, honestly attributed.'
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 Extend the historical import to 2022, so the app holds a third year alongside the 2023–2024 records delivered by `061` — and, in the same pass, 2022's twelve mortgage payments, so 2022 lands as one complete year rather than an expenses-only or mortgage-only partial import. This is decided scope, not an open question: the captain ruled that this entity imports 2022's regular Daily-tab expenses AND 2022's twelve mortgage payments (column J of the `House` tab, dated by column D, spreadsheet `1oUCppCwkfw2BMG8gZwxb13Vq8KVXBQFrVoS57ZH9h6E`) together, in one pass. She was asked directly whether 2022 should land as base expenses only with mortgage added later, or as one combined import, and chose combined for a stated reason: a mortgage-only or expenses-only partial year would misrepresent 2022 in every Reports screen that reads it. This is her reasoning, not scope creep. Expected to be small: `061`'s extractor already discovers the 2022 band and reads it only to find the boundary.
