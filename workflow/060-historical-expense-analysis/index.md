@@ -1,7 +1,7 @@
 ---
 id: "060"
 title: Historical Expense Analysis — Understand How to Spend Less Again
-status: build
+status: verify
 source: captain
 started: 2026-09-02T10:20:26Z
 completed:
