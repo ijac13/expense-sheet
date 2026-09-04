@@ -61,6 +61,14 @@ gates:
               application:
                 target-stage: build
                 state: consumed
+        - id: gate:062:verify
+          stage: verify
+          attempts:
+            - id: gate-attempt:062-verify-1
+              briefing:
+                id: briefing:062:verify:attempt-1:revision-1
+                digest: sha256:e2dee13f3df18db621a6aa0925cf476983e813229a981ac003750fa1515f7fcc
+                room-ref: ./review/verify/briefing-1
 ---
 
 Extend the historical import to 2022, so the app holds a third year alongside the 2023–2024 records delivered by `061` — and, in the same pass, 2022's twelve mortgage payments, so 2022 lands as one complete year rather than an expenses-only or mortgage-only partial import. This is decided scope, not an open question: the captain ruled that this entity imports 2022's regular Daily-tab expenses AND 2022's twelve mortgage payments (column J of the `House` tab, dated by column D, spreadsheet `1oUCppCwkfw2BMG8gZwxb13Vq8KVXBQFrVoS57ZH9h6E`) together, in one pass. She was asked directly whether 2022 should land as base expenses only with mortgage added later, or as one combined import, and chose combined for a stated reason: a mortgage-only or expenses-only partial year would misrepresent 2022 in every Reports screen that reads it. This is her reasoning, not scope creep. Expected to be small: `061`'s extractor already discovers the 2022 band and reads it only to find the boundary.
