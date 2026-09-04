@@ -25,6 +25,18 @@ const WRITE_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const ARCHIVE_SPREADSHEET_ID = "1PThKs3kePy294j5-0cK3ii1ZPAlkAkcgRdoE-6-o04I";
 const ARCHIVE_TAB = "Daily";
 
+/**
+ * Entity 062 — the captain's mortgage schedule, `Coast FIRE_ijac.wei`.
+ *
+ * Unlike the archive workbook, both the staging AND production service accounts
+ * read this one (confirmed live). `HOUSE_RANGE` is bounded to D5:J255 deliberately
+ * (AC-6): columns A-C of this tab hold a bank name, branch, account number and an
+ * account-holder personal name in one cell, and no script may request them.
+ */
+const HOUSE_SPREADSHEET_ID = "1oUCppCwkfw2BMG8gZwxb13Vq8KVXBQFrVoS57ZH9h6E";
+const HOUSE_TAB = "House";
+const HOUSE_RANGE = "D5:J255";
+
 const VALID_TARGETS = ["staging", "production"];
 
 class TargetError extends Error {}
@@ -37,6 +49,23 @@ class TargetError extends Error {}
  * a single swappable pair would make `--target production` read the archive
  * workbook with an account that cannot see it.
  */
+/** Both named credential pairs, regardless of which one a run targets — what
+ * AC-13's House-tab access check needs, since it must authenticate as BOTH. */
+function resolveCredentialPairs(env = process.env) {
+  return {
+    staging: {
+      name: "staging",
+      spreadsheetId: env.SPREADSHEET_ID_STAGING,
+      credentialsJson: env.GOOGLE_SERVICE_ACCOUNT_KEY_STAGING,
+    },
+    production: {
+      name: "production",
+      spreadsheetId: env.SPREADSHEET_ID_PRODUCTION,
+      credentialsJson: env.GOOGLE_SERVICE_ACCOUNT_KEY_PRODUCTION,
+    },
+  };
+}
+
 function resolveTargets({ target, env = process.env }) {
   if (!target) {
     throw new TargetError(
@@ -48,16 +77,7 @@ function resolveTargets({ target, env = process.env }) {
     throw new TargetError(`--target must be one of ${VALID_TARGETS.join(", ")}, got "${target}".`);
   }
 
-  const staging = {
-    name: "staging",
-    spreadsheetId: env.SPREADSHEET_ID_STAGING,
-    credentialsJson: env.GOOGLE_SERVICE_ACCOUNT_KEY_STAGING,
-  };
-  const production = {
-    name: "production",
-    spreadsheetId: env.SPREADSHEET_ID_PRODUCTION,
-    credentialsJson: env.GOOGLE_SERVICE_ACCOUNT_KEY_PRODUCTION,
-  };
+  const { staging, production } = resolveCredentialPairs(env);
 
   // The staging pair is required whatever the target, because the source read
   // needs it. Checking it here rather than at the read means a production run
@@ -108,14 +128,57 @@ function accountEmail(pair) {
   }
 }
 
+/**
+ * AC-13 — confirms BOTH the staging and production service accounts can read the
+ * House tab, at runtime, before a run relies on that assumption.
+ *
+ * The archive workbook is staging-only (production 403s on it), but the mortgage
+ * sheet's access is broader — both accounts read it today. That is a fact about
+ * what the captain shared, not about this code, so it is asserted live rather than
+ * carried as a constant: if her sharing settings on this sheet ever change, this
+ * throws naming exactly which credential lost access, instead of the run silently
+ * assuming staging-only reachability and failing somewhere downstream with no
+ * clear cause.
+ */
+async function verifyHouseTabAccess({ staging, production }, { sheetsFor = sheetsClientFor } = {}) {
+  const results = {};
+  for (const [label, pair] of [["staging", staging], ["production", production]]) {
+    try {
+      const sheets = await sheetsFor(pair, READONLY_SCOPE);
+      await sheets.spreadsheets.values.get({
+        spreadsheetId: HOUSE_SPREADSHEET_ID,
+        range: `'${HOUSE_TAB}'!D5:D5`,
+      });
+      results[label] = { ok: true };
+    } catch (err) {
+      results[label] = { ok: false, error: err.message ?? String(err) };
+    }
+  }
+  const failed = Object.entries(results).filter(([, r]) => !r.ok);
+  if (failed.length > 0) {
+    throw new TargetError(
+      `House tab read-access check failed for: ` +
+      failed.map(([label, r]) => `${label} (${r.error})`).join(", ") +
+      `. Both the staging and production service accounts are expected to read the House ` +
+      `tab (spreadsheet ${HOUSE_SPREADSHEET_ID}); refusing to proceed on a stale assumption.`
+    );
+  }
+  return results;
+}
+
 module.exports = {
   READONLY_SCOPE,
   WRITE_SCOPE,
   ARCHIVE_SPREADSHEET_ID,
   ARCHIVE_TAB,
+  HOUSE_SPREADSHEET_ID,
+  HOUSE_TAB,
+  HOUSE_RANGE,
   VALID_TARGETS,
   TargetError,
+  resolveCredentialPairs,
   resolveTargets,
   sheetsClientFor,
   accountEmail,
+  verifyHouseTabAccess,
 };
