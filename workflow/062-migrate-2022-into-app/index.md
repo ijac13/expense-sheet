@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-062-migrate-2022-into-app
 issue:
-pr: "#33"
+pr: pr-merge:33
 mod-block: merge:pr-merge
 gates:
     version: 1
