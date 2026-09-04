@@ -3,7 +3,7 @@ id: 062
 title: Migrate 2022 Historical Expense Data Into The App
 status: ideation
 source: captain
-started:
+started: 2026-09-04T01:11:34Z
 completed:
 verdict:
 score:
