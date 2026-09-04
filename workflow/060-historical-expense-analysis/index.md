@@ -51,6 +51,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:060:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:060-spec-1
+              briefing:
+                id: briefing:060:spec:attempt-1:revision-1
+                digest: sha256:830adf2651095e4c83ce4b4ebb1286f0ca76dc4d6c10f6340c91195aed1d6e3a
+                room-ref: ./review/spec/briefing-1
 ---
 
 The captain's question, with her figures redacted because this repository is public: **why are 2023 and 2024 roughly half of 2025 — why did my spending roughly double?** She stated it with the two annual amounts; the ratio is the part that can be written down here.
