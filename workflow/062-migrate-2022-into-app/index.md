@@ -419,3 +419,32 @@ Independently re-verified the offline surface (AC-1–16) from a clean build: 28
 ### Summary
 
 The captain's `APPROVED` in `B1` was read literally, character by character, before anything ran — exact match, matching the digest already on record from before her review. Ran the complete rehearsal cycle for real: 1,408 → apply 853 → verify PASSED (exact per-year sum, zero pre-existing rows touched) → undo 853 → byte-identical restore, all against live staging, all provable from the tool's own snapshot/diff mechanism rather than a hand count. AC-17/18's UI-level piece has one honest limit: no authenticated session for the captain's identity exists for me to drive with, the same constraint and the same ruling `061`'s stage hit — so the live-Reports evidence here is the exact same live data source and calculation Reports itself uses, not a browser screenshot. One real, worth-stating-plainly finding surfaced in the process: staging currently holds no 2023/2024 data at all (it only ever lived on production), so those years will read empty on staging's Reports regardless of anything this entity did — not a defect, but something the captain should not mistake for one if she checks staging herself. Production was never touched, this stage or the last.
+
+## Stage Report: verify (cycle 2 — correcting sequencing, leaving rows live for the captain's own drive)
+
+**The PASSED 18/18 verdict above is WITHDRAWN, not final.** AC-17 and AC-18 are declared INTERACTIVE in this entity's own spec, in the same words `061`'s used: "a live drive of the deployed app." My own parallel computation against `reportService.ts`'s own logic is a legitimate supplementary confidence check, but it is the same shape as "I read the code and it looks correct" — I inferred what Reports would show, I did not observe what it actually shows. That is not the evidence the spec named, and undoing before she could look foreclosed her chance to give it. Correcting course now, on the FO's direction.
+
+- DONE: Re-apply the same 853 rows to staging and leave them live.
+  `--apply --target staging --years 2022`: **created=853, skipped=0** (idempotency: same run, same ids, same result as the first apply). `--verify` immediately after: `imported=853 unmatched=0 missing=0 duplicated=0 out-of-range-dates=0 notes-unparseable=0`; per-year sum **EQUAL**; AC-1 check unchanged: **0 modified, 0 deleted among pre-existing rows, 853 added, 0 other. PASSED.** `curl -sI` on `/` and `/reports/`: both **200**, confirmed right after apply. **Rows are live on staging right now and will stay there — no further undo until the captain has looked and told the FO what she saw.**
+- SKIPPED: Undo and restore.
+  Deliberately not run this cycle — that is the fix. Staging is left at 853 imported 2022 rows (plus its normal 1,408 pre-existing) specifically so there is something for her to see.
+- DONE: Write the captain's manual-test steps in plain language, mortgage-visibility and the 2023/2024-empty finding folded in.
+
+### The captain's manual test — everything below is staging, your real data is untouched
+
+1. Open **https://expense-sheet-staging.web.app** and sign in with your usual Google account.
+2. Tap **Reports**, then **Annual** at the top.
+3. Tap the **‹** arrow beside the year until it reads **2022**. Wait for it to load.
+4. Expect: a non-zero total, and the transaction count reads **853**. That 853 includes both your regular Daily-tab spending AND your twelve 2022 mortgage payments together — this entity's whole point was landing both in one pass so 2022 isn't a partial year.
+5. Scroll down on the 2022 view. Expect: the category breakdown includes a **Mortgage** slice, and the monthly chart has a bar in all twelve months.
+6. Tap **‹** twice more to reach **2023**, then again to reach **2024**. **Expect BOTH to show EMPTY — zero total, no bars.** This is not a bug and not something this import broke: staging has never held 2023/2024 data (those rows only exist on production, from `061`), and this entity's changes didn't touch that. If you want to see 2023/2024 actually populated, that's production, which this stage never wrote to.
+7. Tap **Home**. Add an expense the way you normally would, any amount, any category. Expect: it appears in today's list immediately.
+8. Delete the expense you just added. Expect: it disappears.
+9. Tap **History**. Expect: the page loads. Scroll back to somewhere in 2022 and confirm what you see reads sensibly — payer **ijac**, a category on each row, and some rows should read **Mortgage**.
+10. Tell the first officer what you saw at steps 4, 5, 6, 8 and 9 — especially whether Mortgage actually appeared in step 5 (it's a small slice, 12 of 853 rows, so it may be easy to miss if you don't scroll the category list).
+
+Once you've looked and reported back, I'll undo — removing exactly these 853 rows and restoring staging to its prior 1,408, proven byte-identical, the same way I already proved it works in cycle 1.
+
+### Summary
+
+Corrected the sequencing error from cycle 1: re-applied the same 853 rows (idempotent, verified PASSED again) and this time left them live rather than undoing before the captain could look. AC-17/18 are not being closed on my own parallel computation — that was a legitimate confidence check, not a substitute for her actual click-through, and the FO was right to send this back rather than let a proxy stand in for the Live Evidence Requirement. Staging is now genuinely ready for her drive: 853 2022 rows live (Daily-tab + Mortgage together), app confirmed serving, manual-test steps written above including the 2023/2024-empty-on-staging finding so she isn't alarmed by something that isn't a regression. Recommended verdict remains **provisional pending her drive** — not PASSED, not REJECTED, waiting. Will undo and prove byte-identical restoration only after she's looked and the FO confirms.
