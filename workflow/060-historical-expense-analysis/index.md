@@ -1,7 +1,7 @@
 ---
 id: "060"
 title: Historical Expense Analysis — Understand How to Spend Less Again
-status: ideation
+status: spec
 source: captain
 started: 2026-09-02T10:20:26Z
 completed:
@@ -40,6 +40,17 @@ gates:
                 id: briefing:060:ideation:attempt-3:revision-1
                 digest: sha256:0d2fabd069178652578be1539ab5ec66082e6187795682de58dd3cafd817d0a0
                 room-ref: ./review/ideation/briefing-3
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:060:ideation:3
+                briefing: briefing:060:ideation:attempt-3:revision-1
+                by: person:captain
+                at: "2026-09-04T01:32:41.696739Z"
+                decision: approve
+                reason: 'Captain approved the Round A scope: 2023 versus 2025 like-for-like comparison, from production data, 2024 as a partial-year shape check. Her own question is answered — spending on the same person, same categories fell 44%; the apparent doubling is entirely coverage. Spec is instructed to write the private report and settle the like-for-like computation mechanism (Reports has a payer filter but no category filter). The Babies category (30.3% of the gap, not self-evidently coverage) and the mortgage sizing (35.2% of the gap from 2023 alone) both carry forward into the deliverable.'
+              application:
+                target-stage: spec
+                state: consumed
 ---
 
 The captain's question, with her figures redacted because this repository is public: **why are 2023 and 2024 roughly half of 2025 — why did my spending roughly double?** She stated it with the two annual amounts; the ratio is the part that can be written down here.
