@@ -35,6 +35,11 @@ gates:
                 by: agent:first-officer
                 at: "2026-09-02T10:35:20.785965Z"
                 reason: 'Entity body corrected at c77cf4e after the gate was bound. The ideation ensign verified the premise the re-scope rests on by reading production directly rather than trusting 061''s import record, and the reading falsified two of its own figures (2025 is 1,476 rows with ijac 524, not the source CSV''s 1,404/452; 2026 starts 2026-01-01) and, more materially, replaced the leading explanation. Category coverage, not payer asymmetry, is now the primary candidate: 2023 and 2024 each use 14 of the app''s 25 categories while 2025 uses all 25, with eleven categories carrying rows in 2025 and zero in both earlier years and none running the other way. It also corrects a claim the first officer relayed to the captain — that neither era holds rent, mortgage or insurance — which is false for 2025. The bound Briefing predates all of it.'
+            - id: gate-attempt:060-ideation-3
+              briefing:
+                id: briefing:060:ideation:attempt-3:revision-1
+                digest: sha256:0d2fabd069178652578be1539ab5ec66082e6187795682de58dd3cafd817d0a0
+                room-ref: ./review/ideation/briefing-3
 ---
 
 The captain's question, with her figures redacted because this repository is public: **why are 2023 and 2024 roughly half of 2025 — why did my spending roughly double?** She stated it with the two annual amounts; the ratio is the part that can be written down here.
