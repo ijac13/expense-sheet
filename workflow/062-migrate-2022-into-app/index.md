@@ -22,6 +22,10 @@ gates:
                 id: briefing:062:ideation:attempt-1:revision-1
                 digest: sha256:0db600c44ec2971dcb453e9d1f378e00e31613f32ea19ebfc545493e234414ec
                 room-ref: ./review/ideation/briefing-1
+              withdrawal:
+                by: agent:first-officer
+                at: "2026-09-04T01:15:18.806988Z"
+                reason: Entity body amended after this gate was bound. Commit e4a88da landed between the state commit that produced the bound Briefing and now, adding the captain's stated reason for the combined-import ruling, a pointer to reusing 061's two-source extractor/importer shape, 060's full House tab recon so spec does not re-derive it, and the column-J-over-interest-only decision with its reversal reasoning. All additive context that strengthens the gate; nothing contradicted. The bound Briefing predates all of it.
 ---
 
 Extend the historical import to 2022, so the app holds a third year alongside the 2023–2024 records delivered by `061` — and, in the same pass, 2022's twelve mortgage payments, so 2022 lands as one complete year rather than an expenses-only or mortgage-only partial import. This is decided scope, not an open question: the captain ruled that this entity imports 2022's regular Daily-tab expenses AND 2022's twelve mortgage payments (column J of the `House` tab, dated by column D, spreadsheet `1oUCppCwkfw2BMG8gZwxb13Vq8KVXBQFrVoS57ZH9h6E`) together, in one pass. She was asked directly whether 2022 should land as base expenses only with mortgage added later, or as one combined import, and chose combined for a stated reason: a mortgage-only or expenses-only partial year would misrepresent 2022 in every Reports screen that reads it. This is her reasoning, not scope creep. Expected to be small: `061`'s extractor already discovers the 2022 band and reads it only to find the boundary.
