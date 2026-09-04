@@ -1257,6 +1257,11 @@ test("AC-2/AC-9/AC-10 (062): a combined sheet applies both sources in one run, M
     }
   }
   assert.equal(mortgageIds.size, world.mortgageRows.length);
+
+  // AC-7: a second apply of the combined sheet writes nothing, for both sources.
+  const second = await importRun(world, ["--apply", ...base]);
+  assert.equal(second.created, 0, "every candidate from either source must be found already present");
+  assert.equal(second.skipped, world.dailyRows.length + world.mortgageRows.length);
 });
 
 test("AC-5: a second apply against the same target writes nothing", async () => {
