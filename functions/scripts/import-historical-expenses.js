@@ -44,8 +44,10 @@ const {
   READONLY_SCOPE,
   WRITE_SCOPE,
   resolveTargets,
+  resolveCredentialPairs,
   sheetsClientFor,
   accountEmail,
+  verifyHouseTabAccess,
 } = require("./migration-env");
 
 const {
@@ -160,7 +162,17 @@ function historicalId(year, indexWithinYear) {
  * cannot say which source cell a given expense came from. AC-2's join and AC-16's
  * carry-forward both hang off it.
  */
+/**
+ * Entity 062 — a mortgage row (`row.source === "mortgage"`) carries no bucket /
+ * sub-category / detail at all, so its provenance names the source tab and the
+ * House-tab row instead: `House tab row {sourceRow} | key={key}`. Two segments
+ * rather than four-or-five, which is what `parseNotes` below keys its branch on.
+ */
 function buildNotes(row) {
+  if (row.source === "mortgage") {
+    const m = /-mortgage-r(\d+)$/.exec(row.key ?? "");
+    return `House tab row ${m ? m[1] : ""} | key=${row.key}`;
+  }
   const parts = [row.bucket ?? "", row.sub_category ?? "", row.detail ?? ""];
   if (text(row.item_name) !== "") parts.push(text(row.item_name));
   parts.push(`key=${row.key}`);
@@ -171,13 +183,18 @@ function parseNotes(notes) {
   const parts = String(notes ?? "").split(" | ");
   const last = parts[parts.length - 1] ?? "";
   if (!last.startsWith("key=")) return null;
+  const key = last.slice("key=".length);
+  if (parts.length === 2) {
+    const m = /^House tab row (\d*)$/.exec(parts[0]);
+    if (m) return { sourceTab: "House", sourceRow: m[1], key };
+  }
   if (parts.length < 4) return null;
   return {
     bucket: parts[0],
     sub_category: parts[1],
     detail: parts[2],
     item_name: parts.length >= 5 ? parts[3] : "",
-    key: last.slice("key=".length),
+    key,
   };
 }
 
@@ -423,19 +440,29 @@ async function insertRowsAtTop(sheets, spreadsheetId, tabName, rows) {
 }
 
 /**
- * Deletes exactly the rows whose id carries the historical prefix.
+ * Deletes exactly the rows whose id carries one of the given prefix(es).
  *
  * Matching on the id prefix and not on the date year is what lets a row either user
  * added by hand between apply and undo survive — including one they added dated 2024.
  * Deleted bottom-up so an earlier deletion cannot shift a later index.
+ *
+ * `prefixes` accepts a single string (a call site scoped to exactly one prefix, or
+ * an exact id for the rehearsal's hand-add cleanup) or an array (a run scoped to
+ * several years at once). It does NOT default to the module-level `ID_PREFIX` —
+ * entity 062's own finding, reading this file directly: both of `061`'s call sites
+ * passed the unscoped `exp-hist-` prefix, so an undo matched and deleted EVERY
+ * historical row in the tab, `061`'s already-live 2023/2024 rows included. Every
+ * caller must now say explicitly which run's rows it means to remove.
  */
-async function deleteRowsByIdPrefix(sheets, spreadsheetId, prefix, log) {
+async function deleteRowsByIdPrefix(sheets, spreadsheetId, prefixes, log) {
+  const list = Array.isArray(prefixes) ? prefixes : [prefixes];
   const { grid, map } = await readExpenses(sheets, spreadsheetId);
   const idAt = map.index.id;
   const targetRowIndexes = [];
   grid.forEach((row, i) => {
     if (i === 0) return;
-    if (String(row[idAt] ?? "").startsWith(prefix)) targetRowIndexes.push(i);
+    const id = String(row[idAt] ?? "");
+    if (list.some((p) => id.startsWith(p))) targetRowIndexes.push(i);
   });
 
   const sheetId = await sheetIdFor(sheets, spreadsheetId, EXPENSES_SPEC.tab);
@@ -456,8 +483,13 @@ async function deleteRowsByIdPrefix(sheets, spreadsheetId, prefix, log) {
       },
     });
   }
-  log(`[undo] removed ${targetRowIndexes.length} row(s) with the ${prefix} prefix in ${runs.length} batch(es)`);
+  log(`[undo] removed ${targetRowIndexes.length} row(s) matching prefix(es) [${list.join(", ")}] in ${runs.length} batch(es)`);
   return { removed: targetRowIndexes.length };
+}
+
+/** `[2022, 2023]` -> `["exp-hist-2022-", "exp-hist-2023-"]` — this run's own scope. */
+function scopedPrefixesForYears(years) {
+  return years.map((y) => `${ID_PREFIX}${y}-`);
 }
 
 // ---------------------------------------------------------------------------
@@ -690,6 +722,7 @@ function parseArgs(argv) {
     return i === -1 ? null : argv[i + 1] ?? null;
   };
   const phases = PHASES.filter((p) => argv.includes(`--${p}`));
+  const yearsRaw = value("--years");
   return {
     phases,
     target: value("--target"),
@@ -697,6 +730,11 @@ function parseArgs(argv) {
     snapshotFile: value("--snapshot-file"),
     receipt: value("--receipt") ?? DEFAULT_RECEIPT,
     handAddId: value("--hand-add-id"),
+    // `--undo`'s own scope (AC-8): which years' rows THIS invocation may delete.
+    // Required for `--undo` specifically — see the phase handler below — because
+    // `--undo` runs without ever reading the approved sheet, so there is no other
+    // source of truth for what this run's own rows are.
+    years: yearsRaw ? yearsRaw.split(",").map((y) => Number(y.trim())) : null,
   };
 }
 
@@ -731,6 +769,18 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
 
   const snapshotFile = args.snapshotFile ?? defaultSnapshotPath(targets.target, args.fromSheet);
 
+  // AC-13 — re-confirmed here too, not only where the extractor reads the House
+  // tab: a combined-sheet import (dry-run/apply/verify/rehearse) still relies on
+  // that House-tab-sourced data being trustworthy, and this is the check that
+  // protects a later production run (`064`'s reuse, say) from a stale assumption
+  // about which credentials can still read it. `--snapshot` and `--undo` skip it —
+  // neither touches House-tab-sourced data at all.
+  if (phase !== "snapshot" && phase !== "undo") {
+    const pairs = resolveCredentialPairs(env);
+    await verifyHouseTabAccess(pairs, { sheetsFor });
+    log(`[import] House tab read-access confirmed for both staging and production`);
+  }
+
   // --- snapshot -----------------------------------------------------------
   if (phase === "snapshot") {
     const { grid, map } = await readExpenses(writeSheets, targets.write.spreadsheetId);
@@ -746,7 +796,19 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
   // it must work even when the sheet is gone or unapproved, or an undo could be
   // blocked by the very state it exists to clean up.
   if (phase === "undo") {
-    const result = await deleteRowsByIdPrefix(writeSheets, targets.write.spreadsheetId, ID_PREFIX, log);
+    // AC-8's fix: no default, and never the module-level ID_PREFIX unscoped. `061`'s
+    // 2023/2024 rows carry that same `exp-hist-` prefix, so an unscoped undo deletes
+    // them too — reading import-historical-expenses.js directly is what found this,
+    // not a hypothetical. Every `--undo` must now say explicitly which year(s) it
+    // means to remove.
+    if (!args.years || args.years.length === 0) {
+      throw new ImportError(
+        '--undo needs --years "<comma-separated years>", scoped to this run\'s own rows. There is ' +
+        'no default: deleteRowsByIdPrefix matches on a prefix, and the unscoped exp-hist- prefix ' +
+        "would delete every historical row in the tab, including another entity's already-live rows."
+      );
+    }
+    const result = await deleteRowsByIdPrefix(writeSheets, targets.write.spreadsheetId, scopedPrefixesForYears(args.years), log);
     return { phase, ...result };
   }
 
@@ -973,9 +1035,13 @@ async function rehearse({ args, targets, writeSheets, approvedSheet, plan, rows,
   await insertRowsAtTop(writeSheets, spreadsheetId, EXPENSES_SPEC.tab, [handAddRow]);
   record("hand-add", `${handAddId} dated 2024-06-15, inside an imported year`);
 
-  // 5. undo
-  const undoResult = await deleteRowsByIdPrefix(writeSheets, spreadsheetId, ID_PREFIX, log);
-  record("undo", `${undoResult.removed} row(s) removed`);
+  // 5. undo — scoped to exactly the years THIS approved sheet's candidates cover,
+  // derived from the plan itself rather than a flag, so it cannot drift from what
+  // was actually written in step 2 (AC-8).
+  const runYears = [...new Set(plan.candidates.map((c) => c.year))];
+  const undoPrefixes = scopedPrefixesForYears(runYears);
+  const undoResult = await deleteRowsByIdPrefix(writeSheets, spreadsheetId, undoPrefixes, log);
+  record("undo", `${undoResult.removed} row(s) removed, scoped to [${undoPrefixes.join(", ")}]`);
 
   // 6. diff against the snapshot
   const after = await readExpenses(writeSheets, spreadsheetId);
@@ -1066,6 +1132,7 @@ module.exports = {
   assertRehearsed,
   verifyAgainst,
   deleteRowsByIdPrefix,
+  scopedPrefixesForYears,
   insertRowsAtTop,
   parseArgs,
   defaultSnapshotPath,

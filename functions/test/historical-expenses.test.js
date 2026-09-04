@@ -47,6 +47,9 @@ const {
 const FIXTURE_PATH = path.join(__dirname, "fixtures", "historical-bands.json");
 const FIXTURE = JSON.parse(fs.readFileSync(FIXTURE_PATH, "utf8"));
 
+const HOUSE_FIXTURE_PATH = path.join(__dirname, "fixtures", "house-mortgage.json");
+const DEFECTS_2022_FIXTURE_PATH = path.join(__dirname, "fixtures", "historical-2022-defects.json");
+
 const grid = () => JSON.parse(JSON.stringify(FIXTURE.rows));
 
 // Column indexes in the fixture, named so the assertions read as claims about the
@@ -556,7 +559,7 @@ test("AC-16a: --generate into an existing tab exits non-zero and mutates nothing
 
   await assert.rejects(
     extractor.run(
-      ["--generate", "--into", "Migration 2023-2024", "--fixture", FIXTURE_PATH, "--variance-report", tmpFile("v.md")],
+      ["--generate", "--into", "Migration 2023-2024", "--fixture", FIXTURE_PATH, "--house-fixture", HOUSE_FIXTURE_PATH, "--variance-report", tmpFile("v.md")],
       { log: silent, env: STUB_ENV, sheetsFor: async () => stub.sheets }
     ),
     (err) => err instanceof ExtractError && /already exists/.test(err.message) && /--carry-from/.test(err.message)
@@ -570,7 +573,7 @@ test("AC-16a: --generate into an existing tab exits non-zero and mutates nothing
 test("--generate writes the control row with a blank approval cell and a digest", async () => {
   const stub = makeSheets({ Expenses: { header: ["id"], rows: [] } });
   const result = await extractor.run(
-    ["--generate", "--into", "Migration 2023-2024", "--fixture", FIXTURE_PATH, "--variance-report", tmpFile("v.md")],
+    ["--generate", "--into", "Migration 2023-2024", "--fixture", FIXTURE_PATH, "--house-fixture", HOUSE_FIXTURE_PATH, "--variance-report", tmpFile("v.md")],
     { log: silent, env: STUB_ENV, sheetsFor: async () => stub.sheets }
   );
 
@@ -735,14 +738,18 @@ function normalizationTab({ approved = true, edits = {}, rows = null } = {}) {
 }
 
 function makeWorld({ normalization = normalizationTab(), stagingCategories = STAGING_CATEGORIES } = {}) {
+  // AC-13 — a "House" tab must exist on BOTH stubs, or every importRun call fails
+  // the credential-access preflight before it reaches the phase under test.
   const staging = makeSheets({
     Expenses: { header: EXPENSES_HEADER, rows: PRE_EXISTING.map((r) => r.slice()) },
     Categories: { header: CATEGORIES_HEADER, rows: stagingCategories.map((r) => r.slice()) },
     [NORMALIZATION_TAB]: { header: normalization.header, rows: normalization.rows },
+    House: { header: [], rows: [] },
   });
   const production = makeSheets({
     Expenses: { header: EXPENSES_HEADER, rows: PRE_EXISTING.map((r) => r.slice()) },
     Categories: { header: CATEGORIES_HEADER, rows: PRODUCTION_CATEGORIES.map((r) => r.slice()) },
+    House: { header: [], rows: [] },
   });
   return {
     staging,
@@ -1060,7 +1067,7 @@ test("AC-6 + AC-18: the staging rehearsal runs snapshot -> apply -> verify -> ha
 test("AC-6 falsified: an undo matching on the date year eats the row a user added by hand", async () => {
   const byYear = loadPatched("import-historical-expenses.js", [
     [
-      `    if (String(row[idAt] ?? "").startsWith(prefix)) targetRowIndexes.push(i);`,
+      `    if (list.some((p) => id.startsWith(p))) targetRowIndexes.push(i);`,
       `    if (String(row[map.index.date] ?? "").startsWith("2024-")) targetRowIndexes.push(i);`,
     ],
   ]);
@@ -1078,6 +1085,68 @@ test("AC-6 falsified: an undo matching on the date year eats the row a user adde
 
   // And concretely: exp-002 is dated 2024-06-15 and belongs to the household.
   assert.equal(PRE_EXISTING[1][1], "2024-06-15");
+});
+
+// ---------------------------------------------------------------------------
+// AC-8 (062) — the undo-scoping fix, proven by falsification
+// ---------------------------------------------------------------------------
+
+/**
+ * Entity 062's own finding, reading `import-historical-expenses.js` directly:
+ * both `deleteRowsByIdPrefix` call sites passed the module-level `ID_PREFIX`
+ * unscoped, so `061`'s already-live 2023/2024 rows share the exact prefix a 2022
+ * undo would also match. Two runs against IDENTICALLY seeded worlds: the ORIGINAL
+ * (unscoped) code reintroduced via `loadPatched`, and the real, fixed code — same
+ * fixture, opposite outcome, proving the fix by falsification rather than by
+ * asserting the fixed behaviour alone.
+ */
+function worldWithMixedHistoricalRows() {
+  const world = makeWorld();
+  world.staging.grids.Expenses.push(
+    ["exp-hist-2022-0001", "2022-01-01", "10", "cat_003", "ijac", "ijac", "062's own row | key=2022-r1-cH", "2022-01-01T00:00:00.000Z", "", ""],
+    ["exp-hist-2023-0001", "2023-01-01", "20", "cat_003", "ijac", "ijac", "061's row | key=2023-r1-cH", "2023-01-01T00:00:00.000Z", "", ""],
+    ["exp-hist-2024-0001", "2024-01-01", "30", "cat_003", "ijac", "ijac", "061's row | key=2024-r1-cH", "2024-01-01T00:00:00.000Z", "", ""],
+  );
+  return world;
+}
+
+test("AC-8 falsified: the unscoped module-level ID_PREFIX deletes 061's live 2023/2024 rows on a 2022-only undo", async () => {
+  const buggyWorld = worldWithMixedHistoricalRows();
+  const opts = { log: silent, env: STUB_ENV, sheetsFor: buggyWorld.sheetsFor };
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--undo", "--years", "2022"];
+
+  // Reintroduce 061's original shape: the call site passes ID_PREFIX unscoped,
+  // ignoring --years (and the run-scoped prefixes it now builds) entirely.
+  const unscoped = loadPatched("import-historical-expenses.js", [
+    [
+      `    const result = await deleteRowsByIdPrefix(writeSheets, targets.write.spreadsheetId, scopedPrefixesForYears(args.years), log);`,
+      `    const result = await deleteRowsByIdPrefix(writeSheets, targets.write.spreadsheetId, ID_PREFIX, log);`,
+    ],
+  ]);
+  await unscoped.run(base, opts);
+
+  const remaining = expenseIds(buggyWorld.staging);
+  assert.ok(!remaining.includes("exp-hist-2022-0001"), "sanity: this run's own row must be gone");
+  assert.ok(
+    !remaining.includes("exp-hist-2023-0001") && !remaining.includes("exp-hist-2024-0001"),
+    "the bug must actually reproduce: an unscoped undo wrongly deletes 061's 2023/2024 rows too"
+  );
+
+  // Same fixture, the real (fixed) code: only 2022's row is removed.
+  const fixedWorld = worldWithMixedHistoricalRows();
+  await importer.run(base, { log: silent, env: STUB_ENV, sheetsFor: fixedWorld.sheetsFor });
+  const afterFixed = expenseIds(fixedWorld.staging);
+  assert.ok(!afterFixed.includes("exp-hist-2022-0001"), "this run's own 2022 row is removed");
+  assert.ok(afterFixed.includes("exp-hist-2023-0001"), "061's 2023 row survives, unscoped by year 2022");
+  assert.ok(afterFixed.includes("exp-hist-2024-0001"), "061's 2024 row survives, unscoped by year 2022");
+});
+
+test("--undo has no default years, and refuses rather than guess a scope", async () => {
+  const world = makeWorld();
+  await assert.rejects(
+    importRun(world, ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--undo"]),
+    (err) => err instanceof ImportError && /--years/.test(err.message) && /no default/.test(err.message)
+  );
 });
 
 test("AC-18: a production apply refuses with no receipt, and refuses again on a stale digest", async () => {

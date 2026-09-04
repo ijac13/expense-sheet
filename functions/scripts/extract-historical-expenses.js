@@ -50,9 +50,14 @@ const {
   WRITE_SCOPE,
   ARCHIVE_SPREADSHEET_ID,
   ARCHIVE_TAB,
+  HOUSE_SPREADSHEET_ID,
+  HOUSE_TAB,
+  HOUSE_RANGE,
   resolveTargets,
+  resolveCredentialPairs,
   sheetsClientFor,
   accountEmail,
+  verifyHouseTabAccess,
 } = require("./migration-env");
 
 // ---------------------------------------------------------------------------
@@ -70,9 +75,30 @@ const COL_BUCKET = 1;
 const COL_SUB_CATEGORY = 2;
 const COL_DETAIL = 3;
 
+/**
+ * The DEFAULT stays `061`'s own two years, deliberately: every existing test and
+ * caller that relies on this default (unchanged 061 behaviour) keeps working
+ * unchanged. Entity 062 reaches 2022 through `--years 2022,2023,2024` (wired to
+ * `parseArgs` below) rather than by widening what every caller gets for free —
+ * before this flag existed, the constant was not reachable from the command line
+ * at all, which is the defect this entity fixes.
+ */
 const IN_SCOPE_YEARS = [2023, 2024];
 
 const REPORT_DIR = path.resolve(__dirname, "..", "backfill-reports");
+
+/** Entity 062 — the House-tab mortgage source's fixed category. Assigned directly,
+ * never through `CATEGORY_MAP`: the House tab carries no A-C taxonomy to map from. */
+const MORTGAGE_CATEGORY_NAME = "Mortgage";
+
+/** The mortgage schedule's own six prepayment dates (from `060`'s ideation recon).
+ * None fall in 2022 — this entity's AC-5 assertion is meant to pass vacuously, kept
+ * so a later reuse against a year that DOES contain one cannot silently assume it
+ * does not. The prepayment-treatment decision itself belongs to whichever entity
+ * imports that year (`064` for 2023), not to this one. */
+const MORTGAGE_PREPAYMENT_DATES = new Set([
+  "2015-07-15", "2020-02-15", "2021-02-15", "2023-03-15", "2025-03-15", "2025-11-15",
+]);
 
 /**
  * `(項目大類, 項目分類)` -> category `name_en`.
@@ -119,6 +145,9 @@ const SHADOWED_COLUMNS = ["date", "amount", "category_name_en", "status"];
 const SHEET_COLUMNS = [
   "key",
   "year",
+  // Entity 062 — which reader produced this row: "daily" | "mortgage". Structural
+  // metadata like `key`/`year`, not editable and not shadowed.
+  "source",
   "date",
   "date_source",
   "bucket",
@@ -300,7 +329,7 @@ function bandYear(grid, band) {
  *   a day item-name column is one whose LABEL is `品名` AND whose HEADER carries a
  *   date. Its amount column is the NEXT column whatever its label says.
  *
- * Three edge cases the live tab actually contains:
+ * Five edge cases the live tab actually contains, the last two found by 2022:
  *   - column `MI` is June 16's amount column in both bands with a BLANK label. The
  *     `金額`-label rule drops its 3 real amounts silently. Here it is claimed,
  *     because "next column, whatever its label" reaches it.
@@ -310,6 +339,13 @@ function bandYear(grid, band) {
  *   - an amount column whose label is neither `金額` nor blank aborts the run. That
  *     is a shape this parser does not understand, and continuing would mean
  *     guessing.
+ *   - 2022 column `NO`: a second `金額`-labelled column immediately following an
+ *     already-paired day, carrying no header date of its own — a second same-day
+ *     amount, not a new day. Claimed in a second pass, below, once every ordinary
+ *     pair is known.
+ *   - most of 2022's August: the `品名` column's header is BLANK and the date sits
+ *     on the AMOUNT column's header instead. Recovered here rather than emitted
+ *     undated, because the date is genuinely present, just on the neighbouring cell.
  */
 function classifyColumns(grid, band) {
   const labels = rowAt(grid, band.labelRow);
@@ -338,7 +374,8 @@ function classifyColumns(grid, band) {
 
   for (let c = META_COLS; c < maxCol; c++) {
     if (!isItemNameColumn(c)) continue;
-    const iso = parseHeaderDate(header[c]);
+    let iso = parseHeaderDate(header[c]);
+    let dateSource = iso !== null ? "header" : null;
     const next = c + 1;
 
     let amountCol = null;
@@ -360,11 +397,44 @@ function classifyColumns(grid, band) {
         );
       }
       amountCol = next;
+
+      // The August 2022 shape: this item-name column's own header is blank, but
+      // its amount column's header carries the date instead. Recover it rather
+      // than falling through to the undated branch, which would be correct but
+      // needlessly pessimistic when the date is right there on the next cell.
+      if (iso === null) {
+        const recovered = parseHeaderDate(header[next]);
+        if (recovered !== null) {
+          iso = recovered;
+          dateSource = "amount-header";
+        }
+      }
     }
 
     claim(c, "day-item-name");
     if (amountCol !== null) claim(amountCol, "day-amount");
-    days.push({ nameCol: c, amountCol, iso, skipReason });
+    days.push({ nameCol: c, amountCol, iso, skipReason, dateSource });
+  }
+
+  // The 2022 `NO` shape: an unclassified `金額`-labelled column immediately
+  // following an already-claimed day-amount column, with no header date of its
+  // own — a second entry for THAT day, not a new one. Must run after the pairing
+  // loop above, since it depends on knowing which columns are already claimed.
+  for (let c = META_COLS; c < maxCol; c++) {
+    if (kinds.has(c)) continue;
+    if (label(c) !== AMOUNT_LABEL) continue;
+    const prev = c - 1;
+    if (kinds.get(prev) !== "day-amount") continue;
+    const primary = days.find((d) => d.amountCol === prev);
+    claim(c, "day-amount");
+    days.push({
+      nameCol: primary.nameCol,
+      amountCol: c,
+      iso: primary.iso,
+      skipReason: null,
+      dateSource: primary.dateSource,
+      secondary: true,
+    });
   }
 
   // A month-total column carries a date on the header row too — that is why the
@@ -418,7 +488,10 @@ function accountForBand(grid, band, classification) {
   for (let c = META_COLS; c < maxCol; c++) allCols.push(c);
 
   const dayAmount = countOver(days.filter((d) => d.amountCol !== null).map((d) => d.amountCol));
-  const dayItemName = countOver(days.map((d) => d.nameCol));
+  // A `secondary` entry (the 2022 `NO` shape) reuses its primary's `nameCol` — it is
+  // a second AMOUNT for the same day, not a second item-name column — so counting
+  // it here too would double-count that column's cells against the total.
+  const dayItemName = countOver(days.filter((d) => !d.secondary).map((d) => d.nameCol));
   const monthTotal = countOver(monthTotalCols);
   const total = countOver(allCols);
 
@@ -446,6 +519,87 @@ function accountForBand(grid, band, classification) {
 }
 
 // ---------------------------------------------------------------------------
+// Structural findings (AC-15) — names the shape, not just its numeric symptom
+// ---------------------------------------------------------------------------
+
+/**
+ * The three 2022 source-shape defects, named by column reference and cause rather
+ * than left as an aggregate variance percentage — AC-15, and Finding 8's own lesson
+ * from `061`: a percentage with no named cause costs a captain two stages of
+ * confident-but-wrong explanations before anyone reads the actual cells.
+ *
+ * `misdatedColumns` is a general structural check, not a 2022-specific one: a
+ * band's own day columns are chronological by construction (this is a single
+ * calendar year read left to right), so any dated day column whose header does NOT
+ * fall strictly after the immediately preceding dated day column is flagged. It
+ * does not reject the row — the date is well-formed and inside the band's year, so
+ * no existing check catches it — it only names the column so the captain can
+ * confirm or correct it before approving.
+ */
+function structuralFindings(classification) {
+  const primaryDays = classification.days.filter((d) => !d.secondary);
+
+  const secondAmountColumns = classification.days
+    .filter((d) => d.secondary)
+    .map((d) => ({ column: d.amountCol, precedingColumn: d.amountCol - 1, iso: d.iso }));
+
+  const dateRecoveredColumns = primaryDays
+    .filter((d) => d.dateSource === "amount-header")
+    .map((d) => ({ nameColumn: d.nameCol, amountColumn: d.amountCol, iso: d.iso }));
+
+  const misdatedColumns = [];
+  let prevIso = null;
+  let prevCol = null;
+  for (const d of primaryDays) {
+    if (d.iso === null) continue;
+    if (prevIso !== null && d.iso <= prevIso) {
+      misdatedColumns.push({
+        nameColumn: d.nameCol,
+        amountColumn: d.amountCol,
+        iso: d.iso,
+        precedingColumn: prevCol,
+        precedingIso: prevIso,
+      });
+    }
+    prevIso = d.iso;
+    prevCol = d.nameCol;
+  }
+
+  return { secondAmountColumns, dateRecoveredColumns, misdatedColumns };
+}
+
+function renderStructuralFindings(findings) {
+  const lines = [];
+  if (findings.secondAmountColumns.length === 0
+    && findings.dateRecoveredColumns.length === 0
+    && findings.misdatedColumns.length === 0) {
+    return ["- none found"];
+  }
+  for (const d of findings.secondAmountColumns) {
+    lines.push(
+      `- **Second same-day amount column:** ${columnLetter(d.column)} carries a second ` +
+      `${AMOUNT_LABEL} for ${d.iso ?? "(undated)"}, immediately following ` +
+      `${columnLetter(d.precedingColumn)}'s amount column, with no header date of its own.`
+    );
+  }
+  for (const d of findings.dateRecoveredColumns) {
+    lines.push(
+      `- **Date recovered from the amount column's header:** ${columnLetter(d.nameColumn)}'s ` +
+      `own header is blank; its date (${d.iso}) was read from its amount column ` +
+      `${columnLetter(d.amountColumn)}'s header instead.`
+    );
+  }
+  for (const d of findings.misdatedColumns) {
+    lines.push(
+      `- **Possible mis-dated day column:** ${columnLetter(d.nameColumn)} is headered ${d.iso}, ` +
+      `positioned immediately after ${columnLetter(d.precedingColumn)} (headered ${d.precedingIso}) ` +
+      `— not chronologically after it. Verify before approving.`
+    );
+  }
+  return lines;
+}
+
+// ---------------------------------------------------------------------------
 // Row emission
 // ---------------------------------------------------------------------------
 
@@ -464,12 +618,23 @@ function mapCategory(bucket, subCategory) {
  * band repeat `住/家具設備` and `住/住家維修`, distinguished only by the free-text
  * detail column.
  */
-function emitBandRows(grid, band, classification) {
+function emitBandRows(grid, band, classification, findings = { misdatedColumns: [] }) {
   const rows = [];
   const year = band.year;
 
   const dated = classification.days.filter((d) => d.iso !== null && d.amountCol !== null);
   const undated = classification.days.filter((d) => d.iso === null && d.amountCol !== null);
+
+  // AC-15 / the `ZI`/`ZJ` finding: a row whose day column was flagged as possibly
+  // mis-dated carries that warning into `captain_note` on generation, so it surfaces
+  // on the normalization sheet itself and not only in the separate variance report.
+  const misdateNotes = new Map(
+    findings.misdatedColumns.map((m) => [
+      m.nameColumn,
+      `Possible mis-dated column: header reads ${m.iso}, positioned immediately after ` +
+      `${columnLetter(m.precedingColumn)} (headered ${m.precedingIso}). Verify before approving.`,
+    ])
+  );
 
   for (let r = band.firstDataRow; r <= band.lastDataRow; r++) {
     const bucket = text(cellAt(grid, r, COL_BUCKET));
@@ -496,8 +661,9 @@ function emitBandRows(grid, band, classification) {
       rows.push({
         key: `${year}-r${r}-c${columnLetter(day.amountCol)}`,
         year: String(year),
+        source: "daily",
         date: status === "undated" ? "" : day.iso,
-        date_source: status === "undated" ? "missing" : "header",
+        date_source: status === "undated" ? "missing" : day.dateSource ?? "header",
         bucket,
         sub_category: subCategory,
         detail,
@@ -505,7 +671,7 @@ function emitBandRows(grid, band, classification) {
         amount: String(amount),
         category_name_en: mapCategory(bucket, subCategory),
         status,
-        captain_note: "",
+        captain_note: misdateNotes.get(day.nameCol) ?? "",
       });
     };
 
@@ -611,6 +777,11 @@ function renderVarianceReport(bandsVariance, generatedAt) {
     }
     const covered = band.months.filter((m) => m.month).length;
     lines.push("", `- month-total columns found: ${band.months.length} (${covered} with a resolved month)`, "");
+
+    // AC-15 — named source-shape irregularities, not just their numeric symptom.
+    if (band.findings) {
+      lines.push("### Source-shape irregularities", "", ...renderStructuralFindings(band.findings), "");
+    }
   }
 
   return lines.join("\n");
@@ -658,9 +829,10 @@ function extract(grid, { years = IN_SCOPE_YEARS } = {}) {
     const band = seen.get(year);
     const classification = classifyColumns(grid, band);
     const accounting = accountForBand(grid, band, classification);
-    const bandRows = emitBandRows(grid, band, classification);
+    const findings = structuralFindings(classification);
+    const bandRows = emitBandRows(grid, band, classification, findings);
     rows.push(...bandRows);
-    bandsVariance.push({ year, months: varianceForBand(grid, band, classification) });
+    bandsVariance.push({ year, months: varianceForBand(grid, band, classification), findings });
     bands.push({
       year,
       labelRow: band.labelRow,
@@ -688,6 +860,77 @@ function extract(grid, { years = IN_SCOPE_YEARS } = {}) {
     .map((b) => ({ year: b.year, firstDataRow: b.firstDataRow, lastDataRow: b.lastDataRow }));
 
   return { bands, skippedBands, rows, variance: bandsVariance };
+}
+
+// ---------------------------------------------------------------------------
+// House-tab mortgage extraction (entity 062)
+// ---------------------------------------------------------------------------
+
+/**
+ * `houseGrid` is the `D5:J255` range as an array of rows, index 0 = sheet row 5 —
+ * i.e. exactly what `readHouseGrid` returns and what a fixture reproduces. Column
+ * offsets within a row: D=0 (`還款日期`, the date), J=6 (`實際月付`, the payment).
+ *
+ * One row per in-scope-year monthly payment, `category_name_en` fixed to
+ * `"Mortgage"` directly — the House tab carries no A-C taxonomy to map through
+ * `CATEGORY_MAP`. A row with exactly one of D/J populated aborts naming the row
+ * rather than guessing (the edge case a missing schedule cell would otherwise be);
+ * a row with BOTH blank is ordinary schedule padding (the read range is wider than
+ * the 240-row schedule) and is silently skipped, same as a day column with nothing
+ * in it.
+ */
+function extractMortgageRows(houseGrid, { years = IN_SCOPE_YEARS } = {}) {
+  const yearsSet = new Set(years);
+  const rows = [];
+  const perYearCount = new Map();
+
+  houseGrid.forEach((row, i) => {
+    const sourceRow = i + 5; // D5 is houseGrid[0]
+    const dateRaw = row?.[0];
+    const amountRaw = row?.[6];
+    const dEmpty = text(dateRaw) === "";
+    const jEmpty = text(amountRaw) === "";
+    if (dEmpty && jEmpty) return; // schedule padding — nothing here
+
+    const ref = `${HOUSE_TAB}!D${sourceRow}/J${sourceRow}`;
+    if (dEmpty !== jEmpty) {
+      throw new ExtractError(
+        `${ref}: ` +
+        (dEmpty
+          ? `column J (實際月付) = ${JSON.stringify(amountRaw)} but column D (還款日期) is blank`
+          : `column D (還款日期) = ${JSON.stringify(dateRaw)} but column J (實際月付) is blank`) +
+        `. Refusing to guess a mortgage row from half its data.`
+      );
+    }
+
+    const iso = parseHeaderDate(dateRaw);
+    if (iso === null) {
+      throw new ExtractError(`${ref}: column D holds ${JSON.stringify(dateRaw)}, which does not parse as a date.`);
+    }
+    const year = Number(iso.slice(0, 4));
+    if (!yearsSet.has(year)) return; // out of scope — not this run's job
+
+    const amount = parseAmount(amountRaw, ref);
+
+    rows.push({
+      key: `${year}-mortgage-r${sourceRow}`,
+      year: String(year),
+      source: "mortgage",
+      date: iso,
+      date_source: "header",
+      bucket: "",
+      sub_category: "",
+      detail: "",
+      item_name: "",
+      amount: String(amount),
+      category_name_en: MORTGAGE_CATEGORY_NAME,
+      status: "include",
+      captain_note: "",
+    });
+    perYearCount.set(year, (perYearCount.get(year) ?? 0) + 1);
+  });
+
+  return { rows, perYearCount };
 }
 
 // ---------------------------------------------------------------------------
@@ -908,6 +1151,22 @@ async function readSourceGrid(sheets) {
   return grid;
 }
 
+/**
+ * AC-6 — bounded to `D5:J255`. The exact range requested of the Sheets API never
+ * includes column A, B or C, which is what the falsifier checks: a wider or
+ * unbounded range would bring the bank name / branch / account number / personal
+ * name in column A row 2 into this process's memory, from where any downstream
+ * `text(cellAt(...))` call over the grid could surface it.
+ */
+async function readHouseGrid(sheets) {
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: HOUSE_SPREADSHEET_ID,
+    range: `'${HOUSE_TAB}'!${HOUSE_RANGE}`,
+    valueRenderOption: "UNFORMATTED_VALUE",
+  });
+  return res.data.values ?? [];
+}
+
 async function tabTitles(sheets, spreadsheetId) {
   const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" });
   return (meta.data.sheets ?? []).map((s) => s.properties?.title).filter(Boolean);
@@ -965,13 +1224,20 @@ function parseArgs(argv) {
     const i = argv.indexOf(flag);
     return i === -1 ? null : argv[i + 1] ?? null;
   };
+  const yearsRaw = value("--years");
   return {
     report: argv.includes("--report"),
     generate: argv.includes("--generate"),
     into: value("--into"),
     carryFrom: value("--carry-from"),
     fixture: value("--fixture"),
+    houseFixture: value("--house-fixture"),
     varianceReport: value("--variance-report"),
+    // `--years 2022` / `--years 2022,2023,2024`. Wired to `parseArgs` so
+    // `IN_SCOPE_YEARS` is finally reachable from the command line (entity 062):
+    // before this, only the internal constant existed and nothing let a run
+    // choose a different set of years without editing the source.
+    years: yearsRaw ? yearsRaw.split(",").map((y) => Number(y.trim())) : null,
   };
 }
 
@@ -996,7 +1262,14 @@ function summarise(result, log) {
   for (const b of result.skippedBands) {
     log(`[band] ${b.year}: OUT OF SCOPE (rows ${b.firstDataRow}-${b.lastDataRow}) — read only to find the boundary`);
   }
-  log(`[extract] ${result.rows.length} rows total across ${result.bands.length} in-scope bands`);
+  log(`[extract] ${result.rows.length} Daily-tab row(s) total across ${result.bands.length} in-scope band(s)`);
+}
+
+function summariseMortgage(mortgage, log) {
+  for (const [year, count] of mortgage.perYearCount) {
+    log(`[mortgage] ${year}: ${count} House-tab row(s), category "${MORTGAGE_CATEGORY_NAME}"`);
+  }
+  log(`[mortgage] ${mortgage.rows.length} House-tab row(s) total`);
 }
 
 async function run(argv, { log = console.log, env = process.env, sheetsFor = sheetsClientFor } = {}) {
@@ -1012,12 +1285,14 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
   }
 
   const generatedAt = new Date().toISOString();
+  const years = args.years ?? IN_SCOPE_YEARS;
 
   // The extractor is staging in BOTH directions on every run — it never takes a
   // target, because there is nothing here a target could vary.
   const targets = resolveTargets({ target: "staging", env });
 
   let grid;
+  let houseGrid;
   if (args.fixture) {
     const raw = JSON.parse(fs.readFileSync(args.fixture, "utf8"));
     grid = Array.isArray(raw) ? raw : raw.rows;
@@ -1028,8 +1303,31 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
     grid = await readSourceGrid(readSheets);
   }
 
-  const result = extract(grid);
+  if (args.houseFixture) {
+    const raw = JSON.parse(fs.readFileSync(args.houseFixture, "utf8"));
+    houseGrid = Array.isArray(raw) ? raw : raw.rows;
+    log(`[mortgage] fixture ${args.houseFixture}: ${houseGrid.length} rows`);
+  } else {
+    // AC-13 — confirm both service-account pairs can still read the House tab
+    // before this run relies on that assumption, rather than hard-coding staging
+    // and finding out later, on a stale sharing setting, with no clear cause.
+    const pairs = resolveCredentialPairs(env);
+    await verifyHouseTabAccess(pairs, { sheetsFor });
+    log(`[mortgage] House tab read-access confirmed for both staging and production`);
+
+    const readSheets = await sheetsFor(targets.read, READONLY_SCOPE);
+    log(`[mortgage] source ${HOUSE_SPREADSHEET_ID} tab "${HOUSE_TAB}" ${HOUSE_RANGE} as ${accountEmail(targets.read)}`);
+    houseGrid = await readHouseGrid(readSheets);
+  }
+
+  const result = extract(grid, { years });
   summarise(result, log);
+
+  const mortgage = extractMortgageRows(houseGrid, { years });
+  summariseMortgage(mortgage, log);
+
+  result.rows = [...result.rows, ...mortgage.rows];
+  log(`[extract] ${result.rows.length} combined row(s) (Daily + mortgage)`);
 
   const variancePath = args.varianceReport
     ?? path.join(REPORT_DIR, `061-source-variance-${generatedAt.slice(0, 10)}.md`);
@@ -1113,6 +1411,8 @@ module.exports = {
   AMOUNT_LABEL,
   META_COLS,
   IN_SCOPE_YEARS,
+  MORTGAGE_CATEGORY_NAME,
+  MORTGAGE_PREPAYMENT_DATES,
   CATEGORY_MAP,
   FALLBACK_CATEGORY_NAME,
   SHEET_COLUMNS,
@@ -1131,11 +1431,14 @@ module.exports = {
   bandYear,
   classifyColumns,
   accountForBand,
+  structuralFindings,
+  renderStructuralFindings,
   mapCategory,
   emitBandRows,
   varianceForBand,
   renderVarianceReport,
   extract,
+  extractMortgageRows,
   dataDigest,
   controlCellValue,
   parseControlCell,
@@ -1143,9 +1446,12 @@ module.exports = {
   parseSheetGrid,
   carryForward,
   readSourceGrid,
+  readHouseGrid,
   readTabGrid,
   tabTitles,
   writeNormalizationTab,
   parseArgs,
+  summarise,
+  summariseMortgage,
   run,
 };
