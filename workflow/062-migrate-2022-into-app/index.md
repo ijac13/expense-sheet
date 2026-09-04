@@ -294,6 +294,10 @@ Semantics this may change: **stored data only** — new rows in the target Expen
 
 ### Feedback Cycles
 
+### Dispatch Retries
+
+- Retry 1: build — agent-error (session limit reached mid-dispatch, idleReason=failed, no completion signal and no stage report); no commits, no WIP present at any point — re-dispatched fresh
+
 ## Stage Report: ideation
 
 - DONE: Fold the captain's ruling into scope — 062 imports 2022's Daily-tab expenses AND 2022's twelve mortgage payments (`House` tab column J, dated by column D, spreadsheet `1oUCppCwkfw2BMG8gZwxb13Vq8KVXBQFrVoS57ZH9h6E`) in one pass, so 2022 never lands as a mortgage-only or expenses-only partial year.
