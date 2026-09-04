@@ -206,6 +206,69 @@ Open questions for spec, in the order they should be resolved:
 5. **Where does the report live?** Proposed default: a private Google Doc in the captain's own archive folder, the same as cycle 1 proposed. **But** the Drive connector cannot reach her personal account from this session, so an agent may not be able to create it there. Fallback: a local markdown file under a gitignored `analysis/` directory. Confirm which, and confirm the write route works, before the build stage depends on it.
 6. **Should any of this become a Reports feature?** Out of scope here, but if the comparison proves worth repeating annually, say so in the report so the captain can file it.
 
+**Resolved at spec (cycle 2):**
+
+1. **2023/2024 provenance and 4 (what NT$1.2M counted) are the same question.** Neither can be closed by measurement the way 2025 was, because the only independently-readable source for the earlier years' totals — the archive workbook's non-`Daily` tabs — is exactly what Round B needs. Both are deferred to Round B together, not left open in Round A.
+5. **Report location: a local gitignored file, not a Google Doc.** The Drive connector is bound to the captain's work account (confirmed in ideation), so any Doc it creates would land on a corporate-monitored Drive rather than her personal one — a worse privacy outcome than the alternative. Matching `061`'s own precedent, the report lives at `functions/backfill-reports/060-report/report.md`, excluded by `.gitignore:39` alongside `061`'s own probe and report artefacts, verified untracked with `git check-ignore -v` and `git status`. The write route is exercised, not merely proposed: the report and its backing data are already written there.
+6. **Not a Reports feature in this entity.** The report itself flags it as a candidate follow-up for the captain to file if she wants the comparison repeatable.
+
+## Spec
+
+### Goal
+
+Answer the captain's own question — why 2025 looks roughly double 2023 — honestly, from production data alone, and deliver that answer as a private report she can read without any figure of hers ever reaching this public repository.
+
+### User Stories
+
+The five stories under `## User Stories` above stand as written; this stage does not change them.
+
+### Edge Cases
+
+- **2024 is partial (stops 2024-11-08).** Every 2024 figure the report shows is scoped to a matching window in the other years (section 8 of the report); no bare 2024 annual total appears anywhere.
+- **The two eras' category taxonomies don't match (14 vs 25).** Any comparison that skips the like-for-like restriction (section 2 of the report) will overstate the apparent change; the report leads with the restricted comparison specifically to prevent this being misread.
+- **`064` (mortgage migration) has not landed.** The mortgage lever (section 7 of the report) is sourced directly from the House tab schedule rather than from an app import. If `064` lands later, the 2023/2024 app totals will change and the report's ratios will need regenerating — the report says this explicitly and names the regeneration command.
+- **PII surfaces in the source workbooks** — the House tab's column A (bank/account/name in one cell) and the Coast FIRE `Annual` tab's columns AB/AC (free-text life-event notes). No script reads column A; the notes columns were read only to identify their type during ideation and are excluded from every script's output and from the report.
+- **The archive workbook's monthly totals row carries `061` Finding 6's formula errors.** Nothing in this report is reconciled against it; the app is the baseline throughout.
+- **The second payer's absence from 2023/2024 is a fact of the record, not a gap to fix** — per the captain's own `061` D2a ruling. No script or report text treats it as missing data.
+- **The report file must stay untracked.** A future `git add -A` under `functions/` could stage it; `git status` and `git check-ignore -v` both confirm it is excluded today, and any future commit touching `functions/backfill-reports/` should be diffed before committing.
+- **The Coast FIRE `Annual` tab is a forward target, not historical evidence** — its first data row is 2025, so it says nothing about what 2023/2024 should have totalled.
+
+### Out of Scope
+
+Unchanged from `### Out of Scope` under `## Success` above — no migration, no app UI, no automated enforcement, no archive processing, no financial advice.
+
+## Acceptance criteria
+
+**AC-1 — The report exists at a private, gitignored location, and the entity records only that location.**
+Verified by: offline — `git check-ignore -v functions/backfill-reports/060-report/report.md` names the ignoring rule; `git status --short functions/backfill-reports/` shows nothing; the entity body above names only the path. Falsified by: the path being trackable, or report content appearing in the entity.
+
+**AC-2 — No money figure of the captain's appears in this entity, a commit message, or any tracked repo file.**
+Verified by: offline — the entity body contains no NT$ amount other than the pre-existing NT$1.2M target; `git log --oneline` for this branch's commits touching this entity carries no amount; `git status` shows the report/script files as untracked. Falsified by: any commit or entity edit adding a raw expense figure.
+
+**AC-3 — The like-for-like computation mechanism is settled (a script, not hand-summing) and produces real, reproducible figures.**
+Verified by: offline — re-running `node -r ./scripts/load-local-env.js backfill-reports/060-report/compute-report-data.js` from `functions/` reproduces `report-data.json`'s ratios bit-for-bit; the report's section 2 states the ratio (0.561) and section 3 gives the full category table. Falsified by: the report leaving the mechanism as an open question, or figures that don't reproduce.
+
+**AC-4 — `Babies` is presented as a captain decision, not resolved by the report.**
+Verified by: offline — the report's section 6 poses the question (whether 2023 held these costs under another heading) and states plainly that the record cannot settle it, without asserting an answer either way. Falsified by: the report stating a conclusion on Babies' provenance.
+
+**AC-5 — The mortgage lever is sized concretely, sourced correctly given `064`'s status, and a first glide path is proposed against the app's own figures and the Coast FIRE `Annual` tab.**
+Verified by: offline — the report's section 7 states the 2023-mortgage-added ratio (1.495) and gap-share (35.2%), sourced from the House tab schedule (`064` is still `ideation`, not `done`); section 9 proposes steps referencing the Coast FIRE `Annual` tab's "Life spend from earnings" column, not the archive workbook's 2024→2041 table. Falsified by: citing the archive projection table, or omitting a concrete ratio/percentage for the mortgage lever.
+
+**AC-6 (interactive) — The captain reads the report and confirms it answers her question and is usable as delivered.**
+Verified by: interactive — captain opens `functions/backfill-reports/060-report/report.md` locally and gives a plain confirmation or requests changes.
+
+## Risk evidence
+
+No spike needed: this entity's riskiest mechanism — reading production and the two workbooks read-only through the two service accounts, and reproducing the gap-decomposition arithmetic — was already exercised across ideation cycles 1-2 and re-exercised at this stage (`compute-report-data.js`, `compute-monthly.js`), with the additive identity checked to close exactly (§3 of the report, "Total" row). The one new mechanism this stage adds — the like-for-like script itself — was run and its output checked against ideation's independently-computed 0.561 and 35.2% figures, which matched.
+
+## Expected surface and tolerance
+
+No app code changes; this entity is report-only. New files: three gitignored scripts/artifacts under `functions/backfill-reports/060-report/` (`compute-report-data.js`, `compute-monthly.js`, `report-data.json`, `monthly-data.json`, `report.md`), none tracked by git. Estimate: +150 net LOC across those files, tolerance ±30%. Semantics this may change: none — no stored format, API shape, auth, or scheduled behaviour is touched.
+
+## Test plan
+
+Offline: re-run both compute scripts and diff their JSON output against what's already committed to the gitignored directory — deterministic reads, so a clean diff is the test. Interactive: the captain opens the report and confirms (AC-6) — no staging drive needed, since nothing was written to any environment. Estimated cost: low; the read-only scripts run in seconds and the report is a single file to read.
+
 ## Spec — cycle 1, superseded and removed
 
 The cycle-1 spec section — a Goal, four user stories, twelve acceptance criteria, eleven edge cases and an "Access — resolved" block — has been **removed from this file** rather than left in place, because more than half of it is now known-false and a later spec stage could reuse it by mistake. It is preserved in git at commit `30e9c15` (`060: spec — historical expense analysis, report-only, no migration`), and its stage report is still appended below. The spec stage restarts from this ideation.
@@ -314,3 +377,20 @@ The reversal is the substantive change and it improves the entity rather than we
 With the measurement folded in, this ideation now carries an answer rather than a plan to find one. **The captain's spending did not double. On a like-for-like basis it fell 44%**, and the doubling is eleven cost categories plus a second person entering the record. `Mortgage` alone is 31.2% of the gap and her mortgage schedule is monthly and complete for the years in question, so the single largest term is closable by recording a cost she was already paying.
 
 One item is deliberately left for her rather than resolved: **`Babies` at 30.3% of the gap**. Unlike the housing and insurance categories it is not self-evidently a pre-existing cost, `Tuition` being a separate category present in all three years, so it is the largest genuine candidate for a behaviour change in the decomposition and the data cannot settle it.
+
+## Stage Report: spec (cycle 2)
+
+- DONE: Write the honest comparison and the labelled reasons as the private deliverable, with no money figure of the captain's in this entity, a commit message, or any repo file.
+  Report written to `functions/backfill-reports/060-report/report.md`, gitignored per `.gitignore:39` (verified with `git check-ignore -v` and `git status --short`). Entity records the path only; swept this file for any NT$ figure beyond the pre-existing NT$1.2M target — none found.
+- DONE: Settle the like-for-like computation mechanism and produce the actual like-for-like figures.
+  Chose a read-only script over hand-summing (reasoning in report section 2 — reuses the proven read path, exactly reproducible). `compute-report-data.js` and `compute-monthly.js` written to the same gitignored directory; ratios reproduce ideation's independently-computed 0.561 and 35.2% exactly. Full category-by-category table with amount and difference for each of 25 categories is in the report.
+- DONE: Present Babies as a captain decision rather than resolving it.
+  Report section 6 states the Tuition-is-separate reasoning and explicitly says the record cannot settle whether 2023 held these costs under another heading, without asserting either answer.
+- DONE: Size the mortgage lever concretely and propose a first glide path against the app's own figures and the Coast FIRE Annual tab.
+  Report section 7 states the 2023 mortgage total, the corrected ratio (2.046 → 1.495) and gap-share (35.2%), sourced from the House tab schedule directly since `064` is still `ideation`. Report section 9 proposes three ordered steps and a tracking method against the Coast FIRE `Annual` tab's "Life spend from earnings" column, not the archive workbook's projection table.
+
+### Summary
+
+The spec stage's job for this entity was to produce the deliverable itself, per the captain's gate-3 resolution, not a traditional build-stage AC list. Wrote a `## Spec` section (Goal, Edge Cases specific to this report's correctness, Out of Scope by reference) and six ACs — five offline-verifiable against the report and its reproducible backing scripts, one interactive (the captain reading it) — plus Risk evidence, Expected surface, and a Test plan, all added above. Resolved the two Plan questions the ideation left open: 2023/2024 provenance and what NT$1.2M counted turn out to be the same question, both needing the archive workbook's non-`Daily` tabs, so both move to Round B together rather than staying open in Round A; and the report's location is a local gitignored file (matching `061`'s precedent) rather than a Google Doc, because the Drive connector is bound to the captain's work account, not her personal one.
+
+The report itself (`functions/backfill-reports/060-report/report.md`) leads with the payer-controlled comparison Reports already supports natively (ratio 1.159, no script needed), then the like-for-like restriction (ratio 0.561, spending fell 44%), then the full 25-category table, four labelled reasons distinguishing recording-coverage from behaviour, the Babies decision framed for her, the mortgage lever, 2024 shape corroboration (never a bare total), and a three-step glide path checked against her own Coast FIRE Annual tab rather than the archive's old projection table.
