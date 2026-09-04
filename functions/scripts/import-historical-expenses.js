@@ -829,7 +829,11 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
       `The receipt records this, and a production import still refuses until B1 says ${APPROVAL_MARKER}.`
     );
   }
-  const plan = planImport(approvedSheet.rows);
+  // `--years`, wired the same way the extractor's is: no default change for every
+  // existing caller (still 061's own [2023, 2024]), reachable explicitly for a run
+  // that needs a wider scope — this entity's own combined 2022 run included.
+  const scopeYears = args.years ?? IN_SCOPE_YEARS;
+  const plan = planImport(approvedSheet.rows, { years: scopeYears });
 
   log(
     `[plan] ${plan.sheetRowCount} sheet row(s): ${plan.candidates.length} to write, ` +
@@ -893,6 +897,7 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
       plan,
       categories: { live: liveCategories, countBefore: snapshot?.categoryCount ?? null },
       snapshot,
+      years: scopeYears,
     });
     for (const f of result.findings) log(`[verify] FAIL ${f.label}: ${f.detail}`);
     log(
@@ -964,14 +969,14 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
     }
     return rehearse({
       args, targets, readSheets, writeSheets, approvedSheet, plan, rows, snapshotFile, log, now,
-      liveCategories, resolution,
+      liveCategories, resolution, years: scopeYears,
     });
   }
 
   throw new ImportError(`Unhandled phase ${phase}.`);
 }
 
-async function rehearse({ args, targets, writeSheets, approvedSheet, plan, rows, snapshotFile, log, now, resolution }) {
+async function rehearse({ args, targets, writeSheets, approvedSheet, plan, rows, snapshotFile, log, now, resolution, years }) {
   const spreadsheetId = targets.write.spreadsheetId;
   const steps = [];
   const record = (step, detail) => { steps.push({ step, detail }); log(`[rehearse] ${step}: ${detail}`); };
@@ -1008,6 +1013,7 @@ async function rehearse({ args, targets, writeSheets, approvedSheet, plan, rows,
     plan,
     categories: { live: categoriesAfter, countBefore: categoriesBefore.length },
     snapshot,
+    years,
   });
   for (const f of verification.findings) log(`[rehearse] verify FAIL ${f.label}: ${f.detail}`);
   if (!verification.passed) {
