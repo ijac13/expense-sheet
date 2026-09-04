@@ -1,13 +1,13 @@
 ---
 id: "060"
 title: Historical Expense Analysis — Understand How to Spend Less Again
-status: spec
+status: build
 source: captain
 started: 2026-09-02T10:20:26Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-060-historical-expense-analysis
 issue:
 pr:
 gates:
@@ -59,6 +59,17 @@ gates:
                 id: briefing:060:spec:attempt-1:revision-1
                 digest: sha256:830adf2651095e4c83ce4b4ebb1286f0ca76dc4d6c10f6340c91195aed1d6e3a
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:060:spec:1
+                briefing: briefing:060:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-04T03:35:36.037918Z"
+                decision: approve
+                reason: Captain approved the delivered report, closing AC-6 (she read it and confirms it answers her question). Report location (local gitignored file, not a Google Doc) accepted as-is — no request to move it. Babies' provenance was left explicitly open in the report per AC-4; the captain did not rule on it in this approval, so it stands as recorded, unresolved captain judgment for a future round if she wants to settle it.
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 The captain's question, with her figures redacted because this repository is public: **why are 2023 and 2024 roughly half of 2025 — why did my spending roughly double?** She stated it with the two annual amounts; the ratio is the part that can be written down here.
