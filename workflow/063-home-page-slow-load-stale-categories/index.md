@@ -205,3 +205,47 @@ Offline: unit/integration tests for the new category-list cache (seed/read/overw
 ### Summary
 
 Read `app/app/page.tsx`, `AuthGuard.tsx`, `authContext.tsx`, `categories.ts`, `categoryService.ts`, `CategoryPicker.tsx`, and `functions/src/index.ts`/`auth.ts`, plus git history on `page.tsx` (entity 058, `8eb5a9a`), to find that there is no literal page reload anywhere in the code — the "auto-refresh" is two already-existing full-screen re-render swaps (AuthGuard's spinner, then Home's `categoriesReady` gate), and the category mismatch is `DEFAULT_CATEGORIES` (a hardcoded 24-item fallback) being unconditionally replaced by the live Sheet-backed list on every load. The chosen fix caches the last successfully-fetched live category list client-side (same `localStorage` pattern as entity 058's `LAST_CATEGORY_KEY`) so a returning device's first paint already matches the live list, and memoizes the backend's Sheets/auth client so a warm Cloud Functions instance stops re-minting an OAuth token per request; cold-start elimination itself (`minInstances`, replacing `googleapis`) is explicitly out of scope as a cost/product decision for the captain.
+
+## Implementation Plan
+
+**Client-side category-list cache** (`app/app/lib/categories.ts`, `app/app/page.tsx`):
+
+- Add `LAST_CATEGORIES_KEY = "expense_last_categories"` (plural, sibling of the existing singular `LAST_CATEGORY_KEY`) plus two new functions, both wrapped in `try/catch` so a throwing/unavailable `localStorage` fails closed instead of crashing the page (AC-6):
+  - `getCachedCategories(): Category[] | null` — reads and `JSON.parse`s the key; returns `null` on anything not a non-empty array, on a parse error, or on a thrown access (SSR guard included, matching the existing helpers).
+  - `saveCachedCategories(categories: Category[]): void` — `JSON.stringify`s and writes the key; swallows a thrown write.
+- `page.tsx`: seed the `categories` state from `getCachedCategories() ?? DEFAULT_CATEGORIES` instead of always `DEFAULT_CATEGORIES` (AC-2/AC-3). Inside `loadCategories()`'s existing success branch (after the `active.length === 0` guard, so a degraded fetch never overwrites a good cache), call `saveCachedCategories(active)` right after `setCategories(active)` (AC-4).
+- No change to `categoriesReady`, `handleConfirm`, or the Save `disabled` expression — AC-1's guarantee (Save gated on a live id, never a `DEFAULT_CATEGORIES` slug) already falls out of the existing `categoriesReady` gate regardless of what the grid's first paint sources from, so this is a regression test, not a code change.
+- AC-5 (no remount when cache equals the live response) is expected to already hold given `CategoryPicker` keys tiles by `cat.id` (`CategoryPicker.tsx:29`) — React reconciles same-key children in place across a state update rather than remounting, independent of array-reference identity. Verified by a test asserting DOM node identity, not assumed.
+
+**Backend auth-client memoization** (`functions/src/index.ts`):
+
+- Replace the per-call `getSheetsClient()` body with a module-scope memoized promise: first call kicks off `google.auth.getClient(...).then(auth => google.sheets(...))` and caches the promise; every subsequent call on the same warm instance returns the cached promise without a new `getClient()` call (AC-7). Both existing call sites (`api`'s request handler, `subscriptionScheduler`) are unchanged — they already just `await getSheetsClient()`.
+- On rejection, clear the cached promise before rethrowing, so one transient auth failure doesn't permanently wedge a warm instance — not a spec'd AC, but necessary so the memoization itself can't turn a transient error into a standing outage.
+
+**Tests:**
+
+- `app/test/category-list-cache.test.js` — pure-function offline unit tests for `getCachedCategories`/`saveCachedCategories` (seed/read/overwrite/throw-safe), mirroring `last-category.test.js`.
+- `app/test/category-cache.render.test.js` — Home-mount render tests for AC-1 through AC-6, using the existing `test/helpers/dom.js` harness's `deferCategories`/`releaseCategories` gate to observe the pre-fetch-resolution first paint.
+- `functions/test/sheetsClient.api.test.js` — unit test for AC-7 asserting a second request against the same loaded `api` handler does not call `google.auth.getClient()` again.
+- AC-8 and AC-9 stay interactive per the spec (staging timing comparison and a live drive); not self-checked in this stage.
+
+## Stage Report: build
+
+- DONE: Write a brief implementation plan before coding begins, covering the client-side category-list cache design and the backend auth-client memoization.
+  `## Implementation Plan` section above, written and committed (bd57570) before any source file was touched.
+- DONE: Implement per spec — client-side category-list cache, unchanged Save-gating, memoized backend auth client, meeting all 9 acceptance criteria.
+  `app/app/lib/categories.ts` (+`LAST_CATEGORIES_KEY`/`getCachedCategories`/`saveCachedCategories`), `app/app/page.tsx` (seeds `categories` state from cache, writes cache on every successful fetch, `categoriesReady`/`disabled` logic untouched), `functions/src/index.ts` (`getSheetsClient` memoized to a module-scope promise, cleared on rejection) — commit 0f3d2a6.
+- DONE: Document every acceptance criterion's status with evidence, including offline test results for AC-1-7; AC-8/AC-9 left interactive.
+  AC-1 MET — `category-cache.render.test.js`: "Save stays disabled until the live fetch resolves, even when the grid painted from a cache." Falsified by any path letting `handleConfirm`/Save fire before `categoriesReady`; the gating expression itself (`page.tsx`) was not touched, only regression-tested.
+  AC-2 MET — same file: "a device with a cached live list paints that list first, before the fetch resolves"; `category-list-cache.test.js`: "a saved list comes back verbatim." Falsified by DEFAULT_CATEGORIES rendering despite a valid cache.
+  AC-3 MET — "a device with no cache still paints DEFAULT_CATEGORIES first, exactly as today"; unit test "nothing cached yields null." Falsified by a blank grid or thrown error with no cache present.
+  AC-4 MET — "the cache is overwritten after every successful fetch, not just the first" (two mounts, second live response distinct from first, cache inspected after each); unit test "saving again overwrites the previous list." Falsified by the cache staying on the first-ever snapshot.
+  AC-5 MET — "when the fetch resolves to the same list already cached, no tile remounts" — asserts the same DOM node (`===`) for two tiles before and after the fetch resolves, relying on `CategoryPicker`'s existing `key={cat.id}`. Falsified by new DOM nodes appearing for unchanged categories.
+  AC-6 MET — render test stubs only the new `LAST_CATEGORIES_KEY` to throw on `getItem`/`setItem` (leaving entity 058's `LAST_CATEGORY_KEY` working, so the failure is isolated to the new mechanism); asserts first paint still shows `DEFAULT_CATEGORIES` and Save still enables once the fetch resolves. Two matching throw-safe unit tests in `category-list-cache.test.js`. Falsified by an unhandled exception or blank page.
+  AC-7 MET — `functions/test/sheetsClient.api.test.js`, two tests asserting `google.auth.getClient()` is called exactly once across two (and across three, cross-endpoint) requests against one loaded `api` handler. Falsifiability verified directly: temporarily reverting the memoization (`git stash` on `index.ts`, rebuild) made both tests fail with 2 calls instead of 1, then passed again after restoring — not a tautological test.
+  AC-8 NOT SELF-CHECKED — interactive per spec (staging warm-instance timing comparison); deferred to the interactive/verify stage.
+  AC-9 NOT SELF-CHECKED — interactive per spec (live drive of a normal app open); deferred to the interactive/verify stage.
+
+### Summary
+
+Added a `getCachedCategories`/`saveCachedCategories` pair in `categories.ts` mirroring entity 058's `LAST_CATEGORY_KEY` pattern, wired `page.tsx` to seed first paint from that cache and refresh it on every successful fetch, and memoized `functions/src/index.ts`'s `getSheetsClient()` to a module-scope promise (clearing on rejection so a transient auth failure can't wedge a warm instance). No change was needed to Save's `disabled` gate — it already depended only on `categoriesReady`, which still only flips after a live fetch resolves, so AC-1 is a regression test rather than a code change. Full suites pass: `app` 211/211 (`npm test`), `functions` 303/303 (`npm test`); AC-7's tests were additionally confirmed non-tautological by reverting the fix and watching them fail. AC-8/AC-9 need a staging deploy and are left for the interactive verify stage.
