@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:063:ideation:attempt-1:revision-1",
+  "question": "Does this ideation correctly capture the home-page slow-load/auto-refresh/stale-categories problem, and is it ready to move to spec (investigate root cause: what gates the save button, what triggers the auto-refresh, why categories differ before/after)?",
+  "artifacts": [
+    {
+      "id": "artifact:063:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/572088193857e814d8539120378a617090c018ec/workflow/063-home-page-slow-load-stale-categories/index.md",
+      "rev": "sha256:15b6fc1bbdade51059a0383da2ee45e8611b6d7f4d62e456129ad22b2c3a202c",
+      "mediaType": "text/markdown",
+      "summary": "Ideation seed: on opening the app, the home page's save button stays grayed out while something loads, then the page auto-refreshes on its own, sometimes with different categories shown after vs. before. Success is understanding the actual cause (what's loading, what triggers the refresh, why categories can differ) and either removing the wait or replacing the silent stall with a fast, visible loading state. Out of scope: home-page redesign beyond this, and any change to category data/migration itself. Open questions for spec: what gates 'save' (auth/categories fetch/scheduler check/other), what causes the auto-refresh (client reload/service-worker/stale-cache recovery), whether first paint reads a stale cached category list, and whether this is reproducible on demand or intermittent."
+    }
+  ]
+}

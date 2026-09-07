@@ -11,6 +11,17 @@ worktree:
 issue:
 pr:
 mod-block:
+gates:
+    version: 1
+    records:
+        - id: gate:063:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:063-ideation-1
+              briefing:
+                id: briefing:063:ideation:attempt-1:revision-1
+                digest: sha256:375845444224572a7e5b9d0b951eab6970fbb1a84244a57d048d6ec0c2a57a06
+                room-ref: ./review/ideation/briefing-1
 ---
 
 When I open the production expense-sheet web app, the home page keeps loading something and the "save" button is grayed out. Then it refreshes the page on its own, and sometimes the categories shown on the home page change after that refresh. Only after that can I actually add an expense record.
