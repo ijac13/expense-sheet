@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:064:spec:attempt-1:revision-1",
+  "question": "Is the spec's collision-free id-namespace design (exp-hist-mortgage-{year}-{NNNN}), the row-125/K-column edge-case handling, and the 14 acceptance criteria (12 offline, 2 interactive) sound and ready to move to build?",
+  "artifacts": [
+    {
+      "id": "artifact:064:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/5fdcc6f7a635ae76774d9a77b8ada4dc081c742a/workflow/064-migrate-2023-2024-mortgage-into-app/index.md",
+      "rev": "sha256:82807deef7671d9d432848fd6c0ab1cce1bea14a08946fca8666d8ffe77bd95f",
+      "mediaType": "text/markdown",
+      "summary": "Spec resolves all three ideation open questions with live evidence: mortgage rows get a distinct exp-hist-mortgage-{year}-{NNNN} id namespace (a shared/combined counter with 061's 1,670 live rows would either duplicate or silently swallow them); attribution and undo scope confirmed unchanged/scoped. Two new defects found and specced around: row-125 (2024-11-15) has a populated date with J/K both blank and currently aborts the run; the House-tab read must widen to D5:K255 for the 2023-03-15 K-column prepayment while still excluding PII columns A-C. 14 ACs (AC-1-12 offline, AC-13/14 interactive), risk evidence, +320 LOC/5-file estimate at +-50% tolerance, and a test plan reusing 062's seeded-decoy technique for the collision ACs."
+    }
+  ]
+}

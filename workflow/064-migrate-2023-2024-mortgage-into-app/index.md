@@ -33,6 +33,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:064:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:064-spec-1
+              briefing:
+                id: briefing:064:spec:attempt-1:revision-1
+                digest: sha256:347714a3042e3f09e0db1d3602b89661e5a575d2926808edd4dd967826182879
+                room-ref: ./review/spec/briefing-1
 ---
 
 Extend `061`'s already-imported 2023–2024 expense records with the mortgage payments those years were missing. `060` found this is the single largest term in why 2025 looks roughly double 2023–2024: those years' record held no `Mortgage` category at all, and adding just 2023's twelve payments alone closes 35.2% of the apparent gap.
