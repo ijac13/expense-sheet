@@ -1,9 +1,9 @@
 ---
 id: 064
 title: Migrate 2023–2024 Mortgage Payments Into The App
-status: ideation
+status: spec
 source: captain
-started:
+started: 2026-09-07T00:38:44Z
 completed:
 verdict:
 score:
@@ -22,6 +22,17 @@ gates:
                 id: briefing:064:ideation:attempt-1:revision-1
                 digest: sha256:3d0c857780cb616e42d654e0de5891e461900fa196e41fd8d830eaaa13567494
                 room-ref: ./review/ideation/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:064:ideation:1
+                briefing: briefing:064:ideation:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-07T00:37:47.042967Z"
+                decision: approve
+                reason: Ideation scope, safety properties, and open questions for spec are clear and grounded in prior entities' findings; ready to move to spec.
+              application:
+                target-stage: spec
+                state: consumed
 ---
 
 Extend `061`'s already-imported 2023–2024 expense records with the mortgage payments those years were missing. `060` found this is the single largest term in why 2025 looks roughly double 2023–2024: those years' record held no `Mortgage` category at all, and adding just 2023's twelve payments alone closes 35.2% of the apparent gap.
