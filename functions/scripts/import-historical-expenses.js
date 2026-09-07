@@ -667,7 +667,16 @@ function verifyAgainst({ expenses, map, approved, plan, categories, snapshot, ye
     category_id: String(cell(row, map, "category_id") ?? ""),
     notes: String(cell(row, map, "notes") ?? ""),
   }));
-  const imported = rows.filter((r) => r.id.startsWith(ID_PREFIX));
+  // Scoped to THIS run's own id-prefix(es), derived from `plan.candidates` the same
+  // way `--rehearse`'s own undo step already does (`:1109`) — not the blanket
+  // module-level `ID_PREFIX`, which also matches another entity's already-live rows
+  // sharing the same general `exp-hist-` family (e.g. `061`'s Daily-tab rows, when
+  // this run's own approved sheet is a strict subset of what the target already
+  // holds, as `064`'s mortgage-only sheet is). Matching those foreign rows fed false
+  // AC-2 orphan/duplicate/per-year-sum findings and false AC-10 provenance findings
+  // for rows this run never wrote and has no business tracing.
+  const ownPrefixes = [...new Set(plan.candidates.map((c) => c.id.replace(/\d{4}$/, "")))];
+  const imported = rows.filter((r) => ownPrefixes.some((p) => r.id.startsWith(p)));
 
   const findings = [];
   const fail = (label, detail) => findings.push({ label, detail });

@@ -1612,6 +1612,85 @@ test("AC-1/AC-4/AC-5/AC-8/AC-9/AC-10 (064): a 2023/2024 mortgage-only sheet appl
   assert.deepEqual(expenseIds(world.staging), PRE_EXISTING.map((r) => r[0]), "staging restored to its pre-existing rows");
 });
 
+// ---------------------------------------------------------------------------
+// verifyAgainst scoping (cycle 3) — verify cycle 2's live-found gap: `imported`
+// must be scoped to THIS run's own id-prefix(es), not the blanket module-level
+// ID_PREFIX, or a foreign entity's already-live rows sharing the general
+// exp-hist- family produce false AC-2/AC-10 findings the moment they're in scope.
+// ---------------------------------------------------------------------------
+
+test("AC-2/AC-10 (064 cycle 3): --verify does not mistake a foreign 061-shaped row already on the target for one of this run's own", async () => {
+  const world = makeMortgageOnlyWorld();
+  // Stands in for one of 061's real, already-live 2023 Daily-tab rows: present on
+  // the target before this run's own snapshot, sharing the general exp-hist-
+  // family and a parseable four-field notes shape (so it would also pass AC-10's
+  // provenance parse, exactly as verify cycle 2 found), but its key is not part of
+  // this run's own 25-row mortgage-only approved sheet. Live-reproduced on staging
+  // via --rehearse in this file's own cycle-2 verify stage report.
+  world.staging.grids.Expenses.push([
+    "exp-hist-2023-9998", "2023-06-01", "500", "cat_003", "ijac", "ijac",
+    "食 | 食材 | 超市 | 牛奶 | key=2023-r9998-decoy", "2023-06-01T00:00:00.000Z", "2023-06", "500",
+  ]);
+
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+  await importRun(world, ["--snapshot", ...base]);
+  const applied = await importRun(world, ["--apply", ...base]);
+  assert.equal(applied.created, world.mortgageRows.length);
+
+  const { result } = await importRun(world, ["--verify", ...base]);
+  assert.equal(result.passed, true, JSON.stringify(result.findings));
+  assert.equal(
+    result.importedCount, world.mortgageRows.length,
+    "the foreign decoy must not be counted among this run's own imported rows"
+  );
+});
+
+test("AC-2 falsified (064 cycle 3): reverting to the blanket ID_PREFIX reproduces cycle 2's exact live-found false positives", async () => {
+  const unscoped = loadPatched("import-historical-expenses.js", [
+    [
+      "const imported = rows.filter((r) => ownPrefixes.some((p) => r.id.startsWith(p)));",
+      "const imported = rows.filter((r) => r.id.startsWith(ID_PREFIX));",
+    ],
+  ]);
+
+  const world = makeMortgageOnlyWorld();
+  world.staging.grids.Expenses.push([
+    "exp-hist-2023-9998", "2023-06-01", "500", "cat_003", "ijac", "ijac",
+    "食 | 食材 | 超市 | 牛奶 | key=2023-r9998-decoy", "2023-06-01T00:00:00.000Z", "2023-06", "500",
+  ]);
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+  const opts = { log: silent, env: STUB_ENV, sheetsFor: world.sheetsFor, now: () => new Date("2026-08-31T12:00:00.000Z") };
+
+  await unscoped.run(["--snapshot", ...base], opts);
+  await unscoped.run(["--apply", ...base], opts);
+  await assert.rejects(
+    unscoped.run(["--verify", ...base], opts),
+    (err) => /Verification failed/.test(err.message),
+    "the reverted code must reproduce cycle 2's exact live finding: a foreign decoy counted as this run's own"
+  );
+});
+
+test("AC-2 regression (064 cycle 3): --verify still catches a genuinely missing candidate of this run's own", async () => {
+  const world = makeMortgageOnlyWorld();
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+
+  await importRun(world, ["--snapshot", ...base]);
+  await importRun(world, ["--apply", ...base]);
+
+  // One of this run's own candidates never lands on the target — e.g. a batch write
+  // that silently dropped a row. The narrower scope must still catch this: it is
+  // not merely "not everything matching ID_PREFIX", it is "everything this run's
+  // own approved sheet actually promised" (AC-2's missing-row check).
+  const idx = world.staging.grids.Expenses.findIndex((r) => r[0].startsWith("exp-hist-mortgage-"));
+  assert.ok(idx > -1, "sanity: at least one mortgage row must be present to remove");
+  world.staging.grids.Expenses.splice(idx, 1);
+
+  await assert.rejects(
+    importRun(world, ["--verify", ...base]),
+    (err) => /Verification failed/.test(err.message)
+  );
+});
+
 test("AC-5: a second apply against the same target writes nothing", async () => {
   const world = makeWorld();
   const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
@@ -1703,14 +1782,21 @@ test("AC-4c: verify catches a date hand-edited outside 2023-2024, which the extr
     0
   );
 
+  // `imported` is now scoped to THIS run's own id-prefix(es) (cycle 3's fix, this
+  // file), derived from `plan.candidates` — so the smuggled row must carry an id
+  // whose year IS one of this run's own candidates (2024), not an entirely foreign
+  // year (2022) a real run would never claim. The mismatch AC-4c actually defends
+  // against is an id that looks like this run's own next to a date that isn't —
+  // e.g. the underlying Expenses row hand-edited directly, after apply, in a way
+  // the normalization-sheet-level exclusion above cannot see.
   const smuggled = verifyAgainst({
     expenses: [
       EXPENSES_HEADER,
-      ["exp-hist-2022-0001", "2022-01-01", "5", "cat_003", "h", "h", "食 | 食材 |  | key=2022-rX-cA", "x"],
+      ["exp-hist-2024-0003", "2022-01-01", "5", "cat_003", "h", "h", "食 | 食材 |  | key=2024-r3-cH", "x"],
     ],
     map: require("../lib/sheetSchema").buildColumnMap([EXPENSES_HEADER], require("../lib/sheetSchema").EXPENSES_SPEC),
-    approved: [{ key: "2022-rX-cA", status: "include", date: "2022-01-01", amount: "5" }],
-    plan: { candidates: [], perYear: {}, sheetRowCount: 1 },
+    approved: [{ key: "2024-r3-cH", status: "include", date: "2024-03-15", amount: "5" }],
+    plan: { candidates: [{ id: "exp-hist-2024-0003", key: "2024-r3-cH" }], perYear: { 2024: { totalMinor: 500 } }, sheetRowCount: 1 },
     categories: { live: STAGING_CATEGORIES.map((r) => ({ id: r[0], name_en: r[1] })), countBefore: null },
     snapshot: null,
   });
