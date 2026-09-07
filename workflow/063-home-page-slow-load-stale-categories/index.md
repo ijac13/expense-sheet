@@ -1,7 +1,7 @@
 ---
 id: 063
 title: Home Page Slow Load and Stale Categories Before Adding an Expense
-status: build
+status: verify
 source: captain
 started: 2026-09-07T12:45:42Z
 completed:
