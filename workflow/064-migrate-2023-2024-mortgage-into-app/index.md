@@ -9,8 +9,8 @@ verdict: REJECTED
 score:
 worktree: .worktrees/spacedock-ensign-064-migrate-2023-2024-mortgage-into-app
 issue:
-pr:
-mod-block:
+pr: "#34"
+mod-block: merge:pr-merge
 gates:
     version: 1
     records:
@@ -60,6 +60,17 @@ gates:
                 id: briefing:064:verify:attempt-1:revision-1
                 digest: sha256:b6f79b6ca871b79898108ec3a45dc7d83c16dfbc3c00a448f222f5cc52382e96
                 room-ref: ./review/verify/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:064:verify:1
+                briefing: briefing:064:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-07T08:33:09.363681Z"
+                decision: approve
+                reason: 'Approved after full live drive: reviewed and approved the 25-row mortgage-only sheet, confirmed Reports Annual totals for 2023/2024 on staging (2022 unaffected), and confirmed AC-14 (everyday add/delete/History) works. All 14 ACs met; staging restored to baseline after the rehearsal.'
+              application:
+                target-stage: done
+                state: pending
 ---
 
 Extend `061`'s already-imported 2023–2024 expense records with the mortgage payments those years were missing. `060` found this is the single largest term in why 2025 looks roughly double 2023–2024: those years' record held no `Mortgage` category at all, and adding just 2023's twelve payments alone closes 35.2% of the apparent gap.
