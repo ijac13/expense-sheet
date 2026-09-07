@@ -191,3 +191,37 @@ export function saveLastCategory(categoryId: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(LAST_CATEGORY_KEY, categoryId);
 }
+
+export const LAST_CATEGORIES_KEY = "expense_last_categories";
+
+/**
+ * The last successfully-fetched live category list, or null when nothing is
+ * cached, the cached value doesn't parse to a non-empty array, or localStorage
+ * itself is unavailable/throws (private browsing, quota exceeded). Callers fall
+ * back to DEFAULT_CATEGORIES on null — this must never throw and take the page
+ * down with it.
+ */
+export function getCachedCategories(): Category[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LAST_CATEGORIES_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    return parsed as Category[];
+  } catch {
+    return null;
+  }
+}
+
+/** Overwrites the cached category list. Swallows a throwing localStorage rather
+ * than letting a full page crash on a successful fetch. */
+export function saveCachedCategories(categories: Category[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LAST_CATEGORIES_KEY, JSON.stringify(categories));
+  } catch {
+    // Storage unavailable or full — next load falls back to DEFAULT_CATEGORIES,
+    // same as if nothing had ever been cached.
+  }
+}
