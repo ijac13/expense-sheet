@@ -725,6 +725,96 @@ test("--generate writes the control row with a blank approval cell and a digest"
   assert.equal(parsed.rows.length, 44);
 });
 
+// ---------------------------------------------------------------------------
+// AC-2 / AC-3 / AC-13 (064) — `--source mortgage` scopes the REAL --generate/
+// --report path to the House-tab rows only. Cycle-1 verify found the shipped
+// code had no such flag: every real --generate/--report unconditionally
+// re-attached 061's already-imported 2023/2024 Daily-tab rows to the sheet,
+// contradicting the approved spec. These exercise `extractor.run()` itself —
+// not `extractMortgageRows()` called directly, which is what let that gap
+// through the offline suite the first time (`makeMortgageOnlyWorld()` above
+// hand-builds its sheet and never calls `run()`'s --generate/--report path).
+// ---------------------------------------------------------------------------
+
+test("AC-2/AC-3 (064): --report --source mortgage never reads the Daily-tab archive and reports only the 25 new mortgage rows", async () => {
+  const result = await extractor.run(
+    ["--report", "--years", "2023,2024", "--source", "mortgage", "--house-fixture", HOUSE_FIXTURE_PATH],
+    {
+      log: silent,
+      env: STUB_ENV,
+      // --source mortgage's whole point is to skip every spreadsheet read this
+      // run would otherwise make (archive AND, via --house-fixture, the House
+      // tab itself) — if the fix regresses and reads anything, this throws
+      // instead of the test passing on an accidental combined result.
+      sheetsFor: async () => { throw new Error("--source mortgage must not read any spreadsheet"); },
+    }
+  );
+  assert.equal(result.bands.length, 0, "no Daily-tab band was discovered or extracted");
+  assert.equal(result.skippedBands.length, 0);
+  assert.equal(result.rows.length, 25, "12 regular 2023 + 1 prepayment + 12 regular 2024 (AC-2/AC-3's own counts)");
+  assert.ok(result.rows.every((r) => r.source === "mortgage"), "no Daily-tab row is re-attached under --source mortgage");
+});
+
+test("AC-2/AC-3 (064): --generate --source mortgage writes a normalization sheet holding only the mortgage rows, not 061's already-imported Daily-tab rows", async () => {
+  const stub = makeSheets({ Expenses: { header: ["id"], rows: [] } });
+  const result = await extractor.run(
+    ["--generate", "--into", "Migration 2023-2024 Mortgage", "--years", "2023,2024", "--source", "mortgage", "--house-fixture", HOUSE_FIXTURE_PATH],
+    { log: silent, env: STUB_ENV, sheetsFor: async () => stub.sheets }
+  );
+  assert.equal(result.rows.length, 25);
+
+  const written = stub.grids["Migration 2023-2024 Mortgage"];
+  assert.ok(written, "the tab must have been created");
+  const parsed = parseSheetGrid(written);
+  // This is the exact sheet the captain is asked to mark APPROVED (AC-13's own
+  // precondition) — cycle 1's rejected shape put 1,695 rows here (1,670 already
+  // live via 061 + 25 new), not the 25 this fix must produce.
+  assert.equal(parsed.rows.length, 25, "the sheet the captain approves must hold only the new mortgage rows");
+  assert.ok(parsed.rows.every((r) => r.source === "mortgage"));
+});
+
+test("--source rejects an unrecognized value before any read or write", async () => {
+  await assert.rejects(
+    extractor.run(
+      ["--report", "--source", "daily", "--house-fixture", HOUSE_FIXTURE_PATH],
+      { log: silent, env: STUB_ENV, sheetsFor: async () => { throw new Error("must not be called — the bad flag should be rejected first"); } }
+    ),
+    (err) => err instanceof ExtractError && /--source/.test(err.message) && /mortgage/.test(err.message)
+  );
+});
+
+test("AC-2/AC-3/AC-13 (064) falsified: reverting the --source mortgage scoping reproduces cycle 1's exact defect — the sheet re-combines the Daily-tab archive", async () => {
+  const reverted = loadPatched("extract-historical-expenses.js", [
+    [
+      "  if (mortgageOnly) {\n" +
+      "    // The whole point of --source mortgage: 2023/2024's Daily-tab data is\n" +
+      "    // already live via 061, so this run never reads the archive at all —\n" +
+      "    // not \"read it and discard the rows\", skip the read itself.\n" +
+      "    log('[extract] --source mortgage: skipping Daily-tab archive read/extraction (already imported by 061)');\n" +
+      "  } else if (args.fixture) {",
+      "  if (args.fixture) {",
+    ],
+    [
+      "const result = mortgageOnly ? { bands: [], skippedBands: [], rows: [], variance: [] } : extract(grid, { years });",
+      "const result = extract(grid, { years });",
+    ],
+    [
+      "result.rows = mortgageOnly ? mortgage.rows : [...result.rows, ...mortgage.rows];",
+      "result.rows = [...result.rows, ...mortgage.rows];",
+    ],
+  ]);
+  const result = await reverted.run(
+    ["--report", "--years", "2023,2024", "--source", "mortgage", "--fixture", FIXTURE_PATH, "--house-fixture", HOUSE_FIXTURE_PATH, "--variance-report", tmpFile("v.md")],
+    { log: silent, env: STUB_ENV, sheetsFor: async () => { throw new Error("must not be called — --fixture/--house-fixture cover both reads"); } }
+  );
+  // Verify's own live probe against the real sheets: 1670 Daily-tab + 25
+  // mortgage = 1695 combined, despite --source mortgage being passed. Here,
+  // the fixture's 19 Daily-tab rows stand in for the 1670 live ones — same
+  // shape, smaller number — so the assertion is exact rather than "some".
+  assert.equal(result.rows.length, 44, "reverting the fix re-attaches the Daily-tab rows even with --source mortgage set");
+  assert.ok(result.rows.some((r) => r.source !== "mortgage"), "a Daily-tab row leaked back into the mortgage-only sheet");
+});
+
 test("the normalization sheet round-trips through its own parser", () => {
   const rows = extract(grid()).rows;
   const { grid: sheet, digest } = sheetGridFor(rows, "2026-08-31T00:00:00.000Z");

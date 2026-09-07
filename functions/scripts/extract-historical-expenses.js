@@ -16,6 +16,12 @@
  *       --generate --into "Migration 2023-2024"
  *   node -r ./scripts/load-local-env.js scripts/extract-historical-expenses.js \
  *       --generate --into "Migration 2023-2024 v2" --carry-from "Migration 2023-2024"
+ *   node -r ./scripts/load-local-env.js scripts/extract-historical-expenses.js \
+ *       --report --years 2023,2024 --source mortgage
+ *       entity 064: scope --generate/--report to the House-tab mortgage rows
+ *       only, skipping the Daily-tab archive read entirely. Needed for years
+ *       whose Daily-tab data is already live elsewhere (061's 2023/2024), so
+ *       the sheet the captain approves holds only what this run adds.
  *
  *   --fixture <path/to/grid.json>   run the whole core against a local grid
  *
@@ -1264,6 +1270,13 @@ function parseArgs(argv) {
     // before this, only the internal constant existed and nothing let a run
     // choose a different set of years without editing the source.
     years: yearsRaw ? yearsRaw.split(",").map((y) => Number(y.trim())) : null,
+    // Entity 064 — `--source mortgage` scopes `--generate`/`--report` to the
+    // House-tab mortgage rows only, skipping the Daily-tab archive extraction.
+    // Needed for years (2023/2024) whose Daily-tab data 061 already put on
+    // production: without this, the normalization sheet the captain approves
+    // would re-list all of it alongside the new mortgage rows. `null` (the
+    // flag omitted) is the unchanged, default combined Daily+mortgage sheet.
+    source: value("--source"),
   };
 }
 
@@ -1309,6 +1322,13 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
       'the importer is later told to read, and a defaulted one is a tab nobody named.'
     );
   }
+  if (args.source !== null && args.source !== "mortgage") {
+    throw new ExtractError(
+      `--source ${JSON.stringify(args.source)} is not recognized. The only scoped source is ` +
+      '"mortgage" (--source mortgage); omit --source for the default combined Daily+mortgage sheet.'
+    );
+  }
+  const mortgageOnly = args.source === "mortgage";
 
   const generatedAt = new Date().toISOString();
   const years = args.years ?? IN_SCOPE_YEARS;
@@ -1319,7 +1339,12 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
 
   let grid;
   let houseGrid;
-  if (args.fixture) {
+  if (mortgageOnly) {
+    // The whole point of --source mortgage: 2023/2024's Daily-tab data is
+    // already live via 061, so this run never reads the archive at all —
+    // not "read it and discard the rows", skip the read itself.
+    log('[extract] --source mortgage: skipping Daily-tab archive read/extraction (already imported by 061)');
+  } else if (args.fixture) {
     const raw = JSON.parse(fs.readFileSync(args.fixture, "utf8"));
     grid = Array.isArray(raw) ? raw : raw.rows;
     log(`[extract] fixture ${args.fixture}: ${grid.length} rows`);
@@ -1346,24 +1371,33 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
     houseGrid = await readHouseGrid(readSheets);
   }
 
-  const result = extract(grid, { years });
-  summarise(result, log);
+  const result = mortgageOnly ? { bands: [], skippedBands: [], rows: [], variance: [] } : extract(grid, { years });
+  if (!mortgageOnly) summarise(result, log);
 
   const mortgage = extractMortgageRows(houseGrid, { years });
   summariseMortgage(mortgage, log);
 
-  result.rows = [...result.rows, ...mortgage.rows];
-  log(`[extract] ${result.rows.length} combined row(s) (Daily + mortgage)`);
+  result.rows = mortgageOnly ? mortgage.rows : [...result.rows, ...mortgage.rows];
+  log(mortgageOnly
+    ? `[extract] ${result.rows.length} mortgage-only row(s) (--source mortgage; Daily-tab extraction skipped)`
+    : `[extract] ${result.rows.length} combined row(s) (Daily + mortgage)`);
 
-  const variancePath = args.varianceReport
-    ?? path.join(REPORT_DIR, `061-source-variance-${generatedAt.slice(0, 10)}.md`);
-  fs.mkdirSync(path.dirname(variancePath), { recursive: true });
-  fs.writeFileSync(variancePath, renderVarianceReport(result.variance, generatedAt), "utf8");
-  const totalMismatches = result.variance.reduce(
-    (n, b) => n + b.months.reduce((m, x) => m + x.rowMismatchCount, 0), 0
-  );
-  log(`[variance] ${totalMismatches} row-month cells disagree with their own day cells by >1% — reported, gates nothing`);
-  log(`[variance] written to ${variancePath}`);
+  // The variance report reconciles the Daily tab's own month-total columns
+  // against its day cells — meaningless with no Daily-tab rows extracted.
+  let variancePath = null;
+  if (mortgageOnly) {
+    log('[variance] --source mortgage: report skipped (no Daily-tab data extracted this run)');
+  } else {
+    variancePath = args.varianceReport
+      ?? path.join(REPORT_DIR, `061-source-variance-${generatedAt.slice(0, 10)}.md`);
+    fs.mkdirSync(path.dirname(variancePath), { recursive: true });
+    fs.writeFileSync(variancePath, renderVarianceReport(result.variance, generatedAt), "utf8");
+    const totalMismatches = result.variance.reduce(
+      (n, b) => n + b.months.reduce((m, x) => m + x.rowMismatchCount, 0), 0
+    );
+    log(`[variance] ${totalMismatches} row-month cells disagree with their own day cells by >1% — reported, gates nothing`);
+    log(`[variance] written to ${variancePath}`);
+  }
 
   if (args.report) {
     log("[extract] --report: nothing written to any spreadsheet.");
