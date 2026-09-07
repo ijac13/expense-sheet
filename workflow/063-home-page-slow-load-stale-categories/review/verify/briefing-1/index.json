@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:063:verify:attempt-1:revision-1",
+  "question": "AC-1 through AC-7 pass with live-adjacent evidence (staging deploy confirmed byte-identical to this branch's build, full suites green, AC-7's fix independently re-falsified). AC-8 (warm-request timing) and AC-9 (no visible category swap) need your own live sign-in to check, since the app is auth-gated to your account and an ensign can't sign in as you. Ready to run the two manual checks below, or does anything here need to change first?",
+  "artifacts": [
+    {
+      "id": "artifact:063:verify:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/dff6af69ab74817eaf0887f97574604b7b82f78d/workflow/063-home-page-slow-load-stale-categories/index.md",
+      "rev": "sha256:96bc116b9718c84a54528cac546028fa63ff6f975f912e3c34f55ed32132a0a4",
+      "mediaType": "text/markdown",
+      "summary": "Verify: AC-1-7 PASSED on staging with live evidence (fresh deploy confirmed byte-identical via chunk-hash comparison, both suites green, AC-7 falsifiability independently re-proven by reverting the fix). AC-8/AC-9 correctly not self-checked by the ensign: the categories API and home screen are auth-gated to two captain-owned Google accounts (entity 055's known wall), and no identity was fabricated to fake a pass. This is an interactive boundary the spec itself scoped, not a code defect. Staging is live at https://expense-sheet-staging.web.app with a visible staging banner; manual-test steps given for both remaining ACs."
+    }
+  ]
+}
