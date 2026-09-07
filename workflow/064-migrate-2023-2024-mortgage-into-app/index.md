@@ -1,13 +1,13 @@
 ---
 id: 064
 title: Migrate 2023–2024 Mortgage Payments Into The App
-status: spec
+status: build
 source: captain
 started: 2026-09-07T00:38:44Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-064-migrate-2023-2024-mortgage-into-app
 issue:
 pr:
 mod-block:
@@ -41,6 +41,17 @@ gates:
                 id: briefing:064:spec:attempt-1:revision-1
                 digest: sha256:347714a3042e3f09e0db1d3602b89661e5a575d2926808edd4dd967826182879
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:064:spec:1
+                briefing: briefing:064:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-07T01:37:22.153619Z"
+                decision: approve
+                reason: Id-namespace design resolves the collision hazard with 061's live rows; row-125 and K-column edge cases are specced with falsifiable ACs; 14 ACs with offline/interactive split are sound. Ready for build.
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 Extend `061`'s already-imported 2023–2024 expense records with the mortgage payments those years were missing. `060` found this is the single largest term in why 2025 looks roughly double 2023–2024: those years' record held no `Mortgage` category at all, and adding just 2023's twelve payments alone closes 35.2% of the apparent gap.
