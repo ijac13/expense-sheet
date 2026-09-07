@@ -1,13 +1,13 @@
 ---
 id: 063
 title: Home Page Slow Load and Stale Categories Before Adding an Expense
-status: spec
+status: build
 source: captain
 started: 2026-09-07T12:45:42Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-063-home-page-slow-load-stale-categories
 issue:
 pr:
 mod-block:
@@ -41,6 +41,17 @@ gates:
                 id: briefing:063:spec:attempt-1:revision-1
                 digest: sha256:91feba8e97b726c06a6e975536c867740d44cec31dfe7a918e3d1623f69937cb
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:063:spec:1
+                briefing: briefing:063:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-07T13:51:27.0862Z"
+                decision: approve
+                reason: Approved the free fixes (client-side category caching, memoized backend auth client); keeping minInstances/always-warm out of scope for now to see how the free improvements perform first.
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 When I open the production expense-sheet web app, the home page keeps loading something and the "save" button is grayed out. Then it refreshes the page on its own, and sometimes the categories shown on the home page change after that refresh. Only after that can I actually add an expense record.
