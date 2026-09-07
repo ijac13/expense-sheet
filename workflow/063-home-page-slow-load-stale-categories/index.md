@@ -1,9 +1,9 @@
 ---
 id: 063
 title: Home Page Slow Load and Stale Categories Before Adding an Expense
-status: ideation
+status: spec
 source: captain
-started:
+started: 2026-09-07T12:45:42Z
 completed:
 verdict:
 score:
@@ -22,6 +22,17 @@ gates:
                 id: briefing:063:ideation:attempt-1:revision-1
                 digest: sha256:375845444224572a7e5b9d0b951eab6970fbb1a84244a57d048d6ec0c2a57a06
                 room-ref: ./review/ideation/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:063:ideation:1
+                briefing: briefing:063:ideation:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-07T12:44:06.892043Z"
+                decision: approve
+                reason: Seed clearly captures the observed slow-load/auto-refresh/stale-categories problem with concrete user stories and open questions; ready for spec to investigate root cause.
+              application:
+                target-stage: spec
+                state: consumed
 ---
 
 When I open the production expense-sheet web app, the home page keeps loading something and the "save" button is grayed out. Then it refreshes the page on its own, and sometimes the categories shown on the home page change after that refresh. Only after that can I actually add an expense record.
