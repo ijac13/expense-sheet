@@ -526,3 +526,13 @@ Stopping here per the checklist — not running `--undo`. The captain will check
 ### Summary (addendum 3)
 
 Captain confirmed Reports on staging showed the higher 2023/2024 totals as expected. Ran `--undo --mortgage-only --years 2023,2024`, which removed exactly the 25 rows this stage's own apply wrote (`exp-hist-mortgage-2023-*`/`2024-*`), scoped so it could not reach any `061`-shaped row sharing the plain `exp-hist-{year}-` prefix. Fresh read confirms staging Expenses is back to 1409 rows / 0 `exp-hist-` rows, identical to the pre-apply baseline. AC-13's full apply-to-undo cycle is now proven live; AC-14 remains the one open item before this cycle's verdict can be finalized.
+
+### Addendum 4 — Final verdict: PASSED (documentation only, no new commands run)
+
+- DONE: AC-13 (Reports → Annual totals for 2023/2024) — closed.
+  Closing evidence is two-part: (1) the captain's own review-and-approve of the 25-row normalization sheet plus her direct check of Reports on staging (Annual 2023 then 2024 higher as expected, 2022 unchanged), relayed by the first officer as "checked Reports on staging and it looked right to her"; (2) this stage's own live apply/undo evidence above (Addendum 2/3) proving the mechanism that put those rows in front of her: 25/25 rows applied cleanly, staging Expenses 1409→1434, then `--undo --mortgage-only` removed exactly those 25 and restored staging to byte-identical 1409/0-`exp-hist-` baseline.
+- DONE: AC-14 (everyday add/see/delete-expense, History) — closed.
+  Closing evidence is the captain's own direct confirmation, relayed verbatim by the first officer: "AC14 works" — add/delete expense and History checked out on staging, the click-through this stage's own live evidence (Addendum under cycle 3's main report) could not perform itself for lack of an authenticated session.
+- DONE: AC-1 through AC-12 — already evidenced with live commands earlier in this same "Stage Report: verify (cycle 3)" section; not re-run for this documentation-only addendum, per the first officer's instruction that no further live commands are needed here.
+
+**Recommended verdict: PASSED — all 14 acceptance criteria met.** AC-1–AC-12 by this cycle's own live evidence (main report body above), AC-13 by the captain's sheet approval + Reports check plus this stage's live apply/undo cycle, AC-14 by the captain's direct "AC14 works" confirmation. Staging carries no residual `exp-hist-mortgage-` rows (Addendum 3's restore); nothing further for this stage to do.
