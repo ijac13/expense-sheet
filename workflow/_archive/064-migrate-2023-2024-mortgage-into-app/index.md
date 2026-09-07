@@ -1,16 +1,16 @@
 ---
 id: 064
 title: Migrate 2023–2024 Mortgage Payments Into The App
-status: verify
+status: done
 source: captain
 started: 2026-09-07T00:38:44Z
-completed:
-verdict: REJECTED
+completed: 2026-09-07T09:05:26Z
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-064-migrate-2023-2024-mortgage-into-app
 issue:
 pr: pr-merge:34
-mod-block: merge:pr-merge
+mod-block:
 gates:
     version: 1
     records:
@@ -70,7 +70,8 @@ gates:
                 reason: 'Approved after full live drive: reviewed and approved the 25-row mortgage-only sheet, confirmed Reports Annual totals for 2023/2024 on staging (2022 unaffected), and confirmed AC-14 (everyday add/delete/History) works. All 14 ACs met; staging restored to baseline after the rehearsal.'
               application:
                 target-stage: done
-                state: pending
+                state: consumed
+archived: 2026-09-07T09:05:26Z
 ---
 
 Extend `061`'s already-imported 2023–2024 expense records with the mortgage payments those years were missing. `060` found this is the single largest term in why 2025 looks roughly double 2023–2024: those years' record held no `Mortgage` category at all, and adding just 2023's twelve payments alone closes 35.2% of the apparent gap.
