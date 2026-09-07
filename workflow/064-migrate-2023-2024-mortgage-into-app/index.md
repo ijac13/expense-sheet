@@ -244,6 +244,8 @@ Semantics this may change: **stored data only** — new rows in the target Expen
 
 ### Feedback Cycles
 
+- Cycle 1: REJECTED — verify; surface 6 files/+695 LOC net vs estimate +320 (217%); AC unchanged. Verify live-reproduced a gap between the approved spec and shipped code: `--generate`/`--report` always combine 061's 1,670 live Daily-tab rows with the 25 new mortgage rows into one sheet, with no flag to isolate mortgage rows — contradicting the spec's "holds only the new mortgage rows" resolution. Routed to build: add a `--source mortgage` (or equivalent) scoping flag so `--generate`/`--report`/`--dry-run` can isolate mortgage rows for years whose Daily-tab data is already live elsewhere, per verify's own recommended fix direction (`extract-historical-expenses.js:1349-1356`). AC-2/AC-3/AC-13 depend on this fix; disposition: fix, owned by this entity's build stage, no captain scope/AC change needed.
+
 ## Stage Report: spec
 
 - DONE: Write `## Spec` (Goal, User Stories, Edge Cases, Out of Scope) per the Spec Template, resolving the three ideation open questions (sequencing against 061's already-live rows, paid_by/created_by attribution, undo id-prefix) as concrete decisions rather than leaving them open.
