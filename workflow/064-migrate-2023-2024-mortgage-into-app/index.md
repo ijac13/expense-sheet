@@ -487,3 +487,17 @@ No new defect this cycle. Cycle 2's live-found gap — `--verify` mistaking 061'
   Did not run it. `readApprovedSheet` (`import-historical-expenses.js:558-576`) refuses `--apply` unless B1 is exactly `APPROVED`, and this entity's own cycle-3 verify report already ruled that this agent does not type `APPROVED` into B1 itself — only the captain's own read of the 25 rows satisfies that gate. Forcing the write through would mean either bypassing that gate or acting on a confirmation this live check cannot corroborate; escalating instead of guessing.
 
 No staging or production data was written or otherwise touched by this addendum's checks — both live reads above are read-only. Escalating to the first officer: either the captain's chat approval has not yet been typed into the sheet, or a different tab/spreadsheet was intended — needs her or the first officer to resolve before `--apply` can run.
+
+### Addendum 2 — AC-13 apply RUN: B1 confirmed APPROVED, 25 rows written to staging, left live
+
+- DONE: Re-confirmed B1 live before running anything.
+  Raw `sheets.spreadsheets.values.get` on `'064 verify cycle3 mortgage 2023-2024'!A1:C1` at `2026-09-07T07:58:18Z` returned `["STATUS", "APPROVED", "generated=2026-09-07T06:45:35.302Z digest=deed04fd6d3eaf244a11471f75bf7f49"]` — same digest as addendum 1's blocked check, confirming this is the same sheet content she read, not a regenerated one.
+- DONE: Ran `node -r ./scripts/load-local-env.js scripts/import-historical-expenses.js --target staging --apply --years 2023,2024 --from-sheet "064 verify cycle3 mortgage 2023-2024"` against the real staging Expenses tab.
+  Full log: `[import] phase=apply target=staging`, `[plan] 25 sheet row(s): 25 to write, excluded 0 undated / 0 orphaned / 0 status=exclude / 0 out-of-scope year / 0 unrecognised status`, `[categories] all 1 name(s) resolve on staging: Mortgage=cat_021`, `[actor] paid_by = created_by = "ijac"`, `[apply] 25 row(s) to write, 0 already present`, `[apply] wrote 25/25`, `[apply] created=25 skipped=0`. Zero errors, zero `PartialWriteError`, zero rows skipped as already-present.
+  Per-year totals the command printed are deliberately not quoted here, per AC-11 and this entity's established convention.
+- DONE: Fresh row-count read of the staging Expenses tab, immediately after apply, confirming the write landed and rows are left live (no undo run).
+  Before (this cycle's own pre-apply read): **1409 rows incl. header** (1408 data rows), 0 `exp-hist-` rows. After: **1434 rows incl. header** (1433 data rows) — exactly +25, matching `created=25`. 25 `exp-hist-mortgage-` rows now present: 13 for 2023 (`exp-hist-mortgage-2023-0001` .. `exp-hist-mortgage-2023-0013`), 12 for 2024 (`exp-hist-mortgage-2024-0001` .. `exp-hist-mortgage-2024-0012`) — contiguous, no gaps, no duplicates. No `--undo` was run; the rows remain live on staging as of this read.
+- DONE: Confirmed no production write occurred.
+  `--target staging` throughout; the only production touch in this run is the pre-existing, read-only `verifyHouseTabAccess` check (`[import] House tab read-access confirmed for both staging and production`), unchanged from every prior cycle's own apply/rehearse runs and not a write of any kind.
+
+Stopping here per the checklist — not running `--undo`. The captain will check Reports on staging herself (Annual 2023/2024, per the manual-test steps above) and report back before the next step.
