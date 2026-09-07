@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:064:ideation:attempt-1:revision-1",
+  "question": "Does this ideation correctly scope the 2023-2024 mortgage migration (column J full payment, 2023-03-15 prepayment as its own row, PII exclusion, reuse of 061's tooling) and is it ready to move to spec?",
+  "artifacts": [
+    {
+      "id": "artifact:064:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/d7265396641e919677b14a5fee1b8dc1b9cedcf8/workflow/064-migrate-2023-2024-mortgage-into-app/index.md",
+      "rev": "sha256:7622ae49b8b3d2c24e6f58dc5e3e0841dc7133eb4b230b4e9b2f79549492376c",
+      "mediaType": "text/markdown",
+      "summary": "Ideation seed: extend 061's 2023-2024 import with the missing Mortgage category, sourced from House tab column J (dated by column D), including the 2023-03-15 principal prepayment as its own row. PII in column A must never reach the app/repo. Reuses 061's split-approval tooling; spec to decide sequencing against 061's already-live rows, attribution, and undo-prefix scope."
+    }
+  ]
+}
