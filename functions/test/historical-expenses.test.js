@@ -719,7 +719,100 @@ test("--generate writes the control row with a blank approval cell and a digest"
   const parsed = parseSheetGrid(written);
   assert.equal(parsed.control.approval, "");
   assert.equal(parsed.control.digest, result.digest);
-  assert.equal(parsed.rows.length, 19);
+  // 19 Daily-tab rows (historical-bands.json, unchanged) + 25 mortgage rows for
+  // 2023/2024 (12 regular + 1 prepayment for 2023, 12 regular for 2024 — 064
+  // widened the shared house-mortgage.json fixture to cover these years too).
+  assert.equal(parsed.rows.length, 44);
+});
+
+// ---------------------------------------------------------------------------
+// AC-2 / AC-3 / AC-13 (064) — `--source mortgage` scopes the REAL --generate/
+// --report path to the House-tab rows only. Cycle-1 verify found the shipped
+// code had no such flag: every real --generate/--report unconditionally
+// re-attached 061's already-imported 2023/2024 Daily-tab rows to the sheet,
+// contradicting the approved spec. These exercise `extractor.run()` itself —
+// not `extractMortgageRows()` called directly, which is what let that gap
+// through the offline suite the first time (`makeMortgageOnlyWorld()` above
+// hand-builds its sheet and never calls `run()`'s --generate/--report path).
+// ---------------------------------------------------------------------------
+
+test("AC-2/AC-3 (064): --report --source mortgage never reads the Daily-tab archive and reports only the 25 new mortgage rows", async () => {
+  const result = await extractor.run(
+    ["--report", "--years", "2023,2024", "--source", "mortgage", "--house-fixture", HOUSE_FIXTURE_PATH],
+    {
+      log: silent,
+      env: STUB_ENV,
+      // --source mortgage's whole point is to skip every spreadsheet read this
+      // run would otherwise make (archive AND, via --house-fixture, the House
+      // tab itself) — if the fix regresses and reads anything, this throws
+      // instead of the test passing on an accidental combined result.
+      sheetsFor: async () => { throw new Error("--source mortgage must not read any spreadsheet"); },
+    }
+  );
+  assert.equal(result.bands.length, 0, "no Daily-tab band was discovered or extracted");
+  assert.equal(result.skippedBands.length, 0);
+  assert.equal(result.rows.length, 25, "12 regular 2023 + 1 prepayment + 12 regular 2024 (AC-2/AC-3's own counts)");
+  assert.ok(result.rows.every((r) => r.source === "mortgage"), "no Daily-tab row is re-attached under --source mortgage");
+});
+
+test("AC-2/AC-3 (064): --generate --source mortgage writes a normalization sheet holding only the mortgage rows, not 061's already-imported Daily-tab rows", async () => {
+  const stub = makeSheets({ Expenses: { header: ["id"], rows: [] } });
+  const result = await extractor.run(
+    ["--generate", "--into", "Migration 2023-2024 Mortgage", "--years", "2023,2024", "--source", "mortgage", "--house-fixture", HOUSE_FIXTURE_PATH],
+    { log: silent, env: STUB_ENV, sheetsFor: async () => stub.sheets }
+  );
+  assert.equal(result.rows.length, 25);
+
+  const written = stub.grids["Migration 2023-2024 Mortgage"];
+  assert.ok(written, "the tab must have been created");
+  const parsed = parseSheetGrid(written);
+  // This is the exact sheet the captain is asked to mark APPROVED (AC-13's own
+  // precondition) — cycle 1's rejected shape put 1,695 rows here (1,670 already
+  // live via 061 + 25 new), not the 25 this fix must produce.
+  assert.equal(parsed.rows.length, 25, "the sheet the captain approves must hold only the new mortgage rows");
+  assert.ok(parsed.rows.every((r) => r.source === "mortgage"));
+});
+
+test("--source rejects an unrecognized value before any read or write", async () => {
+  await assert.rejects(
+    extractor.run(
+      ["--report", "--source", "daily", "--house-fixture", HOUSE_FIXTURE_PATH],
+      { log: silent, env: STUB_ENV, sheetsFor: async () => { throw new Error("must not be called — the bad flag should be rejected first"); } }
+    ),
+    (err) => err instanceof ExtractError && /--source/.test(err.message) && /mortgage/.test(err.message)
+  );
+});
+
+test("AC-2/AC-3/AC-13 (064) falsified: reverting the --source mortgage scoping reproduces cycle 1's exact defect — the sheet re-combines the Daily-tab archive", async () => {
+  const reverted = loadPatched("extract-historical-expenses.js", [
+    [
+      "  if (mortgageOnly) {\n" +
+      "    // The whole point of --source mortgage: 2023/2024's Daily-tab data is\n" +
+      "    // already live via 061, so this run never reads the archive at all —\n" +
+      "    // not \"read it and discard the rows\", skip the read itself.\n" +
+      "    log('[extract] --source mortgage: skipping Daily-tab archive read/extraction (already imported by 061)');\n" +
+      "  } else if (args.fixture) {",
+      "  if (args.fixture) {",
+    ],
+    [
+      "const result = mortgageOnly ? { bands: [], skippedBands: [], rows: [], variance: [] } : extract(grid, { years });",
+      "const result = extract(grid, { years });",
+    ],
+    [
+      "result.rows = mortgageOnly ? mortgage.rows : [...result.rows, ...mortgage.rows];",
+      "result.rows = [...result.rows, ...mortgage.rows];",
+    ],
+  ]);
+  const result = await reverted.run(
+    ["--report", "--years", "2023,2024", "--source", "mortgage", "--fixture", FIXTURE_PATH, "--house-fixture", HOUSE_FIXTURE_PATH, "--variance-report", tmpFile("v.md")],
+    { log: silent, env: STUB_ENV, sheetsFor: async () => { throw new Error("must not be called — --fixture/--house-fixture cover both reads"); } }
+  );
+  // Verify's own live probe against the real sheets: 1670 Daily-tab + 25
+  // mortgage = 1695 combined, despite --source mortgage being passed. Here,
+  // the fixture's 19 Daily-tab rows stand in for the 1670 live ones — same
+  // shape, smaller number — so the assertion is exact rather than "some".
+  assert.equal(result.rows.length, 44, "reverting the fix re-attaches the Daily-tab rows even with --source mortgage set");
+  assert.ok(result.rows.some((r) => r.source !== "mortgage"), "a Daily-tab row leaked back into the mortgage-only sheet");
 });
 
 test("the normalization sheet round-trips through its own parser", () => {
@@ -775,16 +868,15 @@ test("AC-5: a year outside the House tab's populated rows yields zero rows, not 
   assert.deepEqual(rows, []);
 });
 
-test("a House-tab row with exactly one of column D / column J populated aborts naming the row, rather than guessing or skipping it", () => {
+test("AC-7: a House-tab row with a populated date but J AND K both blank is skipped as a non-event, not aborted (064 generalises 062's own guard)", () => {
   const g = houseGrid();
-  // Row index 2 (sourceRow 7) is 2022-03-15's row: blank its amount, keep its date.
+  // Row index 2 (sourceRow 7) is 2022-01-15's row: blank its amount, keep its date.
+  // K is already blank there, so this now lands in the row-125 shape (AC-7), not
+  // the half-populated abort — the classifier's third case this entity adds.
   g[2][6] = "";
-  assert.throws(
-    () => extractMortgageRows(g, { years: [2022] }),
-    (err) => err instanceof ExtractError
-      && /House!D7\/J7/.test(err.message)
-      && /column J .* is blank/.test(err.message)
-  );
+  const { rows } = extractMortgageRows(g, { years: [2022] });
+  assert.equal(rows.length, 11, "the blanked row contributes nothing; 2022's other eleven rows are unaffected");
+  assert.ok(!rows.some((r) => r.key === "2022-mortgage-r7"), "the blanked source row itself emits no row");
 });
 
 test("a House-tab row with an amount but no date aborts naming the row", () => {
@@ -807,21 +899,21 @@ test("an out-of-scope-year row with exactly one of D/J populated is skipped sile
   assert.equal(rows.length, 12, "the out-of-range partial row must not abort the 2022 extraction");
 });
 
-test("AC-6: the House-tab reader's range is bounded to D5:J255 and never requests column A, B or C", async () => {
+test("AC-6: the House-tab reader's range is bounded to D5:K255 and never requests column A, B or C", async () => {
   const stub = makeSheets({ House: { header: [], rows: houseGrid() } });
   await extractor.readHouseGrid(stub.sheets);
   const getRequests = stub.requests.filter((r) => r.startsWith("GET "));
   assert.equal(getRequests.length, 1);
-  assert.equal(getRequests[0], "GET 'House'!D5:J255");
+  assert.equal(getRequests[0], "GET 'House'!D5:K255");
   assert.ok(!/'House'!A/.test(getRequests[0]));
 });
 
 test("AC-6 falsified: reading the House tab with an unbounded range would put column A's content in memory", async () => {
   const wider = loadPatched("extract-historical-expenses.js", [
-    [`range: \`'\${HOUSE_TAB}'!\${HOUSE_RANGE}\`,`, `range: \`'\${HOUSE_TAB}'!A5:J255\`,`],
+    [`range: \`'\${HOUSE_TAB}'!\${HOUSE_RANGE}\`,`, `range: \`'\${HOUSE_TAB}'!A5:K255\`,`],
   ]);
   // Header is row 1; three blank filler rows put the data row at row 5, matching
-  // where D5:J255 (and this falsified A5:J255) actually starts reading.
+  // where D5:K255 (and this falsified A5:K255) actually starts reading.
   const stub = makeSheets({
     House: {
       header: [],
@@ -838,13 +930,202 @@ test("AC-10: a mortgage row's notes name the House tab and its own source row, d
   const notes = buildNotes(row);
   assert.equal(notes, "House tab row 91 | key=2022-mortgage-r91");
   const parsed = parseNotes(notes);
-  assert.deepEqual(parsed, { sourceTab: "House", sourceRow: "91", key: "2022-mortgage-r91" });
+  assert.deepEqual(parsed, { sourceTab: "House", sourceRow: "91", paymentKind: "regular", key: "2022-mortgage-r91" });
 
   // A Daily-tab row's own shape is unaffected (AC-10's original four fields).
   const dailyNotes = importer.buildNotes({ bucket: "食", sub_category: "食材", detail: "", item_name: "", key: "2022-r63-cH" });
   const dailyParsed = importer.parseNotes(dailyNotes);
   assert.deepEqual(dailyParsed, { bucket: "食", sub_category: "食材", detail: "", item_name: "", key: "2022-r63-cH" });
 });
+
+// ---------------------------------------------------------------------------
+// AC-2 / AC-3 / AC-7 / AC-10 (064) — the two-row J/K emission, the row-125 skip,
+// and the payment-kind notes marker, on the 2023/2024 window
+// ---------------------------------------------------------------------------
+
+test("AC-2: 2023 and 2024 each yield exactly twelve regular J-sourced rows, dated by their own column D, amounted by their own column J", () => {
+  const { rows, perYearCount } = extractMortgageRows(houseGrid(), { years: [2023, 2024] });
+  const regular = rows.filter((r) => r.key.includes("-prepay-") === false);
+  const y2023 = regular.filter((r) => r.year === "2023");
+  const y2024 = regular.filter((r) => r.year === "2024");
+  assert.equal(y2023.length, 12);
+  assert.equal(y2024.length, 12);
+  assert.equal(perYearCount.get(2023), 13, "2023's own count includes its one prepayment row");
+  assert.equal(perYearCount.get(2024), 12);
+  for (const row of [...y2023, ...y2024]) {
+    assert.equal(row.category_name_en, MORTGAGE_CATEGORY_NAME);
+    assert.equal(row.source, "mortgage");
+    assert.match(row.key, /^\d{4}-mortgage-r\d+$/);
+  }
+});
+
+test("AC-3: the 2023-03-15 row carries both a regular J payment and a K prepayment, as two distinct rows", () => {
+  const { rows } = extractMortgageRows(houseGrid(), { years: [2023, 2024] });
+  const onThatDate = rows.filter((r) => r.date === "2023-03-15");
+  assert.equal(onThatDate.length, 2, "one source row, both columns populated, must emit two rows");
+
+  const regular = onThatDate.find((r) => !r.key.includes("-prepay-"));
+  const prepay = onThatDate.find((r) => r.key.includes("-prepay-"));
+  assert.ok(regular, "the regular-payment row must exist");
+  assert.ok(prepay, "the prepayment row must exist");
+  assert.equal(regular.key, "2023-mortgage-r21");
+  assert.equal(prepay.key, "2023-mortgage-prepay-r21");
+  assert.equal(regular.amount, "33200");
+  assert.equal(prepay.amount, "240000");
+  assert.notEqual(regular.amount, prepay.amount);
+
+  // Only one row in the whole 2023-2024 window carries a K value.
+  const allPrepay = rows.filter((r) => r.key.includes("-prepay-"));
+  assert.equal(allPrepay.length, 1);
+});
+
+test("AC-3 falsified: summing J and K into one row instead of emitting two loses which figure is which", () => {
+  const summed = loadPatched("extract-historical-expenses.js", [
+    [
+      `    if (!jEmpty) emit(\`\${year}-mortgage-r\${sourceRow}\`, iso, year, parseAmount(jRaw, \`\${ref}/J\${sourceRow}\`));
+    if (!kEmpty) emit(\`\${year}-mortgage-prepay-r\${sourceRow}\`, iso, year, parseAmount(kRaw, \`\${ref}/K\${sourceRow}\`));`,
+      `    if (!jEmpty || !kEmpty) {
+      const j = jEmpty ? 0 : parseAmount(jRaw, \`\${ref}/J\${sourceRow}\`);
+      const k = kEmpty ? 0 : parseAmount(kRaw, \`\${ref}/K\${sourceRow}\`);
+      emit(\`\${year}-mortgage-r\${sourceRow}\`, iso, year, j + k);
+    }`,
+    ],
+  ]);
+  const broken = summed.extractMortgageRows(houseGrid(), { years: [2023, 2024] });
+  const onThatDate = broken.rows.filter((r) => r.date === "2023-03-15");
+  assert.equal(onThatDate.length, 1, "the defect really does collapse two rows into one");
+  assert.notEqual(onThatDate[0].amount, "33200", "the summed row's amount matches neither the J nor the K figure alone");
+  assert.notEqual(onThatDate[0].amount, "240000");
+});
+
+test("AC-7: a row whose date is populated but whose J and K are both blank contributes zero rows and does not abort", () => {
+  const { rows } = extractMortgageRows(houseGrid(), { years: [2024] });
+  assert.equal(rows.length, 12, "the row-125-shape padding row must not be counted, and 2024's twelve real rows must all still land");
+  assert.ok(!rows.some((r) => r.date === "2024-11-15" && r.amount === ""), "no zero/blank-amount row was invented for the padding row");
+  const nov = rows.filter((r) => r.date === "2024-11-15");
+  assert.equal(nov.length, 1, "the real 11-15 payment (immediately after the padding row) still lands exactly once");
+  assert.equal(nov[0].amount, "35800");
+});
+
+test("AC-7 falsified: without the third case, the live row-125 shape reproduces this spec's own abort", () => {
+  const withoutSkip = loadPatched("extract-historical-expenses.js", [
+    [
+      `    // The row-125 shape (AC-7): a populated date with no payment of any kind that
+    // month is schedule padding wearing a real date, not a half-populated row.
+    if (jEmpty && kEmpty) return;
+
+    if (!jEmpty) emit(\`\${year}-mortgage-r\${sourceRow}\`, iso, year, parseAmount(jRaw, \`\${ref}/J\${sourceRow}\`));`,
+      `    if (jEmpty && kEmpty) {
+      throw new ExtractError(\`\${ref}: reintroduced defect — a populated date with J and K both blank aborts.\`);
+    }
+    if (!jEmpty) emit(\`\${year}-mortgage-r\${sourceRow}\`, iso, year, parseAmount(jRaw, \`\${ref}/J\${sourceRow}\`));`,
+    ],
+  ]);
+  assert.throws(
+    () => withoutSkip.extractMortgageRows(houseGrid(), { years: [2024] }),
+    (err) => /reintroduced defect/.test(err.message),
+    "the guard this AC exists for is the only thing standing between the row-125 shape and an aborted run"
+  );
+});
+
+test("AC-10: a prepayment row's notes carry a (prepayment) marker; a regular row's notes are unchanged from 062's own shape", () => {
+  const { buildNotes, parseNotes } = importer;
+
+  const regular = buildNotes({ source: "mortgage", key: "2023-mortgage-r24" });
+  assert.equal(regular, "House tab row 24 | key=2023-mortgage-r24", "unchanged from 062's already-shipped format");
+  assert.deepEqual(parseNotes(regular), { sourceTab: "House", sourceRow: "24", paymentKind: "regular", key: "2023-mortgage-r24" });
+
+  const prepay = buildNotes({ source: "mortgage", key: "2023-mortgage-prepay-r24" });
+  assert.equal(prepay, "House tab row 24 (prepayment) | key=2023-mortgage-prepay-r24");
+  assert.deepEqual(parseNotes(prepay), { sourceTab: "House", sourceRow: "24", paymentKind: "prepayment", key: "2023-mortgage-prepay-r24" });
+
+  // The two kinds on the SAME source row parse to distinct kinds.
+  assert.notEqual(parseNotes(regular).paymentKind, parseNotes(prepay).paymentKind);
+  assert.equal(parseNotes(regular).sourceRow, parseNotes(prepay).sourceRow);
+});
+
+// ---------------------------------------------------------------------------
+// AC-4 / AC-5 (064) — the mortgage id namespace, and its own scoped undo
+// ---------------------------------------------------------------------------
+
+test("AC-4: 2023/2024 mortgage rows mint under exp-hist-mortgage-{year}-{NNNN}, a counter scoped to source===mortgage only", () => {
+  const rows = extract(grid()).rows; // 061's own Daily-tab fixture, years 2023/2024
+  const mortgageRows = extractMortgageRows(houseGrid(), { years: [2023, 2024] }).rows;
+  const plan = planImport([...rows, ...mortgageRows]);
+
+  const mortgageCandidates = plan.candidates.filter((c) => c.source === "mortgage");
+  const dailyCandidates = plan.candidates.filter((c) => c.source !== "mortgage");
+  assert.ok(mortgageCandidates.length > 0 && dailyCandidates.length > 0, "fixture precondition: both sources present");
+
+  for (const c of mortgageCandidates) {
+    assert.match(c.id, /^exp-hist-mortgage-(2023|2024)-\d{4}$/);
+    assert.ok(!c.id.startsWith(importer.ID_PREFIX + c.year + "-"), "must not collide with the Daily-tab shape for its own year");
+  }
+  for (const c of dailyCandidates) {
+    assert.match(c.id, /^exp-hist-\d{4}-\d{4}$/, "Daily-tab rows keep the original shape, untouched");
+  }
+  // Never interleaved: each namespace numbers its own rows from 1, independent of
+  // how many rows the OTHER source contributed for the same year.
+  const mortgage2023Ids = mortgageCandidates.filter((c) => c.year === 2023).map((c) => c.id).sort();
+  assert.equal(mortgage2023Ids[0], "exp-hist-mortgage-2023-0001");
+});
+
+test("AC-4: 062's own 2022 mortgage rows keep minting under the OLD shared prefix and combined counter, unchanged", () => {
+  const dailyRows = extract(defectsGrid(), { years: [2022] }).rows;
+  const mortgageRows = extractMortgageRows(houseGrid(), { years: [2022] }).rows;
+  const plan = planImport([...dailyRows, ...mortgageRows], { years: [2022] });
+  const mortgageCandidates = plan.candidates.filter((c) => c.source === "mortgage");
+  assert.ok(mortgageCandidates.length > 0);
+  for (const c of mortgageCandidates) {
+    assert.match(c.id, /^exp-hist-2022-\d{4}$/, "2022 mortgage rows are NOT renamespaced by this entity's fix");
+    assert.ok(!c.id.startsWith(importer.MORTGAGE_ID_PREFIX));
+  }
+});
+
+test("AC-4 falsified: reverting to a single shared ID_PREFIX and combined per-year counter collides with 061's live 2023 ids", () => {
+  const reverted = loadPatched("import-historical-expenses.js", [
+    [
+      `  const counters = new Map();
+  const mortgageCounters = new Map();
+  const candidates = included.map((row) => {
+    const useMortgageNamespace = row.source === "mortgage" && MORTGAGE_ID_YEARS.has(row.year);
+    const map = useMortgageNamespace ? mortgageCounters : counters;
+    const next = (map.get(row.year) ?? 0) + 1;
+    map.set(row.year, next);
+    const id = useMortgageNamespace ? mortgageHistoricalId(row.year, next) : historicalId(row.year, next);
+    return {
+      ...row,
+      id,
+      notes: buildNotes(row),
+      createdAt: createdAtFor(row.date, row.key),
+      amountMinor: minorUnits(row.amount),
+    };
+  });`,
+      `  const counters = new Map();
+  const candidates = included.map((row) => {
+    const next = (counters.get(row.year) ?? 0) + 1;
+    counters.set(row.year, next);
+    return {
+      ...row,
+      id: historicalId(row.year, next),
+      notes: buildNotes(row),
+      createdAt: createdAtFor(row.date, row.key),
+      amountMinor: minorUnits(row.amount),
+    };
+  });`,
+    ],
+  ]);
+
+  const mortgageRows = extractMortgageRows(houseGrid(), { years: [2023, 2024] }).rows;
+  // A mortgage key sorts lexicographically BEFORE every Daily-tab key for its year
+  // ("m" < "r"), so under a combined counter the mortgage rows claim the low ids —
+  // exactly the ones 061's own 895 live 2023 rows already occupy on production.
+  const plan = reverted.planImport(mortgageRows.filter((r) => r.year === "2023"));
+  assert.equal(plan.candidates[0].id, "exp-hist-2023-0001", "the reverted code mints an id that collides with a real, already-live production row");
+});
+
+// ---------------------------------------------------------------------------
+
 
 // ---------------------------------------------------------------------------
 // AC-13 (062) — the House-tab credential-access check
@@ -1264,6 +1545,152 @@ test("AC-2/AC-9/AC-10 (062): a combined sheet applies both sources in one run, M
   assert.equal(second.skipped, world.dailyRows.length + world.mortgageRows.length);
 });
 
+// ---------------------------------------------------------------------------
+// AC-1 / AC-4 / AC-5 / AC-8 / AC-9 / AC-10 (064) — a 2023/2024 mortgage-only
+// sheet, end to end: apply clean, verify, idempotent re-apply, mortgage-only undo
+// ---------------------------------------------------------------------------
+
+function makeMortgageOnlyWorld() {
+  const mortgageRows = extractMortgageRows(houseGrid(), { years: [2023, 2024] }).rows;
+  const sheet = normalizationTab({ rows: mortgageRows });
+
+  const withMortgage = (cats) => [
+    ...cats,
+    ["cat_099", "Mortgage", "房貸", "🏠", "99", "true", "housing", ""],
+  ];
+  const staging = makeSheets({
+    Expenses: { header: EXPENSES_HEADER, rows: PRE_EXISTING.map((r) => r.slice()) },
+    Categories: { header: CATEGORIES_HEADER, rows: withMortgage(STAGING_CATEGORIES).map((r) => r.slice()) },
+    [NORMALIZATION_TAB]: { header: sheet.header, rows: sheet.rows },
+    House: { header: [], rows: [] },
+  });
+  return {
+    staging,
+    mortgageRows,
+    digest: sheet.digest,
+    sheetsFor: async () => staging.sheets,
+  };
+}
+
+test("AC-1/AC-4/AC-5/AC-8/AC-9/AC-10 (064): a 2023/2024 mortgage-only sheet applies clean, verifies, is idempotent, and its own --mortgage-only undo removes exactly its rows", async () => {
+  const world = makeMortgageOnlyWorld();
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+
+  await importRun(world, ["--snapshot", ...base]);
+  const applied = await importRun(world, ["--apply", ...base]);
+  assert.equal(applied.created, world.mortgageRows.length);
+
+  const { result } = await importRun(world, ["--verify", ...base]);
+  assert.equal(result.passed, true, JSON.stringify(result.findings));
+  assert.equal(result.importedCount, world.mortgageRows.length);
+  assert.equal(result.categoriesBefore, result.categoriesAfter, "AC-9: no category was created");
+  // AC-1: nothing pre-existing was altered or deleted.
+  assert.equal(result.snapshotDiff.preExistingModified.length, 0);
+  assert.equal(result.snapshotDiff.preExistingDeleted.length, 0);
+  assert.equal(result.snapshotDiff.importedAdded.length, world.mortgageRows.length);
+
+  const imported = world.staging.grids.Expenses.slice(1).filter((r) => r[0].startsWith(importer.ID_PREFIX));
+  assert.equal(imported.length, world.mortgageRows.length);
+  for (const row of imported) {
+    assert.match(row[0], /^exp-hist-mortgage-(2023|2024)-\d{4}$/, "AC-4: every written id carries the mortgage namespace");
+    assert.equal(row[3], "cat_099", "AC-9: resolves against the target's own live Categories tab");
+    const parsed = parseNotes(row[6]);
+    assert.ok(parsed, `AC-10: notes must parse: ${row[6]}`);
+    assert.equal(parsed.sourceTab, "House");
+  }
+
+  // AC-8: a second apply writes nothing for this run's rows.
+  const second = await importRun(world, ["--apply", ...base]);
+  assert.equal(second.created, 0);
+  assert.equal(second.skipped, world.mortgageRows.length);
+
+  // AC-5: this run's own --mortgage-only undo removes exactly its rows and leaves
+  // the pre-existing household rows untouched.
+  await importRun(world, [
+    "--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--undo", "--years", "2023,2024", "--mortgage-only",
+  ]);
+  assert.deepEqual(expenseIds(world.staging), PRE_EXISTING.map((r) => r[0]), "staging restored to its pre-existing rows");
+});
+
+// ---------------------------------------------------------------------------
+// verifyAgainst scoping (cycle 3) — verify cycle 2's live-found gap: `imported`
+// must be scoped to THIS run's own id-prefix(es), not the blanket module-level
+// ID_PREFIX, or a foreign entity's already-live rows sharing the general
+// exp-hist- family produce false AC-2/AC-10 findings the moment they're in scope.
+// ---------------------------------------------------------------------------
+
+test("AC-2/AC-10 (064 cycle 3): --verify does not mistake a foreign 061-shaped row already on the target for one of this run's own", async () => {
+  const world = makeMortgageOnlyWorld();
+  // Stands in for one of 061's real, already-live 2023 Daily-tab rows: present on
+  // the target before this run's own snapshot, sharing the general exp-hist-
+  // family and a parseable four-field notes shape (so it would also pass AC-10's
+  // provenance parse, exactly as verify cycle 2 found), but its key is not part of
+  // this run's own 25-row mortgage-only approved sheet. Live-reproduced on staging
+  // via --rehearse in this file's own cycle-2 verify stage report.
+  world.staging.grids.Expenses.push([
+    "exp-hist-2023-9998", "2023-06-01", "500", "cat_003", "ijac", "ijac",
+    "食 | 食材 | 超市 | 牛奶 | key=2023-r9998-decoy", "2023-06-01T00:00:00.000Z", "2023-06", "500",
+  ]);
+
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+  await importRun(world, ["--snapshot", ...base]);
+  const applied = await importRun(world, ["--apply", ...base]);
+  assert.equal(applied.created, world.mortgageRows.length);
+
+  const { result } = await importRun(world, ["--verify", ...base]);
+  assert.equal(result.passed, true, JSON.stringify(result.findings));
+  assert.equal(
+    result.importedCount, world.mortgageRows.length,
+    "the foreign decoy must not be counted among this run's own imported rows"
+  );
+});
+
+test("AC-2 falsified (064 cycle 3): reverting to the blanket ID_PREFIX reproduces cycle 2's exact live-found false positives", async () => {
+  const unscoped = loadPatched("import-historical-expenses.js", [
+    [
+      "const imported = rows.filter((r) => ownPrefixes.some((p) => r.id.startsWith(p)));",
+      "const imported = rows.filter((r) => r.id.startsWith(ID_PREFIX));",
+    ],
+  ]);
+
+  const world = makeMortgageOnlyWorld();
+  world.staging.grids.Expenses.push([
+    "exp-hist-2023-9998", "2023-06-01", "500", "cat_003", "ijac", "ijac",
+    "食 | 食材 | 超市 | 牛奶 | key=2023-r9998-decoy", "2023-06-01T00:00:00.000Z", "2023-06", "500",
+  ]);
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+  const opts = { log: silent, env: STUB_ENV, sheetsFor: world.sheetsFor, now: () => new Date("2026-08-31T12:00:00.000Z") };
+
+  await unscoped.run(["--snapshot", ...base], opts);
+  await unscoped.run(["--apply", ...base], opts);
+  await assert.rejects(
+    unscoped.run(["--verify", ...base], opts),
+    (err) => /Verification failed/.test(err.message),
+    "the reverted code must reproduce cycle 2's exact live finding: a foreign decoy counted as this run's own"
+  );
+});
+
+test("AC-2 regression (064 cycle 3): --verify still catches a genuinely missing candidate of this run's own", async () => {
+  const world = makeMortgageOnlyWorld();
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+
+  await importRun(world, ["--snapshot", ...base]);
+  await importRun(world, ["--apply", ...base]);
+
+  // One of this run's own candidates never lands on the target — e.g. a batch write
+  // that silently dropped a row. The narrower scope must still catch this: it is
+  // not merely "not everything matching ID_PREFIX", it is "everything this run's
+  // own approved sheet actually promised" (AC-2's missing-row check).
+  const idx = world.staging.grids.Expenses.findIndex((r) => r[0].startsWith("exp-hist-mortgage-"));
+  assert.ok(idx > -1, "sanity: at least one mortgage row must be present to remove");
+  world.staging.grids.Expenses.splice(idx, 1);
+
+  await assert.rejects(
+    importRun(world, ["--verify", ...base]),
+    (err) => /Verification failed/.test(err.message)
+  );
+});
+
 test("AC-5: a second apply against the same target writes nothing", async () => {
   const world = makeWorld();
   const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
@@ -1355,14 +1782,21 @@ test("AC-4c: verify catches a date hand-edited outside 2023-2024, which the extr
     0
   );
 
+  // `imported` is now scoped to THIS run's own id-prefix(es) (cycle 3's fix, this
+  // file), derived from `plan.candidates` — so the smuggled row must carry an id
+  // whose year IS one of this run's own candidates (2024), not an entirely foreign
+  // year (2022) a real run would never claim. The mismatch AC-4c actually defends
+  // against is an id that looks like this run's own next to a date that isn't —
+  // e.g. the underlying Expenses row hand-edited directly, after apply, in a way
+  // the normalization-sheet-level exclusion above cannot see.
   const smuggled = verifyAgainst({
     expenses: [
       EXPENSES_HEADER,
-      ["exp-hist-2022-0001", "2022-01-01", "5", "cat_003", "h", "h", "食 | 食材 |  | key=2022-rX-cA", "x"],
+      ["exp-hist-2024-0003", "2022-01-01", "5", "cat_003", "h", "h", "食 | 食材 |  | key=2024-r3-cH", "x"],
     ],
     map: require("../lib/sheetSchema").buildColumnMap([EXPENSES_HEADER], require("../lib/sheetSchema").EXPENSES_SPEC),
-    approved: [{ key: "2022-rX-cA", status: "include", date: "2022-01-01", amount: "5" }],
-    plan: { candidates: [], perYear: {}, sheetRowCount: 1 },
+    approved: [{ key: "2024-r3-cH", status: "include", date: "2024-03-15", amount: "5" }],
+    plan: { candidates: [{ id: "exp-hist-2024-0003", key: "2024-r3-cH" }], perYear: { 2024: { totalMinor: 500 } }, sheetRowCount: 1 },
     categories: { live: STAGING_CATEGORIES.map((r) => ({ id: r[0], name_en: r[1] })), countBefore: null },
     snapshot: null,
   });
@@ -1456,7 +1890,10 @@ test("AC-8 falsified: the unscoped module-level ID_PREFIX deletes 061's live 202
   // ignoring --years (and the run-scoped prefixes it now builds) entirely.
   const unscoped = loadPatched("import-historical-expenses.js", [
     [
-      `    const result = await deleteRowsByIdPrefix(writeSheets, targets.write.spreadsheetId, scopedPrefixesForYears(args.years), log);`,
+      `    const prefixes = args.mortgageOnly
+      ? scopedMortgagePrefixesForYears(args.years)
+      : scopedPrefixesForYears(args.years);
+    const result = await deleteRowsByIdPrefix(writeSheets, targets.write.spreadsheetId, prefixes, log);`,
       `    const result = await deleteRowsByIdPrefix(writeSheets, targets.write.spreadsheetId, ID_PREFIX, log);`,
     ],
   ]);
@@ -1476,6 +1913,51 @@ test("AC-8 falsified: the unscoped module-level ID_PREFIX deletes 061's live 202
   assert.ok(!afterFixed.includes("exp-hist-2022-0001"), "this run's own 2022 row is removed");
   assert.ok(afterFixed.includes("exp-hist-2023-0001"), "061's 2023 row survives, unscoped by year 2022");
   assert.ok(afterFixed.includes("exp-hist-2024-0001"), "061's 2024 row survives, unscoped by year 2022");
+});
+
+// ---------------------------------------------------------------------------
+// AC-5 (064) — --undo --mortgage-only, scoped to exp-hist-mortgage-{year}- only
+// ---------------------------------------------------------------------------
+
+function worldWithMixedHistoricalAndMortgageRows() {
+  const world = makeWorld();
+  world.staging.grids.Expenses.push(
+    ["exp-hist-2023-0001", "2023-01-01", "10", "cat_003", "ijac", "ijac", "061's Daily row | key=2023-r1-cH", "2023-01-01T00:00:00.000Z", "", ""],
+    ["exp-hist-2024-0001", "2024-01-01", "10", "cat_003", "ijac", "ijac", "061's Daily row | key=2024-r1-cH", "2024-01-01T00:00:00.000Z", "", ""],
+    ["exp-hist-2022-0001", "2022-01-01", "10", "cat_003", "ijac", "ijac", "062's 2022 mortgage row | key=2022-mortgage-r7", "2022-01-01T00:00:00.000Z", "", ""],
+    ["exp-hist-mortgage-2023-0001", "2023-01-15", "20", "cat_003", "ijac", "ijac", "064's own row | key=2023-mortgage-r19", "2023-01-15T00:00:00.000Z", "", ""],
+    ["exp-hist-mortgage-2024-0001", "2024-01-15", "20", "cat_003", "ijac", "ijac", "064's own row | key=2024-mortgage-r31", "2024-01-15T00:00:00.000Z", "", ""],
+  );
+  return world;
+}
+
+test("AC-5: --undo --mortgage-only removes only exp-hist-mortgage-{year}- rows, leaving 061's Daily rows and 062's 2022 mortgage row untouched", async () => {
+  const world = worldWithMixedHistoricalAndMortgageRows();
+  await importRun(world, [
+    "--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--undo", "--years", "2023,2024", "--mortgage-only",
+  ]);
+  const remaining = expenseIds(world.staging);
+  assert.ok(!remaining.includes("exp-hist-mortgage-2023-0001"), "this run's own 2023 mortgage row is removed");
+  assert.ok(!remaining.includes("exp-hist-mortgage-2024-0001"), "this run's own 2024 mortgage row is removed");
+  assert.ok(remaining.includes("exp-hist-2023-0001"), "061's 2023 Daily row survives");
+  assert.ok(remaining.includes("exp-hist-2024-0001"), "061's 2024 Daily row survives");
+  assert.ok(remaining.includes("exp-hist-2022-0001"), "062's 2022 mortgage row survives — different year, different id shape");
+});
+
+test("AC-5 falsified: forgetting --mortgage-only deletes 061's live Daily rows instead of this run's own mortgage rows", async () => {
+  const world = worldWithMixedHistoricalAndMortgageRows();
+  await importRun(world, [
+    "--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--undo", "--years", "2023,2024",
+    // no --mortgage-only: falls back to the ORIGINAL exp-hist-{year}- prefix, the
+    // mistake this AC's falsifier names.
+  ]);
+  const remaining = expenseIds(world.staging);
+  assert.ok(!remaining.includes("exp-hist-2023-0001"), "the year-only prefix wrongly matches 061's Daily row (exp-hist-2023-...)");
+  assert.ok(!remaining.includes("exp-hist-2024-0001"), "same for 061's 2024 Daily row");
+  assert.ok(
+    remaining.includes("exp-hist-mortgage-2023-0001") && remaining.includes("exp-hist-mortgage-2024-0001"),
+    "and this run's OWN mortgage rows are left behind — the prefix doesn't even reach them, so nothing was actually undone"
+  );
 });
 
 test("--undo has no default years, and refuses rather than guess a scope", async () => {

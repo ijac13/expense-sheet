@@ -11,6 +11,11 @@
  *       --target staging --from-sheet "Migration 2023-2024" --dry-run
  *   ... --snapshot | --apply | --verify | --undo | --rehearse
  *
+ * `--undo` always needs --years too (AC-8); add --mortgage-only (entity 064) to
+ * scope it to `exp-hist-mortgage-{year}-` instead of `exp-hist-{year}-`, so this
+ * entity's own undo cannot reach 061's Daily-tab rows for the same years:
+ *   ... --undo --years 2023,2024 --mortgage-only
+ *
  * Neither flag has a default, and that is deliberate twice over. `load-local-env.js`
  * resolves a `SPREADSHEET_ID` that today is PRODUCTION's, so a defaulted target
  * writes live financial data (AC-12); and a defaulted sheet name would let a
@@ -61,6 +66,21 @@ const {
 
 /** Every row this feature writes carries this prefix. Undo matches on it and only it. */
 const ID_PREFIX = "exp-hist-";
+
+/**
+ * Entity `064` — a distinct id namespace for 2023/2024 mortgage rows, collision-free
+ * by construction against any target's already-live ids (AC-4). `MORTGAGE_ID_PREFIX`
+ * is a superstring of `ID_PREFIX`, so every existing `id.startsWith(ID_PREFIX)` check
+ * (AC-1's snapshot diff, AC-2/AC-10's provenance scan) still classifies these rows as
+ * historical without modification — only the year-scoped counter below is new.
+ *
+ * Gated to exactly 2023 and 2024: `062`'s already-shipped 2022 mortgage rows keep
+ * minting under the OLD shared `ID_PREFIX` / combined per-year counter, unchanged,
+ * because no run this entity makes ever requests year 2022 (out of scope) and
+ * changing how an already-imported row's id is computed is not this entity's to do.
+ */
+const MORTGAGE_ID_PREFIX = "exp-hist-mortgage-";
+const MORTGAGE_ID_YEARS = new Set([2023, 2024]);
 
 const WRITE_BATCH_SIZE = 50;
 
@@ -152,6 +172,11 @@ function historicalId(year, indexWithinYear) {
   return `${ID_PREFIX}${year}-${String(indexWithinYear).padStart(4, "0")}`;
 }
 
+/** `exp-hist-mortgage-{year}-{NNNN}` — see `MORTGAGE_ID_PREFIX` above. */
+function mortgageHistoricalId(year, indexWithinYear) {
+  return `${MORTGAGE_ID_PREFIX}${year}-${String(indexWithinYear).padStart(4, "0")}`;
+}
+
 /**
  * `notes` for an imported row: four provenance fields plus the item name when the
  * source carried one.
@@ -167,11 +192,20 @@ function historicalId(year, indexWithinYear) {
  * sub-category / detail at all, so its provenance names the source tab and the
  * House-tab row instead: `House tab row {sourceRow} | key={key}`. Two segments
  * rather than four-or-five, which is what `parseNotes` below keys its branch on.
+ *
+ * Entity 064 — a mortgage row's KEY carries its own payment kind (a plain
+ * `-r{N}` suffix for the regular J payment, a `-prepay-r{N}` suffix for the K
+ * prepayment), so the same regex that finds the source row also finds the kind.
+ * A regular row's rendered text is untouched from 062's own shape — only a
+ * prepayment row gains the `(prepayment)` marker — so 062's already-written 2022
+ * notes and its own AC-10 test format need no change (AC-10).
  */
 function buildNotes(row) {
   if (row.source === "mortgage") {
-    const m = /-mortgage-r(\d+)$/.exec(row.key ?? "");
-    return `House tab row ${m ? m[1] : ""} | key=${row.key}`;
+    const m = /-mortgage-(prepay-)?r(\d+)$/.exec(row.key ?? "");
+    const sourceRow = m ? m[2] : "";
+    const kindSuffix = m?.[1] ? " (prepayment)" : "";
+    return `House tab row ${sourceRow}${kindSuffix} | key=${row.key}`;
   }
   const parts = [row.bucket ?? "", row.sub_category ?? "", row.detail ?? ""];
   if (text(row.item_name) !== "") parts.push(text(row.item_name));
@@ -185,8 +219,8 @@ function parseNotes(notes) {
   if (!last.startsWith("key=")) return null;
   const key = last.slice("key=".length);
   if (parts.length === 2) {
-    const m = /^House tab row (\d*)$/.exec(parts[0]);
-    if (m) return { sourceTab: "House", sourceRow: m[1], key };
+    const m = /^House tab row (\d*)(?: \((prepayment)\))?$/.exec(parts[0]);
+    if (m) return { sourceTab: "House", sourceRow: m[1], paymentKind: m[2] ?? "regular", key };
   }
   if (parts.length < 4) return null;
   return {
@@ -265,13 +299,21 @@ function planImport(sheetRows, { years = IN_SCOPE_YEARS } = {}) {
   // Sorted by key so the ids do not depend on the tab's row order.
   included.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 
+  // Two independent counters, both keyed by year: the original one (every
+  // Daily-tab row, plus 062's own 2022 mortgage rows, unchanged) and a mortgage-only
+  // one gated to 2023/2024 (AC-4) — never interleaved with each other, so neither
+  // can renumber or collide with ids the other assigns.
   const counters = new Map();
+  const mortgageCounters = new Map();
   const candidates = included.map((row) => {
-    const next = (counters.get(row.year) ?? 0) + 1;
-    counters.set(row.year, next);
+    const useMortgageNamespace = row.source === "mortgage" && MORTGAGE_ID_YEARS.has(row.year);
+    const map = useMortgageNamespace ? mortgageCounters : counters;
+    const next = (map.get(row.year) ?? 0) + 1;
+    map.set(row.year, next);
+    const id = useMortgageNamespace ? mortgageHistoricalId(row.year, next) : historicalId(row.year, next);
     return {
       ...row,
-      id: historicalId(row.year, next),
+      id,
       notes: buildNotes(row),
       createdAt: createdAtFor(row.date, row.key),
       amountMinor: minorUnits(row.amount),
@@ -492,6 +534,16 @@ function scopedPrefixesForYears(years) {
   return years.map((y) => `${ID_PREFIX}${y}-`);
 }
 
+/**
+ * Entity 064 — the mortgage-only counterpart: `[2023, 2024]` ->
+ * `["exp-hist-mortgage-2023-", "exp-hist-mortgage-2024-"]`. Used by `--undo
+ * --mortgage-only` so this entity's own standalone undo can remove exactly its own
+ * rows without matching 061's `exp-hist-{year}-` Daily-tab prefix (AC-5).
+ */
+function scopedMortgagePrefixesForYears(years) {
+  return years.map((y) => `${MORTGAGE_ID_PREFIX}${y}-`);
+}
+
 // ---------------------------------------------------------------------------
 // Phases
 // ---------------------------------------------------------------------------
@@ -615,7 +667,16 @@ function verifyAgainst({ expenses, map, approved, plan, categories, snapshot, ye
     category_id: String(cell(row, map, "category_id") ?? ""),
     notes: String(cell(row, map, "notes") ?? ""),
   }));
-  const imported = rows.filter((r) => r.id.startsWith(ID_PREFIX));
+  // Scoped to THIS run's own id-prefix(es), derived from `plan.candidates` the same
+  // way `--rehearse`'s own undo step already does (`:1109`) — not the blanket
+  // module-level `ID_PREFIX`, which also matches another entity's already-live rows
+  // sharing the same general `exp-hist-` family (e.g. `061`'s Daily-tab rows, when
+  // this run's own approved sheet is a strict subset of what the target already
+  // holds, as `064`'s mortgage-only sheet is). Matching those foreign rows fed false
+  // AC-2 orphan/duplicate/per-year-sum findings and false AC-10 provenance findings
+  // for rows this run never wrote and has no business tracing.
+  const ownPrefixes = [...new Set(plan.candidates.map((c) => c.id.replace(/\d{4}$/, "")))];
+  const imported = rows.filter((r) => ownPrefixes.some((p) => r.id.startsWith(p)));
 
   const findings = [];
   const fail = (label, detail) => findings.push({ label, detail });
@@ -735,6 +796,10 @@ function parseArgs(argv) {
     // `--undo` runs without ever reading the approved sheet, so there is no other
     // source of truth for what this run's own rows are.
     years: yearsRaw ? yearsRaw.split(",").map((y) => Number(y.trim())) : null,
+    // Entity 064 — `--undo --mortgage-only` targets `exp-hist-mortgage-{year}-`
+    // instead of `exp-hist-{year}-`, so this entity's own undo cannot reach 061's
+    // Daily-tab rows for the same years (AC-5).
+    mortgageOnly: argv.includes("--mortgage-only"),
   };
 }
 
@@ -808,7 +873,10 @@ async function run(argv, { log = console.log, env = process.env, sheetsFor = she
         "would delete every historical row in the tab, including another entity's already-live rows."
       );
     }
-    const result = await deleteRowsByIdPrefix(writeSheets, targets.write.spreadsheetId, scopedPrefixesForYears(args.years), log);
+    const prefixes = args.mortgageOnly
+      ? scopedMortgagePrefixesForYears(args.years)
+      : scopedPrefixesForYears(args.years);
+    const result = await deleteRowsByIdPrefix(writeSheets, targets.write.spreadsheetId, prefixes, log);
     return { phase, ...result };
   }
 
@@ -1041,11 +1109,13 @@ async function rehearse({ args, targets, writeSheets, approvedSheet, plan, rows,
   await insertRowsAtTop(writeSheets, spreadsheetId, EXPENSES_SPEC.tab, [handAddRow]);
   record("hand-add", `${handAddId} dated 2024-06-15, inside an imported year`);
 
-  // 5. undo — scoped to exactly the years THIS approved sheet's candidates cover,
-  // derived from the plan itself rather than a flag, so it cannot drift from what
-  // was actually written in step 2 (AC-8).
-  const runYears = [...new Set(plan.candidates.map((c) => c.year))];
-  const undoPrefixes = scopedPrefixesForYears(runYears);
+  // 5. undo — scoped to exactly the id prefix(es) THIS approved sheet's candidates
+  // actually minted, derived from each candidate's own id rather than from years or
+  // a flag, so it cannot drift from what was actually written in step 2 (AC-8). A
+  // combined Daily+mortgage sheet (or, for 064, a 2023/2024-mortgage-only one)
+  // yields exactly the prefix(es) it used, whichever id namespace each row's source
+  // and year resolved to.
+  const undoPrefixes = [...new Set(plan.candidates.map((c) => c.id.replace(/\d{4}$/, "")))];
   const undoResult = await deleteRowsByIdPrefix(writeSheets, spreadsheetId, undoPrefixes, log);
   record("undo", `${undoResult.removed} row(s) removed, scoped to [${undoPrefixes.join(", ")}]`);
 
@@ -1111,6 +1181,8 @@ if (require.main === module) {
 
 module.exports = {
   ID_PREFIX,
+  MORTGAGE_ID_PREFIX,
+  MORTGAGE_ID_YEARS,
   HISTORICAL_ACTOR_ID,
   LEGACY_USER_NAMES,
   historicalActorName,
@@ -1120,6 +1192,7 @@ module.exports = {
   ImportError,
   PartialWriteError,
   historicalId,
+  mortgageHistoricalId,
   buildNotes,
   parseNotes,
   createdAtFor,
@@ -1139,6 +1212,7 @@ module.exports = {
   verifyAgainst,
   deleteRowsByIdPrefix,
   scopedPrefixesForYears,
+  scopedMortgagePrefixesForYears,
   insertRowsAtTop,
   parseArgs,
   defaultSnapshotPath,

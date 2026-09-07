@@ -29,13 +29,15 @@ const ARCHIVE_TAB = "Daily";
  * Entity 062 — the captain's mortgage schedule, `Coast FIRE_ijac.wei`.
  *
  * Unlike the archive workbook, both the staging AND production service accounts
- * read this one (confirmed live). `HOUSE_RANGE` is bounded to D5:J255 deliberately
+ * read this one (confirmed live). `HOUSE_RANGE` is bounded to D5:K255 deliberately
  * (AC-6): columns A-C of this tab hold a bank name, branch, account number and an
- * account-holder personal name in one cell, and no script may request them.
+ * account-holder personal name in one cell, and no script may request them. Entity
+ * `064` widened this from D5:J255 to include column K (`先還本金`, the principal
+ * prepayment) — still never touching A-C.
  */
 const HOUSE_SPREADSHEET_ID = "1oUCppCwkfw2BMG8gZwxb13Vq8KVXBQFrVoS57ZH9h6E";
 const HOUSE_TAB = "House";
-const HOUSE_RANGE = "D5:J255";
+const HOUSE_RANGE = "D5:K255";
 
 const VALID_TARGETS = ["staging", "production"];
 
