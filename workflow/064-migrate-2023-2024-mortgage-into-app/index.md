@@ -1,7 +1,7 @@
 ---
 id: 064
 title: Migrate 2023–2024 Mortgage Payments Into The App
-status: build
+status: verify
 source: captain
 started: 2026-09-07T00:38:44Z
 completed:
