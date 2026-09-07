@@ -9,7 +9,7 @@ verdict: REJECTED
 score:
 worktree: .worktrees/spacedock-ensign-064-migrate-2023-2024-mortgage-into-app
 issue:
-pr: "#34"
+pr: pr-merge:34
 mod-block: merge:pr-merge
 gates:
     version: 1
