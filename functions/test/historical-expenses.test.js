@@ -1455,6 +1455,73 @@ test("AC-2/AC-9/AC-10 (062): a combined sheet applies both sources in one run, M
   assert.equal(second.skipped, world.dailyRows.length + world.mortgageRows.length);
 });
 
+// ---------------------------------------------------------------------------
+// AC-1 / AC-4 / AC-5 / AC-8 / AC-9 / AC-10 (064) — a 2023/2024 mortgage-only
+// sheet, end to end: apply clean, verify, idempotent re-apply, mortgage-only undo
+// ---------------------------------------------------------------------------
+
+function makeMortgageOnlyWorld() {
+  const mortgageRows = extractMortgageRows(houseGrid(), { years: [2023, 2024] }).rows;
+  const sheet = normalizationTab({ rows: mortgageRows });
+
+  const withMortgage = (cats) => [
+    ...cats,
+    ["cat_099", "Mortgage", "房貸", "🏠", "99", "true", "housing", ""],
+  ];
+  const staging = makeSheets({
+    Expenses: { header: EXPENSES_HEADER, rows: PRE_EXISTING.map((r) => r.slice()) },
+    Categories: { header: CATEGORIES_HEADER, rows: withMortgage(STAGING_CATEGORIES).map((r) => r.slice()) },
+    [NORMALIZATION_TAB]: { header: sheet.header, rows: sheet.rows },
+    House: { header: [], rows: [] },
+  });
+  return {
+    staging,
+    mortgageRows,
+    digest: sheet.digest,
+    sheetsFor: async () => staging.sheets,
+  };
+}
+
+test("AC-1/AC-4/AC-5/AC-8/AC-9/AC-10 (064): a 2023/2024 mortgage-only sheet applies clean, verifies, is idempotent, and its own --mortgage-only undo removes exactly its rows", async () => {
+  const world = makeMortgageOnlyWorld();
+  const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
+
+  await importRun(world, ["--snapshot", ...base]);
+  const applied = await importRun(world, ["--apply", ...base]);
+  assert.equal(applied.created, world.mortgageRows.length);
+
+  const { result } = await importRun(world, ["--verify", ...base]);
+  assert.equal(result.passed, true, JSON.stringify(result.findings));
+  assert.equal(result.importedCount, world.mortgageRows.length);
+  assert.equal(result.categoriesBefore, result.categoriesAfter, "AC-9: no category was created");
+  // AC-1: nothing pre-existing was altered or deleted.
+  assert.equal(result.snapshotDiff.preExistingModified.length, 0);
+  assert.equal(result.snapshotDiff.preExistingDeleted.length, 0);
+  assert.equal(result.snapshotDiff.importedAdded.length, world.mortgageRows.length);
+
+  const imported = world.staging.grids.Expenses.slice(1).filter((r) => r[0].startsWith(importer.ID_PREFIX));
+  assert.equal(imported.length, world.mortgageRows.length);
+  for (const row of imported) {
+    assert.match(row[0], /^exp-hist-mortgage-(2023|2024)-\d{4}$/, "AC-4: every written id carries the mortgage namespace");
+    assert.equal(row[3], "cat_099", "AC-9: resolves against the target's own live Categories tab");
+    const parsed = parseNotes(row[6]);
+    assert.ok(parsed, `AC-10: notes must parse: ${row[6]}`);
+    assert.equal(parsed.sourceTab, "House");
+  }
+
+  // AC-8: a second apply writes nothing for this run's rows.
+  const second = await importRun(world, ["--apply", ...base]);
+  assert.equal(second.created, 0);
+  assert.equal(second.skipped, world.mortgageRows.length);
+
+  // AC-5: this run's own --mortgage-only undo removes exactly its rows and leaves
+  // the pre-existing household rows untouched.
+  await importRun(world, [
+    "--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--undo", "--years", "2023,2024", "--mortgage-only",
+  ]);
+  assert.deepEqual(expenseIds(world.staging), PRE_EXISTING.map((r) => r[0]), "staging restored to its pre-existing rows");
+});
+
 test("AC-5: a second apply against the same target writes nothing", async () => {
   const world = makeWorld();
   const base = ["--target", "staging", "--from-sheet", NORMALIZATION_TAB, "--snapshot-file", tmpFile("s.json")];
