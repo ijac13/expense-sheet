@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:064:verify:attempt-1:revision-1",
+  "question": "Cycle 2's finding is fixed and independently confirmed live at the exact defect surface (a decoy seeded under 061's real id shape, full rehearse cycle passing where it threw before); AC-1 through AC-12 all have concrete evidence; offline suite is 301/301; PII/secrets and staging liveness are clean. AC-13 needs your review and approval of a live, unapproved 25-row mortgage-only sheet on staging before it can be applied and checked in Reports, and AC-14 needs your own click-through. Ready to do your review and drive, or does anything here need to change first?",
+  "artifacts": [
+    {
+      "id": "artifact:064:verify:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/6b3b6d469a4b5d8d7acc8edf7e2ead95bd8bb027/workflow/064-migrate-2023-2024-mortgage-into-app/index.md",
+      "rev": "sha256:698daf743f9c2bf1681433cce553f41b9304de0ed767504d2be60c9595279820",
+      "mediaType": "text/markdown",
+      "summary": "Verify cycle 3: no new defect. Cycle 2's verifyAgainst scoping fix is confirmed live at the exact scenario that broke it (staging decoy rehearsal: apply+verify+undo all correct, byte-identical restore). Cycle 3's own fix was independently falsified (hand-reverted, exactly 2 named tests went red, nothing else). Offline suite 301/301, PII/secrets sweep clean, staging live with no redeploy needed. AC-1-12 all have concrete evidence (several refreshed live this cycle). AC-13/AC-14 are captain-only: a fresh unapproved 25-row mortgage-only sheet (tab '064 verify cycle3 mortgage 2023-2024') is live on staging awaiting her review/APPROVED, with full manual-test steps given for both AC-13 (Reports Annual 2023/2024) and AC-14 (everyday add/see/delete, History)."
+    }
+  ]
+}
