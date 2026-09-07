@@ -249,3 +249,52 @@ Read `app/app/page.tsx`, `AuthGuard.tsx`, `authContext.tsx`, `categories.ts`, `c
 ### Summary
 
 Added a `getCachedCategories`/`saveCachedCategories` pair in `categories.ts` mirroring entity 058's `LAST_CATEGORY_KEY` pattern, wired `page.tsx` to seed first paint from that cache and refresh it on every successful fetch, and memoized `functions/src/index.ts`'s `getSheetsClient()` to a module-scope promise (clearing on rejection so a transient auth failure can't wedge a warm instance). No change was needed to Save's `disabled` gate — it already depended only on `categoriesReady`, which still only flips after a live fetch resolves, so AC-1 is a regression test rather than a code change. Full suites pass: `app` 211/211 (`npm test`), `functions` 303/303 (`npm test`); AC-7's tests were additionally confirmed non-tautological by reverting the fix and watching them fail. AC-8/AC-9 need a staging deploy and are left for the interactive verify stage.
+
+## Stage Report: verify
+
+**Verdict: AC-1 through AC-7 PASSED with live evidence. AC-8 and AC-9 cannot be self-checked by an ensign — the categories API is auth-gated (entity 055) and the home screen sits entirely behind Google Sign-In restricted to two captain emails (`AuthGuard.tsx`), so no agent-obtainable credential can drive either check. This is not a defect and does not route to build; both need one live pass from the captain (steps below).**
+
+- DONE: Deploy the build branch to staging (functions + hosting) and verify AC-1 through AC-9 with live evidence
+  Deployed `spacedock-ensign/063-home-page-slow-load-stale-categories` to `expense-sheet-staging` in two separate steps (the known combined-deploy trap from entities 055/058: a combined command can report success while leaving hosting on stale code) — `firebase deploy --only functions --project staging` updated both `api` and `subscriptionScheduler`; `firebase deploy --only hosting --project staging` → "release complete". AC-1 through AC-7: re-ran `npm ci` fresh in both `app/` and `functions/` (real reinstalls, no symlinks) and the full suites — app 211/211, functions 303/303 — then ran the two new test files in isolation and confirmed each of the 13 subtests is individually named after and asserts its AC (`app/test/category-list-cache.test.js`, `app/test/category-cache.render.test.js`), including that AC-5's check compares DOM node identity (`assert.equal(before1, after1)` on the actual tile elements) not just data equality. AC-7 falsifiability was independently re-verified in this stage, not just trusted from the build report: temporarily removed the `if (!sheetsClientPromise)` guard in `functions/src/index.ts`, rebuilt, and both `functions/test/sheetsClient.api.test.js` tests failed 2/2 (`2 !== 1`); restored the source, rebuilt, both passed again, `git status` clean throughout. AC-8/AC-9: see the two FAILED items below — blocked by the auth boundary, not by the code.
+- DONE: Confirm the deployed chunk hashes/build output on staging match what was actually built from this branch
+  Built `app/` with `app/.env.staging` (copied from the main checkout, see PII item below) via `npm run build`. `sha256(out/index.html)` == `sha256(curl https://expense-sheet-staging.web.app/)` — `12fe7e71…b1b82` on both sides. 5/5 sampled `_next/static/chunks/*.js` files byte-identical (sha256 match) between the local `out/` and what staging actually serves. Confirmed the new client code shipped: `expense_last_categories` (the new cache key) is present in served chunk `04bhce12abf6x.js`. `GET /api/categories` unauthenticated → `401 {"error":"unauthorized"}` and `OPTIONS` → `204`, proving the redeployed `api` function is live and the auth gate survived the redeploy.
+  Staging build must be scratch-built with staging config — a local `app/.env.staging`/`functions/.env.staging` copied in from the (gitignored) main checkout, plus `app/public/manifest.json` getting dirtied by the `prebuild` manifest swap. Both env files and `.env.local` were deleted and the manifest restored (`git checkout -- app/public/manifest.json`) before signaling completion; `git status` on this worktree is clean.
+- FAILED: AC-8 — live warm-instance timing comparison, before vs. after this deploy
+  Not obtainable by this agent: `GET /api/categories` returns 401 before ever reaching `getSheetsClient()` (`functions/src/index.ts:290-305`), so no unauthenticated timing measurement exercises the code AC-8 is about. Getting a real ID token for one of the two `AUTHORIZED_EMAILS` requires either a browser Google OAuth sign-in or an Admin-SDK lookup of that user's uid — the only service-account key available (`functions/.env.staging`) is Sheets-scoped with no Firebase Auth role (confirmed: this is the identical wall entity 055 hit and documented as unfixable without the captain). No credential-store workaround was attempted, and no identity was fabricated (a `createCustomToken` call with forged `email`/`email_verified` claims would produce a false PASS and was deliberately not used, matching entity 055's own refusal of that shortcut). Captain steps below.
+- FAILED: AC-9 — live confirmation of no visible category swap on a normal open
+  Same boundary as AC-8: the category grid renders only after `AuthGuard` clears Google Sign-In, and sign-in is restricted to two captain-owned emails this agent cannot authenticate as. A curl/token-forgery approach could not substitute — AC-9 is inherently a visual, human-observed rendering check, not an API response. Captain steps below.
+- DONE: Run the Mandatory PII/Secrets Check over the full branch diff
+  `git diff main...HEAD` touches 9 files, none of them `.env*`. Scanned the full diff for API-key shapes (`AIza…`), PEM key headers, `password`/`secret` assignments, bearer-token-shaped strings, email addresses, and internal Google Console/service-account/spreadsheet-id strings — zero hits on every pattern. The one shared-helper change (`functions/test/sheetsStub.js`) only exports an existing internal function (`installAuthStub`); no new fixture data. The two `.env.staging` files copied into the worktree to build/deploy (real staging credentials) were deleted before this report was written; `git status` is clean.
+
+### Summary
+
+Staging is running this exact branch: hosting and functions are both freshly deployed and independently confirmed byte-identical to the local build (index.html + 5 sampled JS chunks + the new cache-key string all match), and the backend's auth gate still works post-deploy (401/204 as expected). AC-1 through AC-7 pass on live-adjacent evidence — fresh dependency installs, full suites green, the two new test files' 13 subtests individually inspected against their AC claims, and AC-7's non-tautological falsifiability re-proven by this agent (not just cited from build). AC-8 and AC-9 are correctly not self-checked: both require a real Google sign-in as one of the two authorized captain emails, which is unobtainable by an ensign in this environment (verified identical to entity 055's documented finding, and no identity-fabrication shortcut was taken). Nothing here is a code defect — it is the same interactive boundary the spec itself scoped these two ACs behind.
+
+### What changed, in plain language
+
+**The category grid you see the instant the page opens now remembers your real categories from last time**, instead of always starting from a generic built-in list and then visibly swapping to your real one a moment later. The first time you ever use the app (or if your browser's storage is cleared), you'll still see the generic placeholder grid for a moment — that part hasn't changed. But every time after that, your device keeps its own private copy of your last-seen category list, and shows that immediately, so there's no more "flash of wrong categories."
+
+**The Save button's behavior hasn't changed at all** — it still only turns on once your real categories have loaded, which was already correct and stays that way on purpose.
+
+**On the backend, the server used to re-verify its own identity with Google on every single request**, even when it had just done that a second ago for someone else's request. Now it does that identity check once and reuses it for as long as the server stays "warm" (a few minutes of activity). This should make requests a little faster when the server is already warm — it does not and cannot make the very first request after a period of no use any faster (that slowness is a separate, known, and out-of-scope issue).
+
+### Staging URL and manual test steps for the captain
+
+**Staging:** https://expense-sheet-staging.web.app (shows an orange "Staging" banner so you always know which environment you're on — never the real data)
+
+**AC-8 — is a warm request actually faster now?**
+1. Open https://expense-sheet-b2db8.web.app (today's live production app) and sign in normally.
+2. Open your browser's developer tools (right-click anywhere on the page → "Inspect", then click the "Network" tab across the top of the panel that opens).
+3. Reload the page twice in a row (this "warms up" the server, same as normal daily use).
+4. Reload one more time. In the Network tab's list, find the row named `categories` and note the number in its "Time" column (in milliseconds).
+5. Now open https://expense-sheet-staging.web.app in a new tab and sign in with the same account.
+6. Repeat steps 2-4 on this staging tab: reload twice to warm it up, reload once more, and note the `categories` row's Time value.
+7. Compare the two numbers from steps 4 and 6. Staging's should be about the same or a little lower than production's. (Ignore the very first load after you haven't used either site in a while — that's a separate, unrelated slowness this change was never meant to fix.)
+
+**AC-9 — do the categories stop visibly swapping on a normal open?**
+1. Open https://expense-sheet-staging.web.app and sign in, if you haven't already used it today. Let it fully finish loading once.
+2. Close that browser tab completely.
+3. Open a brand-new tab and go to https://expense-sheet-staging.web.app again.
+4. Watch the category tiles closely as the page loads.
+5. Confirm the tiles you see the instant they appear are the same set the whole time — they should not disappear and get replaced by a different set of tiles partway through loading.
+6. Pass: the categories look right from the first moment and never change. Fail: you still see the grid swap to a different set of tiles partway through — if so, note what that looked like and report it back.
