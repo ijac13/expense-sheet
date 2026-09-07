@@ -363,4 +363,4 @@ Fixed cycle 1's rejection: added a `--source mortgage` flag to `extract-historic
 
 ### Dispatch Retries
 
-- Retry 0 (not yet attempted): verify (cycle 2) — the dispatched verify ensign ended with no completion signal and no stage report; its last message reported `idleReason: failed`, `failureReason: "You've hit your session limit · resets 12:40pm (Asia/Taipei)"`. This is an account-wide usage-limit failure, not a per-worker transport stall — a same-account retry now would predictably fail identically before the reset. Held for captain decision rather than consuming the one-retry allowance on a doomed attempt; see FO's message to the captain.
+- Retry 1: verify (cycle 2) — no-completion-signal (`idleReason: failed`, `failureReason: "You've hit your session limit · resets 12:40pm (Asia/Taipei)"`, an account-wide usage-limit failure, not a per-worker transport stall). Captain chose to wait for reset; by the time of this entry it was already past 12:40pm Asia/Taipei, so re-dispatched fresh under a `-retry` suffix rather than reusing the dead ensign's name.
