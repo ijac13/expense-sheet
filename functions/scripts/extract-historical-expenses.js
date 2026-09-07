@@ -867,61 +867,38 @@ function extract(grid, { years = IN_SCOPE_YEARS } = {}) {
 // ---------------------------------------------------------------------------
 
 /**
- * `houseGrid` is the `D5:J255` range as an array of rows, index 0 = sheet row 5 —
+ * `houseGrid` is the `D5:K255` range as an array of rows, index 0 = sheet row 5 —
  * i.e. exactly what `readHouseGrid` returns and what a fixture reproduces. Column
- * offsets within a row: D=0 (`還款日期`, the date), J=6 (`實際月付`, the payment).
+ * offsets within a row: D=0 (`還款日期`, the date), J=6 (`實際月付`, the regular
+ * monthly payment), K=7 (`先還本金`, an occasional principal prepayment — entity
+ * `064` widened the read range to reach it).
  *
- * One row per in-scope-year monthly payment, `category_name_en` fixed to
- * `"Mortgage"` directly — the House tab carries no A-C taxonomy to map through
- * `CATEGORY_MAP`. A row with a usable date OUTSIDE the requested years is skipped
- * silently, whatever shape the rest of it is in — this run does not speak for
- * another year (live proof: row 125 of the 2014-2034 schedule is dated 2024-11-15
- * with column J genuinely blank, and is none of this run's business when only 2022
- * is requested). Only an IN-SCOPE row with exactly one of D/J populated, or a
- * row whose date cannot be determined at all, aborts naming the row rather than
- * guessing. A row with BOTH blank is ordinary schedule padding (the read range is
- * wider than the 240-row schedule) and is silently skipped, same as a day column
- * with nothing in it.
+ * Up to TWO rows per source row: a J-row for the regular payment and, only on the
+ * one row in the 2023-2024 window where it is populated (2023-03-15), a K-row for
+ * the prepayment — distinct keys, so neither can be conflated with the other.
+ * `category_name_en` is fixed to `"Mortgage"` directly on both — the House tab
+ * carries no A-C taxonomy to map through `CATEGORY_MAP`.
+ *
+ * A row with a usable date OUTSIDE the requested years is skipped silently,
+ * whatever shape the rest of it is in — this run does not speak for another year.
+ * An IN-SCOPE row with a populated date but J AND K both blank is ALSO skipped
+ * silently, contributing zero rows (live proof: row 125 of the 2014-2034 schedule
+ * is dated 2024-11-15 with both J and K genuinely blank, immediately followed by
+ * row 126's real payment for that same date — a duplicate-date artifact, not a
+ * half-populated row). Only a row where D is BLANK but J or K holds a value aborts,
+ * naming the row rather than guessing — the one shape this parser still refuses. A
+ * row where all three of D/J/K are blank is ordinary schedule padding (the read
+ * range is wider than the 240-row schedule) and is silently skipped, same as a day
+ * column with nothing in it.
  */
 function extractMortgageRows(houseGrid, { years = IN_SCOPE_YEARS } = {}) {
   const yearsSet = new Set(years);
   const rows = [];
   const perYearCount = new Map();
 
-  houseGrid.forEach((row, i) => {
-    const sourceRow = i + 5; // D5 is houseGrid[0]
-    const dateRaw = row?.[0];
-    const amountRaw = row?.[6];
-    const dEmpty = text(dateRaw) === "";
-    const jEmpty = text(amountRaw) === "";
-    if (dEmpty && jEmpty) return; // schedule padding — nothing here
-
-    const ref = `${HOUSE_TAB}!D${sourceRow}/J${sourceRow}`;
-    const iso = dEmpty ? null : parseHeaderDate(dateRaw);
-    const year = iso !== null ? Number(iso.slice(0, 4)) : null;
-
-    // Out of scope: skip silently, whatever shape the rest of the row is in. Only
-    // checked once the year is actually known — a row this run cannot attribute to
-    // any year (D blank or unparseable) falls through to the strict checks below.
-    if (year !== null && !yearsSet.has(year)) return;
-
-    if (dEmpty !== jEmpty) {
-      throw new ExtractError(
-        `${ref}: ` +
-        (dEmpty
-          ? `column J (實際月付) = ${JSON.stringify(amountRaw)} but column D (還款日期) is blank`
-          : `column D (還款日期) = ${JSON.stringify(dateRaw)} but column J (實際月付) is blank`) +
-        `. Refusing to guess a mortgage row from half its data.`
-      );
-    }
-    if (iso === null) {
-      throw new ExtractError(`${ref}: column D holds ${JSON.stringify(dateRaw)}, which does not parse as a date.`);
-    }
-
-    const amount = parseAmount(amountRaw, ref);
-
+  const emit = (key, iso, year, amount) => {
     rows.push({
-      key: `${year}-mortgage-r${sourceRow}`,
+      key,
       year: String(year),
       source: "mortgage",
       date: iso,
@@ -936,6 +913,47 @@ function extractMortgageRows(houseGrid, { years = IN_SCOPE_YEARS } = {}) {
       captain_note: "",
     });
     perYearCount.set(year, (perYearCount.get(year) ?? 0) + 1);
+  };
+
+  houseGrid.forEach((row, i) => {
+    const sourceRow = i + 5; // D5 is houseGrid[0]
+    const dateRaw = row?.[0];
+    const jRaw = row?.[6];
+    const kRaw = row?.[7];
+    const dEmpty = text(dateRaw) === "";
+    const jEmpty = text(jRaw) === "";
+    const kEmpty = text(kRaw) === "";
+    if (dEmpty && jEmpty && kEmpty) return; // schedule padding — nothing here
+
+    const ref = `${HOUSE_TAB}!D${sourceRow}`;
+    if (dEmpty) {
+      // D blank but J and/or K holds a value — still aborts, unchanged in spirit
+      // from 062's own guard, now checking both payment columns rather than J
+      // alone. Refusing to guess a mortgage row from half its data.
+      const holds = [
+        !jEmpty ? `column J (實際月付) = ${JSON.stringify(jRaw)}` : null,
+        !kEmpty ? `column K (先還本金) = ${JSON.stringify(kRaw)}` : null,
+      ].filter(Boolean).join(" and ");
+      throw new ExtractError(
+        `${ref}: column D (還款日期) is blank but ${holds}. Refusing to guess a mortgage row from half its data.`
+      );
+    }
+
+    const iso = parseHeaderDate(dateRaw);
+    if (iso === null) {
+      throw new ExtractError(`${ref}: column D holds ${JSON.stringify(dateRaw)}, which does not parse as a date.`);
+    }
+    const year = Number(iso.slice(0, 4));
+
+    // Out of scope: skip silently, whatever shape the rest of the row is in.
+    if (!yearsSet.has(year)) return;
+
+    // The row-125 shape (AC-7): a populated date with no payment of any kind that
+    // month is schedule padding wearing a real date, not a half-populated row.
+    if (jEmpty && kEmpty) return;
+
+    if (!jEmpty) emit(`${year}-mortgage-r${sourceRow}`, iso, year, parseAmount(jRaw, `${ref}/J${sourceRow}`));
+    if (!kEmpty) emit(`${year}-mortgage-prepay-r${sourceRow}`, iso, year, parseAmount(kRaw, `${ref}/K${sourceRow}`));
   });
 
   return { rows, perYearCount };
@@ -1160,7 +1178,7 @@ async function readSourceGrid(sheets) {
 }
 
 /**
- * AC-6 — bounded to `D5:J255`. The exact range requested of the Sheets API never
+ * AC-6 — bounded to `D5:K255`. The exact range requested of the Sheets API never
  * includes column A, B or C, which is what the falsifier checks: a wider or
  * unbounded range would bring the bank name / branch / account number / personal
  * name in column A row 2 into this process's memory, from where any downstream
