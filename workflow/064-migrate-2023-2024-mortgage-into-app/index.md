@@ -501,3 +501,20 @@ No staging or production data was written or otherwise touched by this addendum'
   `--target staging` throughout; the only production touch in this run is the pre-existing, read-only `verifyHouseTabAccess` check (`[import] House tab read-access confirmed for both staging and production`), unchanged from every prior cycle's own apply/rehearse runs and not a write of any kind.
 
 Stopping here per the checklist — not running `--undo`. The captain will check Reports on staging herself (Annual 2023/2024, per the manual-test steps above) and report back before the next step.
+
+### Addendum 3 — AC-13 undo RUN: captain confirmed Reports looked right, 25 rows removed, staging restored to baseline
+
+- DONE: Captain checked Reports on staging (Annual 2023/2024) and confirmed it looked right, relayed by the first officer.
+  No independent evidence gathered by this agent for that click-through — this is the captain's own manual test from her step 5-8 above, reported via the first officer, not re-derived here.
+- DONE: Ran `node -r ./scripts/load-local-env.js scripts/import-historical-expenses.js --target staging --undo --mortgage-only --years 2023,2024 --from-sheet "064 verify cycle3 mortgage 2023-2024"` at `2026-09-07T08:21:57Z`.
+  Full log: `[import] phase=undo target=staging`, `[undo] removed 25 row(s) matching prefix(es) [exp-hist-mortgage-2023-, exp-hist-mortgage-2024-] in 1 batch(es)`. `--mortgage-only` scoped the match to exactly this entity's own prefixes, not the shared `exp-hist-2023-`/`2024-` prefix `061`'s real rows would use if present on staging — no such rows exist there, so this is a scope guarantee, not evidence a collision was avoided this run.
+- DONE: Fresh row-count read of the staging Expenses tab, immediately after undo, confirming restoration to the exact pre-apply baseline.
+  Before undo (Addendum 2's after-apply read): 1434 rows incl. header (1433 data rows), 25 `exp-hist-mortgage-` rows. After undo: **1409 rows incl. header** (1408 data rows), **0 `exp-hist-` rows, 0 `exp-hist-mortgage-` rows** — byte-identical in count to this cycle's own pre-apply baseline (Addendum 1/2's `1409`/`0`). Staging is back to exactly where it was before this stage's own apply.
+- DONE: Confirmed no production write occurred.
+  `--target staging` throughout, same as the apply run; no `--target production` invocation was made at any point in this stage.
+
+**Verdict: still not PASSED.** AC-13's mechanism is now proven live end-to-end (approve → apply → captain-visible in Reports → undo → restored), but this entity's checklist scopes closing AC-13 to the captain's own review of the normalization sheet plus her Reports check — both now done — while AC-14's click-through (add/delete expense, History) is a separate, still-open manual test (see "The captain's manual test for AC-14" above), per the first officer's explicit instruction not to record a final verdict yet. Recommended verdict remains provisional pending that last piece.
+
+### Summary (addendum 3)
+
+Captain confirmed Reports on staging showed the higher 2023/2024 totals as expected. Ran `--undo --mortgage-only --years 2023,2024`, which removed exactly the 25 rows this stage's own apply wrote (`exp-hist-mortgage-2023-*`/`2024-*`), scoped so it could not reach any `061`-shaped row sharing the plain `exp-hist-{year}-` prefix. Fresh read confirms staging Expenses is back to 1409 rows / 0 `exp-hist-` rows, identical to the pre-apply baseline. AC-13's full apply-to-undo cycle is now proven live; AC-14 remains the one open item before this cycle's verdict can be finalized.
