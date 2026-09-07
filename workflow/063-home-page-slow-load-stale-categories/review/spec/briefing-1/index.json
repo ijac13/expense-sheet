@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:063:spec:attempt-1:revision-1",
+  "question": "Root cause found: no literal page reload exists — the 'auto-refresh' is two existing full-screen re-render swaps (AuthGuard's spinner, then Home's categoriesReady gate), and the category mismatch is DEFAULT_CATEGORIES (a hardcoded 24-item fallback) being unconditionally replaced by the live list on every load, worsened by the backend re-minting its Sheets auth client on every request. Fix: cache the last-fetched live category list client-side (same pattern as entity 058's LAST_CATEGORY_KEY) so a returning device's first paint already matches reality, and memoize the backend auth client so warm instances stop paying a redundant token mint. Is this approach and the 9 ACs (6 offline, 3 interactive) sound and ready to move to build?",
+  "artifacts": [
+    {
+      "id": "artifact:063:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/4e7548c53bdd7e4c80b8404b522d9d78a0022051/workflow/063-home-page-slow-load-stale-categories/index.md",
+      "rev": "sha256:b2e36f61e2b1bc2cc8b129c8f6c85d91cb9766023bb3e2aaf12ad68ddd770489",
+      "mediaType": "text/markdown",
+      "summary": "Spec resolves all four ideation open questions with code-level evidence (file:line citations, no speculation): Save is correctly gated on a live category being selected (entity 058, not a bug); there is no reload mechanism in the code at all; the perceived swap is two legitimate full-screen re-renders (auth spinner, then categories-loading state); and categories visibly change because DEFAULT_CATEGORIES (a hardcoded 24-item build-time fallback) always gets replaced by the live Sheet-backed list, with disjoint id schemes so no tile survives the swap. Fix caches the live list client-side (localStorage, mirroring 058's existing pattern) so a returning device's first paint already matches reality, plus memoizes the backend's Sheets auth client to cut redundant per-request overhead on warm instances. 9 ACs (AC-1-8 offline via mocked mounts, AC-9 interactive live drive), +100 LOC/4-5 files at +-30% tolerance, cold-start elimination itself explicitly out of scope as a captain cost decision."
+    }
+  ]
+}

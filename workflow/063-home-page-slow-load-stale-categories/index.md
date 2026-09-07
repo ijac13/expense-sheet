@@ -33,6 +33,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:063:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:063-spec-1
+              briefing:
+                id: briefing:063:spec:attempt-1:revision-1
+                digest: sha256:91feba8e97b726c06a6e975536c867740d44cec31dfe7a918e3d1623f69937cb
+                room-ref: ./review/spec/briefing-1
 ---
 
 When I open the production expense-sheet web app, the home page keeps loading something and the "save" button is grayed out. Then it refreshes the page on its own, and sometimes the categories shown on the home page change after that refresh. Only after that can I actually add an expense record.
