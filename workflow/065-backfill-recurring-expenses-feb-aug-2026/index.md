@@ -231,3 +231,51 @@ Semantics this may change: **stored data only** — 20 new Expenses rows for Feb
 ### Summary
 
 Live investigation overturned the ideation's premise: Subscriptions itself never writes an expense row (only `POST /api/subscriptions` → a `sub-` record); the 3 reference rows are ordinary manual entries, and the live scheduler's real occurrence-id format is `exp-auto-{subId}-{isoDate}`, not `exp-{timestamp}`. A live scan also found a 4th manual row, `exp-1788759250129`, already covering Uber's February 2026 occurrence — the spec's plan is 20 new rows plus 1 recognized skip, not a flat 21, with AC-2 covering the dedup rule that catches it. Id scheme decided: `exp-sub065-{subscriptionId}-{isoDate}`.
+
+## Implementation Plan (build)
+
+Reuses `051`'s proven write primitives (`buildColumnMap`/`buildWriteRow`/`insertRowsAtTop` from the compiled `lib/sheetSchema`) and `061`'s manifest/receipt discipline (`sync-staging-categories.js`'s apply-writes-a-receipt, undo-reads-it-and-cross-checks pattern) rather than either `051`'s report-editing pipeline (unneeded — the 3 subscriptions and their historical figures are already pinned) or `060`–`064`'s bare-prefix undo (spec requires manifest-backed, not prefix-only).
+
+**Candidate generation.** Three subscriptions are hardcoded as data (subscriptionId, amount, category_id, `paid_by`/`created_by`: `wei`, notes) from the ideation-approved table and spec's live-verified subscription ids — never read from the live Subscriptions tab, so a future edit to a subscription's amount cannot silently change what this backfill writes (AC-3's falsifier). Seven fixed ISO dates (`2026-02-01` .. `2026-08-01`) are a literal array, not computed from `daysInMonth`/`isDueOn`/`now` — the window is the same 21 pairs regardless of run date (AC-6). `exp-sub065-{subscriptionId}-{isoDate}` is minted per pair (AC-4).
+
+**Dedup check.** Before writing, read all existing Expenses rows live and build a Set of `date|amount|category_id|paid_by` keys. A candidate whose key is already present (this is how the pre-existing Uber/Feb row `exp-1788759250129` gets recognized and skipped) OR whose own `exp-sub065-` id is already present (this is what makes a second `--apply` a no-op, AC-8) is skipped and named in the output; every other candidate is written. Both checks read live state, not a manifest, so the dedup logic is correct standalone even before any manifest exists.
+
+**Category resolution.** Before any write, read the Categories tab live and confirm both `cat_024` and `cat_006` resolve; abort naming the missing id(s) with zero writes if either does not (AC-7).
+
+**Manifest-backed undo.** `--apply` writes a JSON manifest (gitignored, alongside 051's/061's report/receipt directories) recording every id it wrote plus the row's own fields, keyed to the target spreadsheet id and a run timestamp. `--undo` requires an explicit manifest path (or the default), refuses if it is missing, deletes only the ids the manifest lists that ALSO start with `exp-sub065-` (defense in depth — a manifest naming an id outside this run's own prefix is refused rather than deleted), and re-reads afterward to confirm every deleted id is gone and nothing else changed row-count.
+
+**CLI surface.** `--target staging|production` (required, resolved via `migration-env.js`'s existing `resolveCredentialPairs` — a single pair only, since this entity, unlike `061`'s archive-import shape, reads and writes only the target's own Expenses/Categories/Subscriptions-adjacent tabs, never a second staging-only source); `--dry-run` (read-only, prints the plan, combinable with `--fixture` for offline testing); `--apply` (writes, requires real credentials, refuses `--fixture`); `--undo` (requires real credentials + manifest). Exactly one of `--dry-run`/`--apply`/`--undo`. No `--target` → refuse before any read (AC-9).
+
+**Files:**
+- `functions/scripts/backfill-subscription-065.js` — candidate generation, dedup, category-resolution guard, apply/dry-run/undo, manifest read/write, CLI.
+- `functions/test/backfill-subscription-065.test.js` — unit tests against a fixture reproducing the live shapes (the Uber/Feb decoy row, decoy rows under `exp-hist-`/`exp-auto-`/plain `exp-{timestamp}` for AC-4/AC-5), covering AC-2/3/4/5/6/7/8/9 offline; a live dry-run (not automated) covers the rest of AC-1/AC-2's live-data claims per the spec's test plan.
+- `functions/scripts/fixtures/backfill-065-sample/` — `Subscriptions.json`, `Expenses.json` fixtures for the above.
+
+AC-10/AC-11 are interactive-only per the spec and are not exercised by this stage's automation; the stage report documents them as not self-checked, matching the spec's verification split.
+
+## Stage Report: build
+
+- DONE: Write a brief implementation plan before coding begins, covering the candidate-generation logic, the (date, amount, category_id, paid_by) dedup check, and the exp-sub065- id/manifest scheme.
+  Written under "## Implementation Plan (build)" above, committed as 8ab1e9d before any code was written.
+- DONE: Implement per spec: functions/scripts/backfill-subscription-065.js generating the 20 fixed candidate rows for the 3 known subscriptions across Feb-Aug 2026 (skipping the pre-existing Uber/Feb row via the dedup check), minting exp-sub065-{subscriptionId}-{isoDate} ids disjoint from exp-hist-, exp-auto-, and plain exp-{timestamp}, with --dry-run/--apply/--undo (manifest-backed, not a bare prefix scan), refusing without an explicit --target and without both categories resolving live — meeting all 11 acceptance criteria (AC-1 through AC-11), with no writes to the Subscriptions tab and no dependency on the current date for the candidate window.
+  functions/scripts/backfill-subscription-065.js (386 lines); AC-by-AC evidence below.
+- DONE: Document every acceptance criterion's status (met, with evidence) in the stage report, including the offline tests run and results for AC-1-9; AC-10/AC-11 remain interactive and are not self-checked here.
+  See "### Acceptance criteria status" immediately below.
+
+### Acceptance criteria status
+
+- AC-1 (met, offline + live read-only): fixture apply-then-undo rehearsal proves every pre-existing row byte-identical after apply and after undo (`backfill-subscription-065.test.js`, "AC-1 / AC-8" and "AC-5" tests); live `--dry-run --target production` used READONLY_SCOPE only — zero writes reached the real sheet.
+- AC-2 (met, offline + live): fixture test proves the Uber/Feb candidate is recognized via the pre-existing row `exp-1788759250129` and skipped (20 write / 1 skip); a companion regression test proves an id-only dedup rule would wrongly plan all 21. A live `--dry-run --target production` run reproduced the identical 20-write/1-skip split against the real spreadsheet.
+- AC-3 (met, offline): unit test asserts the exact 20-row value set (2105/cat_024/wei/wei/勞保 x7, 2745/cat_024/wei/wei/三人健保 x7, 150/cat_006/wei/wei/"" x6 Mar-Aug) sourced from the ideation-pinned constants, never read from a live Subscriptions tab.
+- AC-4 (met, offline + live): unit test asserts every candidate id starts with `exp-sub065-` and none match `exp-hist-`, `exp-auto-`, or a plain `exp-{timestamp}` shape; the same live production dry-run (4,749+ rows) shows zero pre-existing id collision.
+- AC-5 (met, offline): the apply-then-undo test proves undo removes exactly the manifest's 20 ids and every decoy (`exp-hist-`, `exp-auto-`, plain, the 3 reference rows, the Uber/Feb row) survives untouched; a separate test proves undo refuses with no manifest present and refuses a manifest naming an id outside `exp-sub065-`, in both cases without ever calling delete.
+- AC-6 (met, offline): `MONTHS` is a literal 7-date array; a test asserts two calls to `generateCandidates()` are deep-equal (no clock/randomness leak); `grep`ing the script for any Subscriptions-tab reference returns nothing.
+- AC-7 (met, offline + live): a fixture missing `cat_024` aborts `run()` with zero mutations reaching the sheet, naming exactly the missing id; live reads against both staging and production resolved both ids without the guard firing.
+- AC-8 (met, offline + live): a second `--apply` against the same fixture sheet reports `created: 0, skipped: 21` with row count/content unchanged; the apply path merges into any prior manifest rather than overwriting it, so a no-op re-apply cannot erase the first run's undo record.
+- AC-9 (met, offline): `run()` without `--target` rejects before any env/credential resolution; a CLI subprocess test confirms a non-zero exit and zero mutations.
+- AC-10 (not self-checked — interactive per spec): requires a live drive of Reports → Monthly on staging then production after a captain-approved `--apply`, which this build stage does not perform.
+- AC-11 (not self-checked — interactive per spec): requires a live add-expense drive and a before/after read of the Subscriptions tab's `due_day`/`start_date`/`is_active`. Static evidence in lieu: the script contains no code path that reads or writes the Subscriptions tab (confirmed by grep), so the live scheduler's own state cannot be touched by this entity regardless of drive results.
+
+### Summary
+
+Implemented `backfill-subscription-065.js`, reusing entity 051's write primitives (`buildColumnMap`/`buildWriteRow`, the same insertDimension+updateCells all-or-nothing batch) and entity 061's manifest/receipt discipline for a scoped undo that is not a bare prefix scan. All 9 offline-verifiable ACs pass via `functions/test/backfill-subscription-065.test.js` (17/17); `npm test` is otherwise green except one pre-existing failure in `normalize-category-ids.test.js` unrelated to this entity (the `app/` package's own toolchain is not installed in this fresh worktree — confirmed by running that test in isolation and by `app/node_modules` being absent). A read-only `--dry-run --target production` against the real spreadsheet reproduced the spec's predicted 20-write/1-skip split exactly, with zero writes. Surface landed well over the spec's +180 LOC/±50% estimate — 386 (script) + 305 (test) + 16 (fixtures) = 707 added lines, git-diff-confirmed — driven by the manifest-merge-on-reapply logic and the same falsification-style regression tests the spec's own tolerance section anticipated (051/061/064 all overran similarly); flagged here for the FO's Cycle-line/tolerance check rather than cut to fit.
