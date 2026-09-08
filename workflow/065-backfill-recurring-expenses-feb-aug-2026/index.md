@@ -1,7 +1,7 @@
 ---
 id: 065
 title: Backfill 3 Recurring Expenses for Feb–Aug 2026
-status: build
+status: verify
 source: captain
 started: 2026-09-08T00:24:43Z
 completed:
