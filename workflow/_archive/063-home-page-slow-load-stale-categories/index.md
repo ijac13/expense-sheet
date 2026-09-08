@@ -74,6 +74,8 @@ gates:
 archived: 2026-09-08T00:16:12Z
 ---
 
+**Production deploy:** `firebase deploy --only functions,hosting --project production` run 2026-09-08. First attempt shipped stale local builds (`app/out`/`functions/lib` predated this entity's merge) — caught by checking for the new code in what was actually served, not by trusting the deploy command's exit code. Rebuilt fresh (`npm run build` in both `app/` with `.env.local` and `functions/`) and redeployed: hosting confirmed live via `sha256(app/out/index.html) == sha256(curl https://expense-sheet-b2db8.web.app/)` match, and the new `expense_last_categories` cache key confirmed present in the served chunk (`_next/static/chunks/15y9k11sed2c7.js`). Functions confirmed live via `GET /api/categories` → `401` / `OPTIONS` → `204` (auth gate unchanged) and the compiled `sheetsClientPromise` memoization present in the uploaded `functions/lib/index.js`. AC-8/AC-9's actual behavior (faster warm request, no visible category swap) was already captain-confirmed on staging during verify; this deploy ships the identical, byte-matched code to production.
+
 When I open the production expense-sheet web app, the home page keeps loading something and the "save" button is grayed out. Then it refreshes the page on its own, and sometimes the categories shown on the home page change after that refresh. Only after that can I actually add an expense record.
 
 Why do I need to wait? What is it loading, and what is it refreshing for?
