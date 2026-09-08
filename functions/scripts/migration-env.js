@@ -39,6 +39,18 @@ const HOUSE_SPREADSHEET_ID = "1oUCppCwkfw2BMG8gZwxb13Vq8KVXBQFrVoS57ZH9h6E";
 const HOUSE_TAB = "House";
 const HOUSE_RANGE = "D5:K255";
 
+/**
+ * Entity 066 — ijac's own `smoney` ledger export, the source for the Jan-Apr 2026
+ * backfill. Read-only, staging-credentialed only (same asymmetry as the archive
+ * workbook: never assume the production account can see it). Both the tab TITLE
+ * and its GID are pinned, not just the title, because AC-9's falsifier is a
+ * position/index read surviving a spreadsheet reorder — `verifyTabIdentity` in
+ * the extractor checks both against the same spreadsheet metadata call.
+ */
+const MIGRATION066_SPREADSHEET_ID = "1F2gv7ZytfwIVHuaAkZGMTEnB8jG9GoeKx-CyyjTCKto";
+const MIGRATION066_TAB = "migrate";
+const MIGRATION066_GID = 2065989204;
+
 const VALID_TARGETS = ["staging", "production"];
 
 class TargetError extends Error {}
@@ -176,6 +188,9 @@ module.exports = {
   HOUSE_SPREADSHEET_ID,
   HOUSE_TAB,
   HOUSE_RANGE,
+  MIGRATION066_SPREADSHEET_ID,
+  MIGRATION066_TAB,
+  MIGRATION066_GID,
   VALID_TARGETS,
   TargetError,
   resolveCredentialPairs,
