@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-063-home-page-slow-load-stale-categories
 issue:
-pr: "#35"
+pr: pr-merge:35
 mod-block: merge:pr-merge
 gates:
     version: 1
