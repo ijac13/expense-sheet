@@ -279,3 +279,41 @@ AC-10/AC-11 are interactive-only per the spec and are not exercised by this stag
 ### Summary
 
 Implemented `backfill-subscription-065.js`, reusing entity 051's write primitives (`buildColumnMap`/`buildWriteRow`, the same insertDimension+updateCells all-or-nothing batch) and entity 061's manifest/receipt discipline for a scoped undo that is not a bare prefix scan. All 9 offline-verifiable ACs pass via `functions/test/backfill-subscription-065.test.js` (17/17); `npm test` is otherwise green except one pre-existing failure in `normalize-category-ids.test.js` unrelated to this entity (the `app/` package's own toolchain is not installed in this fresh worktree — confirmed by running that test in isolation and by `app/node_modules` being absent). A read-only `--dry-run --target production` against the real spreadsheet reproduced the spec's predicted 20-write/1-skip split exactly, with zero writes. Surface landed well over the spec's +180 LOC/±50% estimate — 386 (script) + 305 (test) + 16 (fixtures) = 707 added lines, git-diff-confirmed — driven by the manifest-merge-on-reapply logic and the same falsification-style regression tests the spec's own tolerance section anticipated (051/061/064 all overran similarly); flagged here for the FO's Cycle-line/tolerance check rather than cut to fit.
+
+## Stage Report: verify
+
+- DONE: Independently re-run and falsify the offline surface from a clean rebuild (fresh install, full suite, and re-verify AC-4/AC-5's falsifiability by reverting the fix and confirming the expected tests go red), and independently re-run a live read-only --dry-run --target production to confirm the 20-write/1-skip plan still holds unchanged.
+  `rm -rf functions/node_modules functions/lib && npm ci && npm run build && npm test`: 292/293 pass; the one failure (`normalize-category-ids.test.js`) is entity 054's pre-existing dependency on `app/node_modules`, absent in this fresh worktree — confirmed unrelated by `git log` on that test file (last touched by 054) and by `test -d app/node_modules` returning false, not by this entity's diff. `functions/test/backfill-subscription-065.test.js` run standalone: 17/17. Falsified AC-4 by changing `ID_PREFIX` from `exp-sub065-` to `exp-auto-`: both AC-4 tests (and, as collateral, AC-5's decoy-survival test) went red, nothing else. Restored, re-ran clean (17/17), confirmed `git diff` against HEAD empty. Falsified AC-5 by rewriting `runUndo` to a bare live prefix-scan (no manifest read, no outside-prefix refusal): the "undo refuses without a manifest, and refuses a manifest naming an id outside its own prefix" test went red, nothing else. Restored, re-ran clean (17/17), `git diff` against HEAD empty again. Live `node -r ./scripts/load-local-env.js scripts/backfill-subscription-065.js --target production --dry-run`: `21 candidate(s), 20 to write, 1 skipped`, skip is `exp-sub065-sub-1788759015607-2026-02-01` matching `exp-1788759250129` — byte-identical to build's claimed plan, used `READONLY_SCOPE` (no write scope requested).
+- DONE: Run the Mandatory PII/Secrets Check over the full branch diff.
+  `git diff $(git merge-base main HEAD)..HEAD` across all 5 changed files, grepped for key/secret/token/password patterns, PEM headers, emails, phone numbers, and Google Sheets IDs/URLs: zero hits beyond the env-var *names* (`GOOGLE_SERVICE_ACCOUNT_KEY_STAGING`, no value) and stub credential literals (`"{}"`) already used by sibling entities' tests. Only identifiers present are first names (`wei`, `ijac`) matching the app's existing data model across every prior entity — no full names, emails, or phone numbers. No `.env*` file is part of the diff.
+- DONE: Confirm no deploy is needed (this entity touches only functions/scripts/ and functions/test/, matching 060-064's pattern, not app/ or functions/src/) and confirm staging is otherwise unaffected.
+  `git diff --numstat` vs `main`: only `functions/scripts/backfill-subscription-065.js`, `functions/scripts/fixtures/backfill-065-sample/{Categories,Expenses}.json`, `functions/test/backfill-subscription-065.test.js`, and this entity file — zero touches to `app/`, `functions/src/`, or any deploy config. `curl -sI https://expense-sheet-staging.web.app/` → 200; `curl -sI https://expense-sheet-staging.web.app/api` → 401 unauthenticated (correct fail-closed) — staging serves exactly as before, consistent with a scripts/tests-only diff that was never deployed there.
+- DONE: Provide concrete numbered manual-test steps for the captain covering: reviewing/approving whatever the apply step requires, AC-10 (Reports Monthly totals for Feb-Aug 2026, September unaffected) and AC-11 (everyday use unaffected, Subscriptions tab unchanged).
+  See "The captain's manual test" below.
+
+### The captain's manual test
+
+**Before anything is written — approving the plan**
+
+1. This backfill will add 20 new expense rows, none of them changing anything that already exists. Broken down: 7 rows of 勞保 at 2105 (Feb-Aug), 7 rows of 三人健保 at 2745 (Feb-Aug), and 6 rows of Uber 公會會費 at 150 (Mar-Aug — February is skipped because you already logged that one yourself). A live check against the real production sheet just now confirmed this exact 20-write/1-skip plan still holds.
+2. Tell the first officer if this matches what you expect. Your go-ahead here is what allows the write to actually happen — nothing is written to production before you say so.
+
+**After it's applied to production — AC-10, checking Reports**
+
+3. Open **https://expense-sheet-b2db8.web.app** and sign in with your usual Google account.
+4. Tap **Reports**, switch to **Monthly**, and step back to **February 2026**. Expect: the Insurance category total is 4,850 higher than it showed before, and Transportation is unchanged (that month's Uber payment was already logged).
+5. Step to **March 2026**. Expect: Insurance up by 4,850, Transportation up by 150, versus before.
+6. Step through **April, May, June, July, August 2026** one at a time. Expect: each of those months, Insurance up by 4,850 and Transportation up by 150, versus before.
+7. Step to **September 2026**. Expect: totals unchanged from before this backfill — this entity does not touch September onward.
+8. Tell the first officer whether steps 4-7 looked right.
+
+**After it's applied — AC-11, everyday use and Subscriptions unaffected, can be done anytime**
+
+9. Still on **https://expense-sheet-b2db8.web.app**, tap **Home**. Add an expense the way you normally would — any amount, any category. Expect: it appears in today's list immediately.
+10. Delete the expense you just added. Expect: it disappears.
+11. Tap **Subscriptions**. Find the three you set up on 2026-09-07 (勞保, 三人健保, and the Uber one). Expect: their due day, start date, and active status all look exactly the way you left them — this backfill never touches this tab.
+12. Tell the first officer whether steps 9-11 behaved as expected.
+
+### Summary
+
+Independently re-verified the offline surface build already claimed: clean rebuild (removed `node_modules`/`lib`, `npm ci`, `npm run build`), full suite 292/293 (the one failure is entity 054's pre-existing, unrelated `app/node_modules` gap), 17/17 in this entity's own test file. Reintroduced AC-4's and AC-5's exact bugs by hand and confirmed each turns exactly its named test(s) red and nothing else, then restored to a byte-identical `git diff` against HEAD. A fresh live `--dry-run --target production` reproduced build's claimed 20-write/1-skip plan exactly. PII/secrets sweep of the full branch diff is clean, and the diff (scripts/tests/entity-file only) confirms no deploy is needed; staging's routes are live and unaffected. Recommended verdict: PASSED for the offline surface (AC-1 through AC-9, all independently re-confirmed); AC-10 and AC-11 are interactive-only by the spec's own design and are the two criteria only the captain's own drive can close — concrete numbered steps for both, plus the pre-write approval step, are given above.
