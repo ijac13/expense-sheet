@@ -1,9 +1,9 @@
 ---
 id: 065
 title: Backfill 3 Recurring Expenses for Feb–Aug 2026
-status: ideation
+status: spec
 source: captain
-started:
+started: 2026-09-08T00:24:43Z
 completed:
 verdict:
 score:
@@ -22,6 +22,17 @@ gates:
                 id: briefing:065:ideation:attempt-1:revision-1
                 digest: sha256:df1d0c41ed5b3e4063400402326dfb847959e15dcca77f4761fa9e802b97c7e1
                 room-ref: ./review/ideation/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:065:ideation:1
+                briefing: briefing:065:ideation:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-08T00:24:26.40467Z"
+                decision: approve
+                reason: Scope, success criteria, and open questions for spec are clear and correctly bounded to Feb-Aug 2026; ready to move to spec.
+              application:
+                target-stage: spec
+                state: consumed
 ---
 
 The captain just set up 3 real recurring costs as app Subscriptions with a start date of 2026-09-07, but each was already being paid before that date — so February through August 2026 have no record of them, and those months' totals understate what she actually spent.
