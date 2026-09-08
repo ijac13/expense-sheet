@@ -9,8 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-065-backfill-recurring-expenses-feb-aug-2026
 issue:
-pr:
-mod-block:
+pr: "#36"
+mod-block: merge:pr-merge
 gates:
     version: 1
     records:
@@ -60,6 +60,17 @@ gates:
                 id: briefing:065:verify:attempt-1:revision-1
                 digest: sha256:59f0033273a7bcfa2dd7b916a783b9c24e90c6f122f91eeb15aaee441dba2d4c
                 room-ref: ./review/verify/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:065:verify:1
+                briefing: briefing:065:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-08T06:56:29.327916Z"
+                decision: approve
+                reason: 'Approved after full drive: staging rehearsed first per request, a real staging/production category-id divergence was found and confirmed harmless, production apply confirmed correct via Reports and Subscriptions-tab checks. All 11 ACs met.'
+              application:
+                target-stage: done
+                state: pending
 ---
 
 The captain just set up 3 real recurring costs as app Subscriptions with a start date of 2026-09-07, but each was already being paid before that date — so February through August 2026 have no record of them, and those months' totals understate what she actually spent.
