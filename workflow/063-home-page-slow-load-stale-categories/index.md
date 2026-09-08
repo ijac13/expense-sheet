@@ -306,3 +306,18 @@ Staging is running this exact branch: hosting and functions are both freshly dep
 4. Watch the category tiles closely as the page loads.
 5. Confirm the tiles you see the instant they appear are the same set the whole time — they should not disappear and get replaced by a different set of tiles partway through loading.
 6. Pass: the categories look right from the first moment and never change. Fail: you still see the grid swap to a different set of tiles partway through — if so, note what that looked like and report it back.
+
+### Closing addendum — captain-confirmed AC-8/AC-9
+
+**Final verdict: PASSED — all 9 acceptance criteria (AC-1 through AC-9) now hold.**
+
+This addendum records evidence the captain gathered directly (relayed by team-lead), not evidence this agent observed live — the two ACs above were unobtainable by an ensign for the reasons given, and the captain's own run is exactly the closing step the manual-test steps were written for.
+
+- DONE: AC-8 — warm-instance timing comparison, captain-run
+  Per captain, relayed by team-lead: staging (this branch, memoized auth client) finished the network-panel comparison at Finish 1.91s / Load 163ms; production (current live code, unmemoized) at Finish 2.36s / Load 188ms. Staging at least as fast as production on every figure, no regression — satisfies AC-8's falsifiability bar ("no measurable improvement on a warm instance, or a regression on a cold one" did not occur).
+- DONE: AC-9 — no visible category swap on a normal open, captain-run
+  Per captain, relayed by team-lead, verbatim: "AC test works" — confirming the category grid did not visibly swap on a fresh open of staging, per the manual-test steps above.
+
+### Summary (addendum)
+
+With the captain's own run closing AC-8 and AC-9, every acceptance criterion for entity 063 is now PASSED — 7 by this agent's live-adjacent evidence (deploy/hash/test verification) and 2 by the captain's direct staging observation, which was always the intended verification path for these two per the spec's own "interactive" designation. No further build or verify work is outstanding.
