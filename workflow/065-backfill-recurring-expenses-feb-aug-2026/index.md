@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-065-backfill-recurring-expenses-feb-aug-2026
 issue:
-pr: "#36"
+pr: pr-merge:36
 mod-block: merge:pr-merge
 gates:
     version: 1
