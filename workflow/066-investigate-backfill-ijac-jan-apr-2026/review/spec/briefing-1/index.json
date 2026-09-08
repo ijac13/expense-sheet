@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:066:spec:attempt-1:revision-1",
+  "question": "Gap confirmed real (23 exp-auto- rows only, zero manual entries Jan-Apr 2026). Migration tab characterized via the captain's connected Drive account since neither service account can reach it (403/401) -- 310 rows, 203 in-window expense rows + 1 out-of-scope income row, no PII hazard, new exp-mig066-r{sourceRow} id scheme collision-free against every other entity. Two things need the captain before build: (1) share the spreadsheet with expense-tracker-staging@expense-sheet-staging.iam.gserviceaccount.com (Viewer) so build's live extraction can run; (2) rule on two categories that don't cleanly cross-map -- 房客 (default proposed: map to 房客支出/cat_023 on both targets) and 進修 (no match on either target: cat_012 Tuition or cat_022 Other?). Is the approach and the 13 ACs sound and ready to move to build once these are resolved?",
+  "artifacts": [
+    {
+      "id": "artifact:066:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/619d5471d5a37df5697ff8342d23d9ff31492c63/workflow/066-investigate-backfill-ijac-jan-apr-2026/index.md",
+      "rev": "sha256:468ae3154bd233cc13660deab6bcd8a4514182a82c09ef8acc5d3a001dd71d77",
+      "mediaType": "text/markdown",
+      "summary": "Spec confirms the ideation's premise live: ijac has zero non-subscription Expenses rows for Jan-Apr 2026 on production (23 rows, all scheduler-generated exp-auto-). The source migration tab (a personal smoney ledger export) was characterized via the captain's own connected Drive account, since both service accounts get 403 and public export gets 401 -- 310 total rows, 203 in-window expense rows to import, 1 income row correctly excluded (no income field in the app schema), and a second unrelated 2025 data block in the same file flagged as out of scope. 15 of 17 categories map cleanly by exact name on both staging and production; 2 need the captain's ruling (房客 vs 房客支出 staging/production divergence, and 進修 with no match on either target). New id scheme exp-mig066-r{sourceRow}, collision-free against every prior entity. 13 ACs (11 offline, 2 interactive). Build cannot start its live extraction until the spreadsheet is shared with the staging service account."
+    }
+  ]
+}

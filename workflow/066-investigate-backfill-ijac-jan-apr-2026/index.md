@@ -33,6 +33,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:066:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:066-spec-1
+              briefing:
+                id: briefing:066:spec:attempt-1:revision-1
+                digest: sha256:9d31c95c25e423a027af3279fc5b8902378977b4007838ec5ef09a71007f1b1a
+                room-ref: ./review/spec/briefing-1
 ---
 
 It looks like "ijac" (one of the two payers) has no recorded expenses for January through April 2026, other than subscription charges — worth confirming against the live app data, and if the gap is real, backfilling it from a source spreadsheet the captain has identified.
