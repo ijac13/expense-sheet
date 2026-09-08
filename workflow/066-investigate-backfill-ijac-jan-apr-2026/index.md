@@ -1,13 +1,13 @@
 ---
 id: 066
 title: Investigate and Backfill Ijac's Missing Jan-Apr 2026 Expenses
-status: spec
+status: build
 source: captain
 started: 2026-09-08T07:09:11Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-066-investigate-backfill-ijac-jan-apr-2026
 issue:
 pr:
 mod-block:
@@ -41,6 +41,17 @@ gates:
                 id: briefing:066:spec:attempt-1:revision-1
                 digest: sha256:9d31c95c25e423a027af3279fc5b8902378977b4007838ec5ef09a71007f1b1a
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:066:spec:1
+                briefing: briefing:066:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-08T10:05:45.238827Z"
+                decision: approve
+                reason: Gap confirmed real, source characterized, both category rulings given (房客->房客支出, 進修->學費), and spreadsheet access confirmed live for the staging service account. Ready for build.
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 It looks like "ijac" (one of the two payers) has no recorded expenses for January through April 2026, other than subscription charges — worth confirming against the live app data, and if the gap is real, backfilling it from a source spreadsheet the captain has identified.
