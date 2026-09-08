@@ -1,7 +1,9 @@
 /**
- * Entity 066, phase 1 of 2 — read ijac's own `smoney` ledger export ("migrate"
- * tab) and write a normalization sheet the captain can read and correct, one row
- * per in-window (2026-01-01..2026-04-30) 支出 (expense) row.
+ * Entity 066, phase 1 of 2 — read ijac's own `smoney` ledger export (the tab
+ * named by `MIGRATION066_TAB`/`MIGRATION066_GID` in `migration-env.js` — see
+ * that file's own comment for the Dispatch Retry 1 tab-identity correction) and
+ * write a normalization sheet the captain can read and correct, one row per
+ * in-window (2026-01-01..2026-04-30) 支出 (expense) row.
  *
  * This script NEVER writes an expense row — the importer does that, from a tab
  * this script produced and the captain then marked `APPROVED`. Same two-script
@@ -368,10 +370,9 @@ function carryForward(freshRows, priorRows) {
 // ---------------------------------------------------------------------------
 
 /**
- * AC-9 — confirms the tab named `migrate` is the SAME tab whose gid this spec
- * pinned, via one `spreadsheets.get` metadata call. A spreadsheet reorder that
- * renamed a different tab to "migrate" (or moved this one) surfaces here, before
- * any data is read.
+ * AC-9 — confirms the tab named `MIGRATION066_TAB` is the SAME tab whose gid
+ * `MIGRATION066_GID` pins, via one `spreadsheets.get` metadata call. A
+ * spreadsheet reorder or rename surfaces here, before any data is read.
  */
 async function verifyTabIdentity(sheets) {
   const meta = await sheets.spreadsheets.get({ spreadsheetId: MIGRATION066_SPREADSHEET_ID, fields: "sheets.properties" });

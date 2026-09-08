@@ -1,10 +1,10 @@
 // Run with: npm run build && node --test test/
 //
 // Entity 066 — backfill ijac's real Jan-Apr 2026 expenses from her own `smoney`
-// ledger export ("migrate" tab). Fixtures reproduce the shapes the spec found
-// live: an income row sharing a date with an expense row, two rows sharing a
-// date disambiguated only by their own sheet row, and the two categories
-// needing the captain's explicit ruling (房客, 進修).
+// ledger export. Fixtures reproduce the shapes the spec found live: an income
+// row sharing a date with an expense row, two rows sharing a date disambiguated
+// only by their own sheet row, and the two categories needing the captain's
+// explicit ruling (房客, 進修).
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
@@ -12,6 +12,7 @@ const os = require("os");
 const path = require("path");
 
 const { makeSheets } = require("./sheetsStub");
+const { MIGRATION066_TAB, MIGRATION066_GID } = require("../scripts/migration-env");
 
 const extract = require("../scripts/extract-migration066-expenses.js");
 const {
@@ -137,12 +138,23 @@ test("AC-9: checkHeaders reports MATCH only for the exact confirmed 8 headers, i
 });
 
 test("AC-9: verifyTabIdentity accepts a tab whose title AND gid both match the confirmed values", async () => {
-  const sheets = { spreadsheets: { get: async () => ({ data: { sheets: [{ properties: { title: "migrate", sheetId: 2065989204 } }] } }) } };
+  const sheets = { spreadsheets: { get: async () => ({ data: { sheets: [{ properties: { title: MIGRATION066_TAB, sheetId: MIGRATION066_GID } }] } }) } };
   await assert.doesNotReject(verifyTabIdentity(sheets));
 });
 
-test("AC-9: verifyTabIdentity refuses a tab named \"migrate\" whose gid does not match — a reorder/rename would otherwise read silently wrong data", async () => {
-  const sheets = { spreadsheets: { get: async () => ({ data: { sheets: [{ properties: { title: "migrate", sheetId: 999 } }, { properties: { title: "2025-01~04", sheetId: 2065989204 } }] } }) } };
+test('AC-9: verifyTabIdentity refuses a tab with the confirmed title whose gid does not match — a reorder/rename would otherwise read silently wrong data (this is the exact live shape Dispatch Retry 1 found: a "migrate"-named tab existed with a DIFFERENT gid, holding the out-of-scope 2025 block instead)', async () => {
+  const sheets = {
+    spreadsheets: {
+      get: async () => ({
+        data: {
+          sheets: [
+            { properties: { title: MIGRATION066_TAB, sheetId: 999 } },
+            { properties: { title: "migrate", sheetId: MIGRATION066_GID } },
+          ],
+        },
+      }),
+    },
+  };
   await assert.rejects(verifyTabIdentity(sheets), ExtractError);
 });
 

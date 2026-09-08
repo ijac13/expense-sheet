@@ -46,10 +46,20 @@ const HOUSE_RANGE = "D5:K255";
  * and its GID are pinned, not just the title, because AC-9's falsifier is a
  * position/index read surviving a spreadsheet reorder — `verifyTabIdentity` in
  * the extractor checks both against the same spreadsheet metadata call.
+ *
+ * CORRECTED during build, Dispatch Retry 1 (see the entity's own "Dispatch
+ * Retries" log): the build dispatch's original instruction — a tab literally
+ * named `migrate`, gid `2065989204` — was wrong. That tab holds the spec's own
+ * documented OUT-OF-SCOPE `2025-01~04` reference block (151 rows, all dated
+ * 2025), not the migration source. The spreadsheet's only OTHER tab, titled
+ * after the export itself, reproduces the spec's own recorded Jan-Apr 2026
+ * figures exactly (203 `支出` / 1 `收入`, live-confirmed) and is the real source.
+ * Spec had correctly flagged this gid as unconfirmed; the FO's build dispatch
+ * incorrectly presented it as already-confirmed.
  */
 const MIGRATION066_SPREADSHEET_ID = "1F2gv7ZytfwIVHuaAkZGMTEnB8jG9GoeKx-CyyjTCKto";
-const MIGRATION066_TAB = "migrate";
-const MIGRATION066_GID = 2065989204;
+const MIGRATION066_TAB = "smoney-2026年9月8日_上午81314_ijac";
+const MIGRATION066_GID = 792951830;
 
 const VALID_TARGETS = ["staging", "production"];
 
