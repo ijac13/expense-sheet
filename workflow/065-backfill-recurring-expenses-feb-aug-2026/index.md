@@ -317,3 +317,31 @@ Implemented `backfill-subscription-065.js`, reusing entity 051's write primitive
 ### Summary
 
 Independently re-verified the offline surface build already claimed: clean rebuild (removed `node_modules`/`lib`, `npm ci`, `npm run build`), full suite 292/293 (the one failure is entity 054's pre-existing, unrelated `app/node_modules` gap), 17/17 in this entity's own test file. Reintroduced AC-4's and AC-5's exact bugs by hand and confirmed each turns exactly its named test(s) red and nothing else, then restored to a byte-identical `git diff` against HEAD. A fresh live `--dry-run --target production` reproduced build's claimed 20-write/1-skip plan exactly. PII/secrets sweep of the full branch diff is clean, and the diff (scripts/tests/entity-file only) confirms no deploy is needed; staging's routes are live and unaffected. Recommended verdict: PASSED for the offline surface (AC-1 through AC-9, all independently re-confirmed); AC-10 and AC-11 are interactive-only by the spec's own design and are the two criteria only the captain's own drive can close — concrete numbered steps for both, plus the pre-write approval step, are given above.
+
+### Addendum — staging rehearsal (live)
+
+Per the captain's request, staging was rehearsed before production, mirroring `060`-`064`'s pattern.
+
+- Live `--dry-run --target staging`: **21 candidate(s), 21 to write, 0 skipped** — differs from production's 20/1 split because staging's Expenses tab holds no equivalent of production's pre-existing `exp-1788759250129` Uber/Feb row. Confirmed live, not assumed, per the first officer's instruction.
+- `cat_024`/`cat_006` both resolved on staging: the dry-run's `assertCategoriesResolve` guard runs before any candidate output and did not throw.
+- `--apply --target staging` was denied to this ensign by the Claude Code auto-mode permission classifier as an unattended live external write. The first officer ran the staging apply, staging undo, and production dry-run/apply directly in the interactive session instead, with the captain present directing each step — not a workaround of the block.
+- Staging `--apply`: 21/21 written.
+
+### Addendum — staging category-id divergence (finding, no code change)
+
+The captain reviewed staging's Reports after the staging apply and found the 4,850 Insurance total showing under a category labelled **"Antkee"** instead of Insurance. Investigated live: staging's own Categories tab has `cat_024` = "Antkee"/房客 (sort_order 24), while staging's actual Insurance category is `cat_027`. Production's `cat_024` genuinely is Insurance (confirmed live at spec time and unchanged since). `cat_006` (Transportation) happens to match on both environments, which is why only the Insurance figure looked wrong to her on staging.
+
+This is a real staging/production category-id divergence, not a defect in this entity: the spec (AC-3) and build deliberately pin category ids from the ideation-approved, production-verified figures rather than resolving by name per-target, specifically so a later edit to a subscription's live state cannot silently rewrite historical values. Resolving by name per-target would have hidden this divergence rather than surfacing it, at the cost of the AC-3 guarantee. No code change is warranted; recording this here as a documented fact about the staging environment, since a future entity touching `cat_024`/`cat_027` on staging should know they are not what they are on production.
+
+- Staging `--undo`: 21/21 removed, staging confirmed restored to baseline.
+
+### Addendum — production apply and AC-10/AC-11 closure
+
+- Live `--dry-run --target production` (final check, run again immediately before apply): reproduced the exact 20-write/1-skip plan.
+- Production `--apply`: **20/20 written, 1 skipped** (`exp-sub065-sub-1788759015607-2026-02-01`, matching `exp-1788759250129`), manifest saved.
+- **AC-10 closed:** the captain reviewed Reports → Monthly on production for February through August 2026 following the numbered steps above and confirmed the expected deltas — Insurance (`cat_024`) up 4,850 every month, Transportation (`cat_006`) up 150 every month except February, September unchanged — relayed by the first officer as "confirmed."
+- **AC-11 closed:** the captain added and deleted a test expense on production and checked the Subscriptions tab (due day, start date, active status for all three records) — relayed by the first officer as "all good."
+
+### Final verdict: PASSED
+
+All 11 acceptance criteria are now met. AC-1 through AC-9 were independently re-verified offline and via live dry-run above; AC-10 and AC-11 are closed by the captain's own production drive, relayed by the first officer per the interactive-only verification split the spec itself defined. The staging category-id divergence above is a documented environmental fact, not an outstanding defect — it required no fix, since the entity's pinned-id design (AC-3) is what surfaced it rather than masking it.
