@@ -1,13 +1,13 @@
 ---
 id: 065
 title: Backfill 3 Recurring Expenses for Feb–Aug 2026
-status: spec
+status: build
 source: captain
 started: 2026-09-08T00:24:43Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-065-backfill-recurring-expenses-feb-aug-2026
 issue:
 pr:
 mod-block:
@@ -41,6 +41,17 @@ gates:
                 id: briefing:065:spec:attempt-1:revision-1
                 digest: sha256:638d7e37542642c21436421230f506edad3cee3fbc37164374d7a4ac11fc2245
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:065:spec:1
+                briefing: briefing:065:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-08T03:20:37.450948Z"
+                decision: approve
+                reason: Investigation corrected the ideation's own premise with live evidence and caught a real double-count hazard (Uber/Feb) and a paid_by discrepancy; the 11 ACs and id-namespace design are sound. Ready for build.
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 The captain just set up 3 real recurring costs as app Subscriptions with a start date of 2026-09-07, but each was already being paid before that date — so February through August 2026 have no record of them, and those months' totals understate what she actually spent.
