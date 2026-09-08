@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:065:ideation:attempt-1:revision-1",
+  "question": "Does this ideation correctly capture backfilling the 3 recurring expenses (勞保, 三人健保, and the cat_006 item) for Feb-Aug 2026, before the 2026-09-07 Subscriptions start date, and is it ready to move to spec (characterize how Subscriptions actually generates its rows, confirm categories, and design a collision-safe id scheme for a direct app-data write)?",
+  "artifacts": [
+    {
+      "id": "artifact:065:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/a65c8bdafb239418550f77ccb07151505fea0f63/workflow/065-backfill-recurring-expenses-feb-aug-2026/index.md",
+      "rev": "sha256:4618b9ddb0c857c40a5dcef4e9ce2be33a076a1049bf330c53c59ef1cb2d36d8",
+      "mediaType": "text/markdown",
+      "summary": "Ideation seed: 3 recurring costs (labor insurance NT$2105, family health insurance NT$2745, and a cat_006 item at NT$150) were just set up as app Subscriptions starting 2026-09-07, but were real costs before that date too. Success is 21 backfilled rows (3 expenses x 7 months, Feb-Aug 2026), leaving September onward to the live Subscriptions mechanism untouched. Open questions for spec: how Subscriptions actually computes its occurrence date/id (the reference rows show date 2026-01-01 despite being created 2026-09-07), real category names for cat_024/cat_006, which day-of-month to use, confirming this is a direct app-data write (not a spreadsheet import like 060-064), and a collision-safe id scheme distinct from the exp-hist- pattern those entities use."
+    }
+  ]
+}

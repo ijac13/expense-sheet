@@ -11,6 +11,17 @@ worktree:
 issue:
 pr:
 mod-block:
+gates:
+    version: 1
+    records:
+        - id: gate:065:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:065-ideation-1
+              briefing:
+                id: briefing:065:ideation:attempt-1:revision-1
+                digest: sha256:df1d0c41ed5b3e4063400402326dfb847959e15dcca77f4761fa9e802b97c7e1
+                room-ref: ./review/ideation/briefing-1
 ---
 
 The captain just set up 3 real recurring costs as app Subscriptions with a start date of 2026-09-07, but each was already being paid before that date — so February through August 2026 have no record of them, and those months' totals understate what she actually spent.
