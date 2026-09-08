@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:065:spec:attempt-1:revision-1",
+  "question": "Live investigation overturned the ideation's premise: Subscriptions never writes an expense row itself (only a Subscriptions-tab record); the 3 reference rows are ordinary manual entries, and the live scheduler's real id format is exp-auto-{subId}-{isoDate}. A 4th manual row was found already covering Uber's February 2026 occurrence, so the plan is 20 new rows plus 1 recognized skip, under a new exp-sub065- id namespace disjoint from all three existing id families on production. Is this approach and the 11 ACs (9 offline, 2 interactive) sound and ready to move to build?",
+  "artifacts": [
+    {
+      "id": "artifact:065:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/6eb0803ac09225d485c014504ad70ff9c8f66e1b/workflow/065-backfill-recurring-expenses-feb-aug-2026/index.md",
+      "rev": "sha256:a7ace82578459f412baa00567d5e4e179b5b829b293edf0db6e0a54d7bad05a8",
+      "mediaType": "text/markdown",
+      "summary": "Spec overturns the ideation's own premise with live evidence: Subscriptions itself never writes an expense row (only POST /api/subscriptions, writing a sub- record to the Subscriptions tab); the 3 reference rows are ordinary manual entries via the generic add-expense endpoint, and the only subscription-driven expense id/date format is the live scheduler's exp-auto-{subscriptionId}-{isoDate}. A live scan of production found a 4th manual row already covering Uber x February 2026, so the plan writes 20 new rows (not 21) and explicitly skips that one occurrence. New id scheme exp-sub065-{subscriptionId}-{isoDate} confirmed disjoint from all three existing families (exp-hist-, exp-auto-, plain exp-{timestamp}) across production's 4,749 rows. Also caught: the Subscriptions tab's paid_by (ijac) disagrees with the reference rows' paid_by (wei) - resolved to follow the reference rows. 11 ACs (AC-1-9 offline, AC-10/11 interactive), +180 LOC/3-file estimate at +-50% tolerance."
+    }
+  ]
+}

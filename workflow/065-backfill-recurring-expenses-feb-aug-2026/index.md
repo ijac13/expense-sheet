@@ -33,6 +33,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:065:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:065-spec-1
+              briefing:
+                id: briefing:065:spec:attempt-1:revision-1
+                digest: sha256:638d7e37542642c21436421230f506edad3cee3fbc37164374d7a4ac11fc2245
+                room-ref: ./review/spec/briefing-1
 ---
 
 The captain just set up 3 real recurring costs as app Subscriptions with a start date of 2026-09-07, but each was already being paid before that date — so February through August 2026 have no record of them, and those months' totals understate what she actually spent.
