@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:065:verify:attempt-1:revision-1",
+  "question": "AC-1 through AC-9 independently re-confirmed with a fresh rebuild and hand-falsified AC-4/AC-5 (each turned exactly its named test red, nothing else). A live read-only dry-run against real production reproduced the exact 20-write/1-skip plan (Uber x February skipped as already covered). Surface landed at 707 LOC vs the +180 (+-50%) estimate (393% over) -- consistent with 051/061/064's own falsification-test-driven overruns, not scope creep. Ready to approve the plan and have it applied to production, then do your own live drive for AC-10/AC-11?",
+  "artifacts": [
+    {
+      "id": "artifact:065:verify:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/c8003209cc93d8e4fb1ada283f3ca3643721c346/workflow/065-backfill-recurring-expenses-feb-aug-2026/index.md",
+      "rev": "sha256:eddf06d2ff08ab5476745dddb03ea5fbf798c3e55e5716ee54e626ad76a27787",
+      "mediaType": "text/markdown",
+      "summary": "Verify: AC-1-9 PASSED, independently re-confirmed (fresh rebuild, 292/293 suite -- the 1 failure is an unrelated pre-existing environment gap from entity 054 -- 17/17 in this entity's own tests, AC-4 and AC-5 both independently re-falsified by hand). Live read-only dry-run against production reproduced the exact 20-write/1-skip plan build claimed. PII/secrets sweep clean. No deploy needed (scripts/tests-only diff, matching 060-064's pattern). AC-10/AC-11 are captain-only: numbered manual-test steps given for both, plus a pre-write approval step for the 20-row plan itself. Surface overrun (707 LOC vs +180 est, 393%) flagged -- same falsification-test-driven pattern 051/061/064 all showed."
+    }
+  ]
+}

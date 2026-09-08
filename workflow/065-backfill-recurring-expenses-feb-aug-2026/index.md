@@ -52,6 +52,14 @@ gates:
               application:
                 target-stage: build
                 state: consumed
+        - id: gate:065:verify
+          stage: verify
+          attempts:
+            - id: gate-attempt:065-verify-1
+              briefing:
+                id: briefing:065:verify:attempt-1:revision-1
+                digest: sha256:59f0033273a7bcfa2dd7b916a783b9c24e90c6f122f91eeb15aaee441dba2d4c
+                room-ref: ./review/verify/briefing-1
 ---
 
 The captain just set up 3 real recurring costs as app Subscriptions with a start date of 2026-09-07, but each was already being paid before that date — so February through August 2026 have no record of them, and those months' totals understate what she actually spent.
