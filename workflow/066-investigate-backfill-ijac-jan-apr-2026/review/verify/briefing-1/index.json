@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:066:verify:attempt-1:revision-1",
+  "question": "AC-1 through AC-11 independently re-confirmed (clean rebuild, 340/340 suite, the exact tab-identity check hand-falsified). A digest comparison proves your migration-tab edit touched nothing in the Jan-Apr 2026 window. Ready to review and approve the normalization sheet on staging, then do your own live drive for AC-12/AC-13?",
+  "artifacts": [
+    {
+      "id": "artifact:066:verify:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/ae14e93d5ca843ab4a77a05ce494d84d51151579/workflow/066-investigate-backfill-ijac-jan-apr-2026/index.md",
+      "rev": "sha256:84ffe16f299e21f0bef34325abbc8ff436ba863e632b2bfdd5ddd0e3194eb626",
+      "mediaType": "text/markdown",
+      "summary": "Verify: AC-1-11 PASSED, independently re-confirmed (clean rebuild, 340/340 suite, verifyTabIdentity's own gid check falsified by hand to prove it's real). Live report/dry-run against the corrected tab reproduced build's exact 203/1 expense/income split and 17/17 category mapping. A digest comparison confirms the captain's reported edit to the migration tab changed nothing in the Jan-Apr 2026 window or the tab's identity. PII/secrets sweep clean. No deploy needed. AC-12/AC-13 are captain-only: numbered manual-test steps given for both, plus the normalization-sheet approval step (staging tab 'Migration066 Jan-Apr 2026')."
+    }
+  ]
+}
