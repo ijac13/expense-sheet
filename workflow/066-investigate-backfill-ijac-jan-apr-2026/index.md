@@ -1,7 +1,7 @@
 ---
 id: 066
 title: Investigate and Backfill Ijac's Missing Jan-Apr 2026 Expenses
-status: build
+status: verify
 source: captain
 started: 2026-09-08T07:09:11Z
 completed:
