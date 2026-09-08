@@ -287,3 +287,43 @@ The ideation's premise held up under a live check: ijac has zero non-subscriptio
 ### Summary
 
 Live extraction surfaced a real defect before any write: the FO's build dispatch pointed the extractor at the wrong tab (`migrate`/`2065989204`, the spec's own documented out-of-scope 2025 block) instead of the actual Jan-Apr 2026 source (the export's own default-named tab, gid `792951830`). Per the stage's own Review-finding disposition, work stopped before any candidate mutation, the finding was escalated to the FO, and the FO independently re-verified it live and authorized the correction (Dispatch Retry 1). With the corrected tab, every offline test (20 in `migration066.test.js`, 340 across the full `functions` suite) passes, and a full live staging rehearsal — snapshot, apply of all 203 real rows, verify, a hand-added decoy, undo, diff, and restore — completed cleanly with zero pre-existing rows touched. Production was never written to; `--apply` against staging correctly refused pending the captain's own `APPROVED` mark on the normalization sheet now sitting on staging ("Migration066 Jan-Apr 2026") for her review.
+
+## Stage Report: verify
+
+- DONE: Independently re-run and falsify the offline surface from a clean rebuild, and independently re-run a live `--report`/`--dry-run` against the corrected migration tab (title/gid confirmed via `verifyTabIdentity`) to confirm the 203/1 split and category mapping still hold unchanged. Confirm live whether the captain's edit to the migration tab changed anything in the Jan-Apr 2026 window or the tab identity, and report exactly what changed.
+  Clean rebuild: `npm ci` + `npm test` from scratch → 340/340 pass; `migration066.test.js` isolated → 20/20 pass, matching build's claim exactly. Falsified, not just re-read: hand-disabled the AC-9 gid-mismatch check inside `verifyTabIdentity` (the exact defect Dispatch Retry 1 hit live) — test 11 went red (`not ok`), every other test stayed green; reverted, `git status` clean. Live `--report` against the migration tab reconfirmed identity (title `smoney-2026年9月8日_上午81314_ijac`, gid `792951830`), 744 rows spanning 2024-11-18..2026-05-02, 203 支出/1 收入 in-window — byte-identical to build's own figures. Live category resolution against both live Categories tabs: all 17 distinct target names resolve (0 unresolved, 0 duplicates), 房客支出→`cat_026` staging / `cat_023` production — matches build's evidence exactly. Captain's edit: computed today's extraction digest over the 203 in-window candidates (key/date/amount/category_name_zh/notes/status) = `72edd78688469adae3fe3755a7ef61b2` — byte-identical to the digest stamped in the normalization sheet's own control row at build's generation time (`generated=2026-09-08T13:19:56.331Z digest=72edd78688469adae3fe3755a7ef61b2`, read live from `'Migration066 Jan-Apr 2026'!A1:C1` on staging). Row count, date range, and tab identity are also unchanged from build's report. Whatever the captain edited, it changed nothing inside the Jan-Apr 2026 window and did not touch the source-of-truth tab's title or gid.
+- DONE: Run the Mandatory PII/Secrets Check over the full branch diff
+  `git ls-files` shows only `.env*.example` tracked, no real `.env`; `git diff main...HEAD` has zero private-key/API-key-shaped matches. No real personal names/emails/phones: the only `@...iam.gserviceaccount.com` strings are the same service-account identifiers already established by prior entities' `migration-env.js` pattern. The AC-10 fixture's embedded name (`線上課程 Aiden 陪同`) is confirmed absent from all 744 live source rows (checked live, case-insensitive) — synthetic test data built to exercise the byte-preservation edge case the spec flagged, not a leaked real name.
+- DONE: Confirm no deploy is needed and confirm staging is otherwise unaffected
+  `git diff main...HEAD --stat`: only `functions/scripts/{extract,import,migration-env}-migration066...js`/`migration-env.js`, `functions/test/migration066.test.js` + its fixture, and this entity file — zero touches to `app/` or `functions/src/` (the deployed `lib/index.js` entry point), matching `060`-`065`'s pattern. `curl -sI https://expense-sheet-staging.web.app/` → 200; `/api` → 401 unauthenticated (correct fail-closed), unchanged. Live check of staging's `Expenses` tab: 1408 rows, 0 `exp-mig066-` rows present — the build-stage rehearsal's undo fully restored staging; nothing from this entity is live anywhere yet.
+- DONE: Provide concrete numbered manual-test steps for the captain covering reviewing/approving the normalization sheet on staging, AC-12, and AC-13
+  See "The captain's manual test" below.
+
+### The captain's manual test — needs one step from you first: reviewing and approving the normalization sheet
+
+1. Ask the first officer for the link to the staging spreadsheet, and open the tab named **`Migration066 Jan-Apr 2026`**.
+2. Read through the 203 rows — each is one of your own `smoney` expenses from January-April 2026. Look especially at rows where the category column reads **房客支出** (source label was 房客) or **學費** (source label was 進修) — those two are the ones without an automatic match, mapped per your own ruling from the spec gate. Confirm they look right, and skim the rest for anything you'd want to correct.
+3. If it looks right, type **APPROVED** into cell **B1** of that tab and tell the first officer.
+4. The first officer will then apply the sheet to staging and tell you when it's ready to look at.
+
+### AC-12 — Reports, after the staging apply
+
+5. Open **https://expense-sheet-staging.web.app** and sign in with your usual Google account.
+6. Tap **Reports**, and step to **January 2026**. Expect: your total spending is about **NT$111,205 higher** than before (48 new rows).
+7. Step to **February 2026**. Expect: about **NT$137,290 higher** (36 new rows).
+8. Step to **March 2026**. Expect: about **NT$82,289 higher** (76 new rows).
+9. Step to **April 2026**. Expect: about **NT$45,328 higher** (43 new rows) — the one bike-rack sale that month is income, not an expense, so it is deliberately not included here.
+10. Step to **December 2025**. Expect: totals unchanged from before this import.
+11. Step to **May 2026**. Expect: totals unchanged from before this import.
+12. Tell the first officer whether steps 6-11 looked right.
+
+### AC-13 — everyday use, can be done anytime, independent of the steps above
+
+13. Still on staging, tap **Home**. Add an expense the way you normally would — any amount, any category. Expect: it appears in today's list immediately.
+14. Delete the expense you just added. Expect: it disappears.
+15. Tap **History**. Expect: it loads normally, same as always.
+16. Tell the first officer whether steps 13-15 behaved as expected.
+
+### Summary
+
+Independently reproduced everything build claimed offline (clean `npm ci`, full suite 340/340, entity tests 20/20) and proved the suite is falsifiable by hand-breaking the exact `verifyTabIdentity` gid check Dispatch Retry 1's real bug hit, watching it go red, then restoring cleanly. A fresh live `--report` and a live category-resolution check against both targets reproduced build's 203/1 split and 17/17 category mapping exactly, with no drift. The captain's reported edit to the migration tab left the Jan-Apr 2026 window byte-identical (digest match) and the tab's identity unchanged — whatever she edited, it did not touch this entity's scope. PII/secrets sweep is clean, including confirming a test fixture's embedded name is synthetic rather than a real one pulled from the live sheet. The branch touches only `functions/scripts/`, `functions/test/`, and this entity file, so no deploy is needed, and staging is confirmed live and otherwise unaffected (0 residual rows from the build-stage rehearsal). Recommended verdict: **PASSED** for the offline surface (AC-1 through AC-11, all independently re-confirmed); AC-12 and AC-13 are interactive-only by the spec's own design and are the two criteria only the captain's own drive can close — her approval of the normalization sheet is also still pending, per numbered steps above.
