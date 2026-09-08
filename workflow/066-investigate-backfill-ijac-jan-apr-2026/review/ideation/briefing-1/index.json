@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:066:ideation:attempt-1:revision-1",
+  "question": "Does this ideation correctly capture confirming whether ijac genuinely has no non-subscription Jan-Apr 2026 expenses in production, and if so backfilling from the given spreadsheet's 'migration' tab -- and is it ready to move to spec (characterize that tab live, confirm the gap is real, and design a collision-safe id scheme)?",
+  "artifacts": [
+    {
+      "id": "artifact:066:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/6740f87a13630143ca12e765b037807bb22e013e/workflow/066-investigate-backfill-ijac-jan-apr-2026/index.md",
+      "rev": "sha256:a05905f707e176c962c642f65fea6a9aef9257129e6d6940faf60501c458b3f3",
+      "mediaType": "text/markdown",
+      "summary": "Ideation seed: the captain suspects ijac has no recorded expenses (except subscriptions) for Jan-Apr 2026, and wants this confirmed live against production before any backfill. If confirmed, the fix is to import ijac's real Jan-Apr 2026 expenses from a given spreadsheet's 'migration' tab (not yet characterized -- columns, schema, PII risk, and payer/category mapping are all open questions for spec, mirroring how 060 characterized its own source before 061-064 were speced). Out of scope: any month outside Jan-Apr, wei's own data, and any change to subscriptions. Same staging-first, captain-approved safety properties as prior backfills."
+    }
+  ]
+}

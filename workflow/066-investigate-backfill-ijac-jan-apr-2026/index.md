@@ -11,6 +11,17 @@ worktree:
 issue:
 pr:
 mod-block:
+gates:
+    version: 1
+    records:
+        - id: gate:066:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:066-ideation-1
+              briefing:
+                id: briefing:066:ideation:attempt-1:revision-1
+                digest: sha256:79048b4a53634c1368778ceab52a2d168b6f5503d27f28075aadf8ca33f30609
+                room-ref: ./review/ideation/briefing-1
 ---
 
 It looks like "ijac" (one of the two payers) has no recorded expenses for January through April 2026, other than subscription charges — worth confirming against the live app data, and if the gap is real, backfilling it from a source spreadsheet the captain has identified.
