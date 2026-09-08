@@ -269,6 +269,7 @@ module.exports = {
   parseRange,
   makeSheets,
   loadApi,
+  installAuthStub,
   call,
   makeAuthStub,
   fakeToken,

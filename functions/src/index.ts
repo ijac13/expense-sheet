@@ -43,11 +43,23 @@ function setCors(res: { set: (key: string, value: string) => void }) {
   res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
-async function getSheetsClient() {
-  const auth = await google.auth.getClient({
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-  return google.sheets({ version: "v4", auth });
+// Memoized at module scope so a warm instance reuses one authenticated Sheets
+// client instead of re-minting an OAuth token via google.auth.getClient() on
+// every request. Cleared on rejection so one transient auth failure doesn't
+// wedge every request on this instance until it cold-starts away.
+let sheetsClientPromise: Promise<ReturnType<typeof google.sheets>> | null = null;
+
+function getSheetsClient(): Promise<ReturnType<typeof google.sheets>> {
+  if (!sheetsClientPromise) {
+    sheetsClientPromise = google.auth
+      .getClient({ scopes: ["https://www.googleapis.com/auth/spreadsheets"] })
+      .then((auth) => google.sheets({ version: "v4", auth }))
+      .catch((err) => {
+        sheetsClientPromise = null;
+        throw err;
+      });
+  }
+  return sheetsClientPromise;
 }
 
 // Fetch a whole tab plus the column map built from its own header row. The map

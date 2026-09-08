@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, PenLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
 import DatePickerModal from "./components/DatePickerModal";
-import { Category, DEFAULT_CATEGORIES, categoryIcon, getDefaultCategory, pickCategoryId, resolveCategory, saveLastCategory } from "./lib/categories";
+import { Category, DEFAULT_CATEGORIES, categoryIcon, getCachedCategories, getDefaultCategory, pickCategoryId, resolveCategory, saveCachedCategories, saveLastCategory } from "./lib/categories";
 import { getCategories } from "./lib/categoryService";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
 import { DEFAULT_USER, USERS, type UserId } from "./lib/users";
@@ -33,7 +33,9 @@ export default function HomePage() {
   // the screen is never blank. `categoriesReady` is what decides whether anything
   // may be SUBMITTED — a slug is a legitimate placeholder and an illegitimate
   // write, and conflating the two is the bug this entity exists to remove.
-  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  // A device that has fetched successfully before draws its last-known live list
+  // instead, so first paint doesn't visibly swap out from under the captain.
+  const [categories, setCategories] = useState<Category[]>(() => getCachedCategories() ?? DEFAULT_CATEGORIES);
   const [categoriesReady, setCategoriesReady] = useState(false);
   const [categoriesFailed, setCategoriesFailed] = useState(false);
   const [amount, setAmount] = useState("");
@@ -71,6 +73,7 @@ export default function HomePage() {
         const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
         if (active.length === 0) { setCategoriesFailed(true); return; }
         setCategories(active);
+        saveCachedCategories(active);
         // The seed from localStorage was never reconciled here, which is how a
         // stale slug survived all the way into the POST body on the fastest path
         // through the app: type an amount, confirm, touch nothing else.
