@@ -1,9 +1,9 @@
 ---
 id: 066
 title: Investigate and Backfill Ijac's Missing Jan-Apr 2026 Expenses
-status: ideation
+status: spec
 source: captain
-started:
+started: 2026-09-08T07:09:11Z
 completed:
 verdict:
 score:
@@ -22,6 +22,17 @@ gates:
                 id: briefing:066:ideation:attempt-1:revision-1
                 digest: sha256:79048b4a53634c1368778ceab52a2d168b6f5503d27f28075aadf8ca33f30609
                 room-ref: ./review/ideation/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:066:ideation:1
+                briefing: briefing:066:ideation:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-08T07:08:48.242802Z"
+                decision: approve
+                reason: 'Scope is clear: confirm the gap live before designing anything, then characterize the source tab. Ready to move to spec.'
+              application:
+                target-stage: spec
+                state: consumed
 ---
 
 It looks like "ijac" (one of the two payers) has no recorded expenses for January through April 2026, other than subscription charges — worth confirming against the live app data, and if the gap is real, backfilling it from a source spreadsheet the captain has identified.
