@@ -1,16 +1,16 @@
 ---
 id: 066
 title: Investigate and Backfill Ijac's Missing Jan-Apr 2026 Expenses
-status: verify
+status: done
 source: captain
 started: 2026-09-08T07:09:11Z
-completed:
-verdict:
+completed: 2026-09-09T09:25:47Z
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-066-investigate-backfill-ijac-jan-apr-2026
 issue:
 pr: pr-merge:37
-mod-block: merge:pr-merge
+mod-block:
 gates:
     version: 1
     records:
@@ -70,7 +70,8 @@ gates:
                 reason: 'Approved after full drive: normalization sheet reviewed and approved, staging apply/undo cycle proven, captain confirmed Reports totals and everyday use unaffected. All 13 ACs met.'
               application:
                 target-stage: done
-                state: pending
+                state: consumed
+archived: 2026-09-09T09:25:47Z
 ---
 
 It looks like "ijac" (one of the two payers) has no recorded expenses for January through April 2026, other than subscription charges — worth confirming against the live app data, and if the gap is real, backfilling it from a source spreadsheet the captain has identified.
