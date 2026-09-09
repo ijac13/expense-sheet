@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-066-investigate-backfill-ijac-jan-apr-2026
 issue:
-pr: "#37"
+pr: pr-merge:37
 mod-block: merge:pr-merge
 gates:
     version: 1
