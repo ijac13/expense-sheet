@@ -11,6 +11,17 @@ worktree:
 issue:
 pr:
 mod-block:
+gates:
+    version: 1
+    records:
+        - id: gate:067:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:067-ideation-1
+              briefing:
+                id: briefing:067:ideation:attempt-1:revision-1
+                digest: sha256:7c8a137aa5aa03255ad0802f54ef295d85723d36f097ac469ba6c0928d7d6478
+                room-ref: ./review/ideation/briefing-1
 ---
 
 Ijac's own 健保 (health insurance) and 勞保 (labor insurance) recurring costs — like wei's equivalent subscriptions backfilled in entity `065` — need to be backfilled from January through September 2026. Unlike `065`'s scope, this window explicitly includes September, since a live subscription with `due_day: 1` and a `start_date` after the 1st of the month it's created in does not actually fire for that first month (found while building `065`).

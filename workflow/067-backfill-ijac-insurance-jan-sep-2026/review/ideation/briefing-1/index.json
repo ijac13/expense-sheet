@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:067:ideation:attempt-1:revision-1",
+  "question": "Does this ideation correctly capture backfilling ijac's own 健保/勞保 subscriptions for Jan-Sep 2026, and is it ready to move to spec (confirm the subscriptions exist and their real config, check for collision with entity 066's just-landed 203 rows for the same months, and design a collision-safe id scheme)?",
+  "artifacts": [
+    {
+      "id": "artifact:067:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/65c1011d18f81f285b22a25140dd1558fd95f511/workflow/067-backfill-ijac-insurance-jan-sep-2026/index.md",
+      "rev": "sha256:b3f8cc9cebe03ff7b412e6a2e297f0663ead4fe18f8c3acaf9d577bdb368f581",
+      "mediaType": "text/markdown",
+      "summary": "Ideation seed: mirrors 065's approach but for ijac's own 健保/勞保 subscriptions, Jan-Sep 2026 (September included this time, since a subscription created after its due day already passed that month won't fire until next month -- learned while building 065). Open questions for spec: do these subscriptions exist yet and what's their real config, why September specifically needs backfill, a collision check against existing manual entries -- now flagged as known-likely given entity 066 just backfilled 203 of ijac's own rows for exactly this Jan-Apr window -- and a new collision-safe id scheme distinct from 065's own."
+    }
+  ]
+}
