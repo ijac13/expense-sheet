@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:067:spec:attempt-1:revision-1",
+  "question": "Both subscriptions confirmed live (健保 ijac 3172, 勞保 ijac 1145, both cat_024/Insurance, due_day 5, first real scheduler fire 2026-10-05). The flagged 066 collision was checked and did NOT materialize -- zero pre-existing coverage anywhere in Jan-Sep 2026, so the plan is a clean 18 rows, 0 skips. New id scheme exp-sub067-... confirmed disjoint against all 7 known id families on both spreadsheets. Is this approach and the 11 ACs (9 offline, 2 interactive) sound and ready to move to build?",
+  "artifacts": [
+    {
+      "id": "artifact:067:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/b240dba3abc3fe3b72d4b152df9f75f1122a29a0/workflow/067-backfill-ijac-insurance-jan-sep-2026/index.md",
+      "rev": "sha256:517b997511d1fbc31ea4c7ad46e0e49b8f8bb3ca4c347b12bbcadd6042370b55",
+      "mediaType": "text/markdown",
+      "summary": "Spec confirms both of ijac's subscriptions live (健保 3172, 勞保 1145, both cat_024, due_day 5, created 2026-09-07). Root-caused via the scheduler's own code why September needs backfilling: isDueOn never checks start_date, and due_day 5 had already passed at creation, so first real fire is 2026-10-05 -- the same due_day-vs-start_date gap 065 hit for wei but didn't catch, correctly left out of scope here rather than retrofitted. The known-likely collision with entity 066's 203 live production rows was checked explicitly and found clean: zero matches on amount or notes anywhere in the Jan-Sep window. New id scheme exp-sub067-{subscriptionId}-{isoDate}, confirmed disjoint against all 7 known id families (exp-hist-, exp-hist-mortgage-, exp-sub065-, exp-mig066-, exp-auto-, plain exp-{timestamp}, legacy exp_{year}_{NNNN}) across both spreadsheets. Staging has no equivalent subscriptions and a differently-meaning cat_024 (065's own documented divergence), so rehearsal will use seeded fixtures rather than live staging data. 11 ACs (9 offline, 2 interactive)."
+    }
+  ]
+}
