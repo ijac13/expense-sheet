@@ -1,7 +1,7 @@
 ---
 id: 067
 title: Backfill Ijac's 健保 and 勞保 Subscriptions for Jan-Sep 2026
-status: build
+status: verify
 source: captain
 started: 2026-09-09T09:31:46Z
 completed:
