@@ -9,8 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-066-investigate-backfill-ijac-jan-apr-2026
 issue:
-pr:
-mod-block:
+pr: "#37"
+mod-block: merge:pr-merge
 gates:
     version: 1
     records:
@@ -60,6 +60,17 @@ gates:
                 id: briefing:066:verify:attempt-1:revision-1
                 digest: sha256:c7f8d2823cf232970955ea657bffdf0194b710182a3e334e2ebd5698fa1cdb39
                 room-ref: ./review/verify/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:066:verify:1
+                briefing: briefing:066:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-09T09:01:40.921153Z"
+                decision: approve
+                reason: 'Approved after full drive: normalization sheet reviewed and approved, staging apply/undo cycle proven, captain confirmed Reports totals and everyday use unaffected. All 13 ACs met.'
+              application:
+                target-stage: done
+                state: pending
 ---
 
 It looks like "ijac" (one of the two payers) has no recorded expenses for January through April 2026, other than subscription charges — worth confirming against the live app data, and if the gap is real, backfilling it from a source spreadsheet the captain has identified.
