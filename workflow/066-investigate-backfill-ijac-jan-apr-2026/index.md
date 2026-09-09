@@ -327,3 +327,17 @@ Live extraction surfaced a real defect before any write: the FO's build dispatch
 ### Summary
 
 Independently reproduced everything build claimed offline (clean `npm ci`, full suite 340/340, entity tests 20/20) and proved the suite is falsifiable by hand-breaking the exact `verifyTabIdentity` gid check Dispatch Retry 1's real bug hit, watching it go red, then restoring cleanly. A fresh live `--report` and a live category-resolution check against both targets reproduced build's 203/1 split and 17/17 category mapping exactly, with no drift. The captain's reported edit to the migration tab left the Jan-Apr 2026 window byte-identical (digest match) and the tab's identity unchanged — whatever she edited, it did not touch this entity's scope. PII/secrets sweep is clean, including confirming a test fixture's embedded name is synthetic rather than a real one pulled from the live sheet. The branch touches only `functions/scripts/`, `functions/test/`, and this entity file, so no deploy is needed, and staging is confirmed live and otherwise unaffected (0 residual rows from the build-stage rehearsal). Recommended verdict: **PASSED** for the offline surface (AC-1 through AC-11, all independently re-confirmed); AC-12 and AC-13 are interactive-only by the spec's own design and are the two criteria only the captain's own drive can close — her approval of the normalization sheet is also still pending, per numbered steps above.
+
+### Addendum — normalization-sheet approval, staging apply, and AC-12/AC-13 closure
+
+The captain's manual test above ran to completion, relayed via the first officer:
+
+- The captain reviewed the normalization sheet ("Migration066 Jan-Apr 2026" on staging) and marked cell **B1 = APPROVED**. The first officer confirmed this live before proceeding.
+- The first officer ran `--apply --target staging` directly in the interactive session: **203/203 rows written, 0 skipped** — matching this report's own live re-derivation of the candidate count exactly.
+- **AC-12 closed**: the captain checked Reports on staging for January-April 2026 against the per-month deltas given in the manual-test steps above (Jan +NT$111,205 / Feb +NT$137,290 / Mar +NT$82,289 / Apr +NT$45,328, December 2025 and May 2026 unaffected) and relayed verbatim: **"looks good."**
+- **AC-13 closed**: the captain added and deleted a test expense and confirmed History loads on staging, relayed verbatim: **"AC 13 works."**
+- The first officer then ran `--undo --target staging` directly: **203/203 rows removed**, restoring staging to its pre-apply baseline — consistent with this entity's rehearse-first-then-restore pattern; the real backfill still needs to be applied again (staging and/or production, per the captain's and first officer's direction) since this run's purpose was closing AC-12/AC-13, not leaving the data live.
+
+No independent evidence was re-gathered by this ensign for the captain's own click-through — it is her manual test, reported through the first officer, per the same convention `061`/`064`/`065` used for their own interactive ACs.
+
+**Final verdict: PASSED — all 13 acceptance criteria now met.** AC-1 through AC-11 per this report's own independent offline/live re-verification above; AC-12 and AC-13 per the captain's live confirmation on staging, relayed above.
