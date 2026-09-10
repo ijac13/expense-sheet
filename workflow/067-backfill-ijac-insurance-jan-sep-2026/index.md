@@ -292,3 +292,13 @@ Reused entity 065's proven backfill mechanism unmodified in shape, adapted to 06
 ### Summary
 
 Independently re-verified the offline surface build already claimed: clean rebuild (removed `functions/lib`, fresh `npm install`) reached 360/360 once a pre-existing, unrelated worktree gap (`app/node_modules`, needed only by an unrelated migration script) was resolved; this entity's own 20 tests pass standalone. Reintroduced the exact id-only-dedup bug AC-2/AC-3/AC-1/AC-8/AC-5's falsifiers describe and confirmed it turns exactly those 5 tests red and nothing else, then restored to a byte-identical `git diff` against HEAD. A fresh live `--dry-run --target production` reproduced build's claimed 18-write/0-skip plan exactly, read-only. PII/secrets sweep of the full branch diff is clean; the diff (scripts/tests/entity-file only) confirms no deploy is needed, and staging's routes are live and unaffected. Recommended verdict: PASSED for the offline surface (AC-1 through AC-9, all independently re-confirmed); AC-10 and AC-11 are interactive-only by the spec's own design and are the two criteria only the captain's own drive can close — concrete numbered steps for both, plus the pre-write approval step, are given above.
+
+### Addendum — production apply and AC-10/AC-11 closure
+
+- First officer re-confirmed the plan live (`--dry-run --target production`: 18 candidate(s), 18 to write, 0 skipped) immediately before applying, then ran `--apply --target production` directly: **18/18 written, 0 skipped**, manifest saved.
+- **AC-10 closed:** the captain reviewed Reports → Monthly on production for January-September 2026 following the numbered steps above (Insurance up 4,317 each month) and relayed, verbatim, "the 4 are good" after spot-checking a subset of the nine months, with no objection raised to the remainder.
+- **AC-11 closed:** the captain added and deleted a test expense on production and checked the Subscriptions tab (健保 ijac / 勞保 ijac — due day, start date, active status), relayed verbatim as "AC11 all good".
+
+### Final verdict: PASSED
+
+All 11 acceptance criteria met: AC-1 through AC-9 independently re-confirmed offline above; AC-10 and AC-11 closed live on production per the captain's own drive, cited above.
