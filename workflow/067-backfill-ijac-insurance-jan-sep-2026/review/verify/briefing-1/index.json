@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:067:verify:attempt-1:revision-1",
+  "question": "AC-1 through AC-9 independently re-confirmed (clean rebuild, 360/360 suite, the id-only-dedup bug's falsifier reproduced exactly the 5 expected red tests). A fresh live dry-run against production reproduced the exact 18-write/0-skip plan. Since staging has no equivalent subscriptions/category, this entity's rehearsal already happened offline against seeded fixtures -- there's no separate live staging apply to approve. Ready to approve the plan for a direct production apply, then do your own live drive for AC-10/AC-11?",
+  "artifacts": [
+    {
+      "id": "artifact:067:verify:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/173a716890e949911a93af64398cc4368dc30b11/workflow/067-backfill-ijac-insurance-jan-sep-2026/index.md",
+      "rev": "sha256:19057c61b112ef13a36cd1957d51324a26690644cd6c6c7cdec0167cb4c31aa1",
+      "mediaType": "text/markdown",
+      "summary": "Verify: AC-1-9 PASSED, independently re-confirmed (clean rebuild, 360/360 suite, id-only-dedup falsifier reproduced exactly 5 red tests, then restored). Live dry-run against production reproduced the exact 18-write/0-skip plan build claimed. PII/secrets sweep clean. No deploy needed. No staging apply needed either -- staging holds neither the real subscriptions nor a matching category, so this entity's staging-equivalent rehearsal was the offline seeded-fixture test suite during build. AC-10/AC-11 are captain-only: numbered manual-test steps given for both, plus a pre-write approval step for the 18-row production plan itself."
+    }
+  ]
+}
