@@ -9,8 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-067-backfill-ijac-insurance-jan-sep-2026
 issue:
-pr:
-mod-block:
+pr: "#38"
+mod-block: merge:pr-merge
 gates:
     version: 1
     records:
@@ -60,6 +60,17 @@ gates:
                 id: briefing:067:verify:attempt-1:revision-1
                 digest: sha256:b55afb271aeb181475ed8df91c7b07eaec2201409588a0a21c14fbdd06b302a3
                 room-ref: ./review/verify/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:067:verify:1
+                briefing: briefing:067:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-10T08:15:39.83738Z"
+                decision: approve
+                reason: 'Approved after full drive: production apply confirmed 18/18, captain confirmed Reports totals and everyday use/Subscriptions tab unaffected. All 11 ACs met.'
+              application:
+                target-stage: done
+                state: pending
 ---
 
 Ijac's own 健保 (health insurance) and 勞保 (labor insurance) recurring costs — like wei's equivalent subscriptions backfilled in entity `065` — need to be backfilled from January through September 2026. Unlike `065`'s scope, this window explicitly includes September, since a live subscription with `due_day: 1` and a `start_date` after the 1st of the month it's created in does not actually fire for that first month (found while building `065`).
