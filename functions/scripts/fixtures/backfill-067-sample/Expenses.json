@@ -1,0 +1,11 @@
+[
+  ["id", "date", "amount", "category_id", "paid_by", "created_by", "notes", "created_at"],
+  ["exp-hist-2023-0001", "2023-03-01", "999", "cat_099", "user1", "user1", "decoy historical row", ""],
+  ["exp-hist-mortgage-2023-0001", "2023-04-01", "5000", "cat_099", "user1", "user1", "decoy mortgage row", ""],
+  ["exp-sub065-sub-1788758970594-2026-01-01", "2026-01-01", "2105", "cat_024", "wei", "wei", "勞保", ""],
+  ["exp-mig066-r1", "2026-02-15", "500", "cat_005", "ijac", "ijac", "decoy migration row", ""],
+  ["exp-auto-sub-1788741741902-2026-10-05", "2026-10-05", "3172", "cat_024", "ijac", "ijac", "健保 ijac", ""],
+  ["exp-1690000000000", "2026-04-15", "888", "cat_099", "wei", "wei", "unrelated manual row", ""],
+  ["exp_2024_0007", "2024-05-01", "777", "cat_099", "user2", "user2", "legacy decoy row", ""],
+  ["exp-1788800000000", "2026-03-05", "3172", "cat_024", "ijac", "ijac", "健保 paid manually before backfill ran", ""]
+]

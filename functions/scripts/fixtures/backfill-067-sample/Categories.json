@@ -1,0 +1,5 @@
+[
+  ["id", "name_en", "name_zh", "icon", "sort_order", "is_active"],
+  ["cat_024", "Insurance", "保險", "shield", "24", "true"],
+  ["cat_099", "Other", "其他", "dots", "99", "true"]
+]
