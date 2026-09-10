@@ -11,6 +11,17 @@ worktree:
 issue:
 pr:
 mod-block:
+gates:
+    version: 1
+    records:
+        - id: gate:068:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:068-ideation-1
+              briefing:
+                id: briefing:068:ideation:attempt-1:revision-1
+                digest: sha256:90ca23ac973e7d0b11350a5eb7f1f1eef5c3a6ef9bc0a1385423846e7d9830b4
+                room-ref: ./review/ideation/briefing-1
 ---
 
 Reports currently requires stepping month by month (Annual/Monthly navigation) to reach a specific month. The captain wants to jump straight to any month, using a picker UI similar to the day picker already used elsewhere in the app (`app/app/components/DatePickerModal.tsx`, used on Home, History, Subscriptions, and the expense-edit sheet).

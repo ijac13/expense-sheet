@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:068:ideation:attempt-1:revision-1",
+  "question": "Approve the ideation scope for a Reports month picker (jump-to-month UI modeled on the existing DatePickerModal) to proceed to spec?",
+  "artifacts": [
+    {
+      "id": "artifact:068:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/4ad1f655746ae40f837dc4d1ddcb62b6cae76288/workflow/068-reports-month-picker/index.md",
+      "rev": "sha256:17804769d2df33c772bd72105e16e23b0af8866636abaf3e68d69ed1b1db1360",
+      "mediaType": "text/markdown",
+      "summary": "Add a month picker to Reports so the captain can jump directly to any month instead of stepping one month at a time, styled/interacted like the existing DatePickerModal (Home/History/Subscriptions/expense-edit). Out of scope: changing DatePickerModal's day-picking behavior, changing what Reports shows once a month is selected, and an Annual-view picker (spec to confirm if needed). Spec stage resolves: DatePickerModal's actual UI shape, hooking into existing Monthly nav state vs new state, year-jumping, and whether to build a sibling MonthPickerModal or extend DatePickerModal with a mode."
+    }
+  ]
+}
