@@ -255,3 +255,40 @@ Live investigation confirmed both ijac subscriptions exist on production (健保
 ### Summary
 
 Reused entity 065's proven backfill mechanism unmodified in shape, adapted to 067's own 2 pinned subscriptions (健保 3172, 勞保 1145, both `cat_024`, due day 5) and 9 fixed Jan-Sep 2026 dates, under a new `exp-sub067-` id/manifest namespace. All 9 offline acceptance criteria (AC-1 through AC-9) are met and evidenced by 20 new unit tests plus a live read-only dry-run against production, which independently confirms the spec's own claim of exactly 18 candidates with 0 skips today. The fixture deliberately seeds a value-level dedup collision (absent from real production data) to exercise the dedup path per the test plan, alongside decoys under all 7 known id families including the live scheduler's own future `exp-auto-` write for these same 2 subscriptions. AC-10/AC-11 are interactive-only and deferred to the verify stage, unchanged from the spec's own split. Full repo test suite (360 tests) passes with no regressions.
+
+## Stage Report: verify
+
+- DONE: Independently re-run and falsify the offline surface from a clean rebuild, and independently re-run a live --dry-run against production to confirm the 18/0 candidate split still holds unchanged.
+  `rm -rf functions/lib && npm install && npm test`: 332/333 — the sole failure (`normalize-category-ids.test.js`) is a pre-existing worktree gap (missing `app/node_modules`, needed by an unrelated migration script), confirmed by symlinking the main checkout's `app/node_modules` and re-running clean: 360/360, no regressions. `functions/test/backfill-subscription-067.test.js` standalone: 20/20. Falsified AC-2/AC-3/AC-1/AC-8/AC-5 by rewriting `planCandidates` to an id-only dedup (dropping the `byKey`/`dedupKey` value check): exactly 5 tests went red ("AC-2: the 健保/March candidate...", "AC-3: the 17-row write set...", "AC-1 / AC-8: --apply writes 17...", "AC-5: undo removes exactly...", "dry-run against the checked-in fixture...") and nothing else. Restored the original file and confirmed `git status --short`/`git diff` empty, then re-ran 20/20 clean. Live `node -r ./scripts/load-local-env.js scripts/backfill-subscription-067.js --target production --dry-run`: `18 candidate(s), 18 to write, 0 skipped`, all 18 ids and values matching build's claimed plan exactly — `READONLY_SCOPE` only, no write.
+- DONE: Run the Mandatory PII/Secrets Check over the full branch diff.
+  `git diff main...HEAD` across all 4 changed source files, grepped for key/secret/token/password/PEM patterns, emails, phone numbers: zero hits beyond the env-var *names* (`GOOGLE_SERVICE_ACCOUNT_KEY_STAGING`) and stub literals (`"{}"`, `"sheet-under-test"`) already used by sibling entities' tests. Only identifiers present are first names (`ijac`, `wei`) matching the app's existing data model across every prior entity. No `.env*` file is part of the diff.
+- DONE: Confirm no deploy is needed (this entity touches only functions/scripts/ and functions/test/, matching 060-066's pattern, not app/ or functions/src/) and confirm staging is otherwise unaffected.
+  `git diff main...HEAD --name-only`: only `functions/scripts/backfill-subscription-067.js`, `functions/scripts/fixtures/backfill-067-sample/{Categories,Expenses}.json`, `functions/test/backfill-subscription-067.test.js`, and this entity file — zero touches to `app/`, `functions/src/`, or any deploy config. `curl -sI https://expense-sheet-staging.web.app/` → 200; `curl -sI https://expense-sheet-staging.web.app/api` → 401 unauthenticated (correct fail-closed) — staging serves exactly as before.
+- DONE: Provide concrete numbered manual-test steps for the captain covering: reviewing/approving whatever the apply step requires, AC-10 (Reports Insurance total up by exactly 4,317 each month Jan-Sep, October unaffected) and AC-11 (everyday use unaffected, Subscriptions tab unchanged).
+  See "The captain's manual test" below.
+
+### The captain's manual test
+
+**Before anything is written — approving the plan**
+
+1. This backfill adds 18 new expense rows to production, none of them changing anything that already exists: 9 rows of 健保 at 3,172 (Jan-Sep 2026) and 9 rows of 勞保 at 1,145 (Jan-Sep 2026). A live check against the real production sheet just now confirmed this exact 18-write/0-skip plan still holds.
+2. Tell the first officer if this matches what you expect. Your go-ahead here is what allows the write to actually happen — nothing is written to production before you say so. (Staging has no equivalent 健保/勞保 subscriptions or matching Insurance category to rehearse against live, so this entity's staging rehearsal already happened offline against seeded fixtures during build — there is no live staging apply step to approve separately, unless you'd like one anyway.)
+
+**After it's applied to production — AC-10, checking Reports**
+
+3. Open **https://expense-sheet-b2db8.web.app** and sign in with your usual Google account.
+4. Tap **Reports**, switch to **Monthly**, and step to **January 2026**. Expect: the Insurance category total is 4,317 higher than it showed before (3,172 + 1,145).
+5. Step through **February, March, April, May, June, July, August, September 2026** one at a time. Expect: each of those months, Insurance up by 4,317 versus before.
+6. Step to **October 2026**. Expect: totals unchanged from before this backfill — this entity does not touch October onward, and the live scheduler's own first fire for these two subscriptions is 2026-10-05.
+7. Tell the first officer whether steps 4-6 looked right.
+
+**After it's applied — AC-11, everyday use and Subscriptions unaffected, can be done anytime**
+
+8. Still on **https://expense-sheet-b2db8.web.app**, tap **Home**. Add an expense the way you normally would — any amount, any category. Expect: it appears in today's list immediately.
+9. Delete the expense you just added. Expect: it disappears.
+10. Tap **Subscriptions**. Find **健保 ijac** and **勞保 ijac**. Expect: due day (5), start date (2026-09-07), and active status all look exactly as you left them — this backfill never touches this tab.
+11. Tell the first officer whether steps 8-10 behaved as expected.
+
+### Summary
+
+Independently re-verified the offline surface build already claimed: clean rebuild (removed `functions/lib`, fresh `npm install`) reached 360/360 once a pre-existing, unrelated worktree gap (`app/node_modules`, needed only by an unrelated migration script) was resolved; this entity's own 20 tests pass standalone. Reintroduced the exact id-only-dedup bug AC-2/AC-3/AC-1/AC-8/AC-5's falsifiers describe and confirmed it turns exactly those 5 tests red and nothing else, then restored to a byte-identical `git diff` against HEAD. A fresh live `--dry-run --target production` reproduced build's claimed 18-write/0-skip plan exactly, read-only. PII/secrets sweep of the full branch diff is clean; the diff (scripts/tests/entity-file only) confirms no deploy is needed, and staging's routes are live and unaffected. Recommended verdict: PASSED for the offline surface (AC-1 through AC-9, all independently re-confirmed); AC-10 and AC-11 are interactive-only by the spec's own design and are the two criteria only the captain's own drive can close — concrete numbered steps for both, plus the pre-write approval step, are given above.
