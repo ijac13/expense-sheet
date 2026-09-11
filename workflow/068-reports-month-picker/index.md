@@ -1,13 +1,13 @@
 ---
 id: 068
 title: Add a Month Picker to Reports
-status: spec
+status: build
 source: captain
 started: 2026-09-11T07:54:16Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-068-reports-month-picker
 issue:
 pr:
 mod-block:
@@ -40,6 +40,16 @@ gates:
                 id: briefing:068:spec:attempt-1:revision-1
                 digest: sha256:63de9931472615dc85ceb06b5f6d42b1093429a7b375ac4fed83c7c6d026342f
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:068:spec:1
+                briefing: briefing:068:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-11T08:05:39.358649Z"
+                decision: approve
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 Reports currently requires stepping month by month (Annual/Monthly navigation) to reach a specific month. The captain wants to jump straight to any month, using a picker UI similar to the day picker already used elsewhere in the app (`app/app/components/DatePickerModal.tsx`, used on Home, History, Subscriptions, and the expense-edit sheet).
