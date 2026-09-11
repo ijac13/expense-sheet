@@ -1,7 +1,7 @@
 ---
 id: 068
 title: Add a Month Picker to Reports
-status: build
+status: verify
 source: captain
 started: 2026-09-11T07:54:16Z
 completed:
