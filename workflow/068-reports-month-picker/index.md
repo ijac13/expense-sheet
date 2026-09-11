@@ -32,6 +32,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:068:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:068-spec-1
+              briefing:
+                id: briefing:068:spec:attempt-1:revision-1
+                digest: sha256:63de9931472615dc85ceb06b5f6d42b1093429a7b375ac4fed83c7c6d026342f
+                room-ref: ./review/spec/briefing-1
 ---
 
 Reports currently requires stepping month by month (Annual/Monthly navigation) to reach a specific month. The captain wants to jump straight to any month, using a picker UI similar to the day picker already used elsewhere in the app (`app/app/components/DatePickerModal.tsx`, used on Home, History, Subscriptions, and the expense-edit sheet).

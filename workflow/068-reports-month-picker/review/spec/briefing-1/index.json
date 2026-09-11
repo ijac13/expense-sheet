@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:068:spec:attempt-1:revision-1",
+  "question": "Approve the spec for the Reports month picker (MonthPickerModal as a new sibling component, 13 ACs with proposed offline/interactive proof) to proceed to build?",
+  "artifacts": [
+    {
+      "id": "artifact:068:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/01a32a1a9686a9faa17bd210e6258c328428d5ff/workflow/068-reports-month-picker/index.md",
+      "rev": "sha256:eb3fd0754f5a206de06d7c502a91f49aa5eb2099019eaacc76e194b1f6167955",
+      "mediaType": "text/markdown",
+      "summary": "Spec resolves ideation's four open questions: MonthPickerModal ships as a NEW SIBLING component to DatePickerModal (not a mode prop) to protect DatePickerModal's four-site pinned 26-AC suite; reuses year/month as plain numbers matching Reports' own state; exposes the same tap-title year-list flow DatePickerModal already has; and the Monthly trigger button supplements (not replaces) the existing prev/next chevrons. Annual view gets no analogous control. Design is grounded in a direct, line-cited read of DatePickerModal.tsx, reports/page.tsx, and both locale files. Risk evidence: no spike needed — every mechanism (portal+stopPropagation guard, local-calendar-part arithmetic, year-list range/selection) is reused verbatim from DatePickerModal's already-proven, already-tested code; the one new piece (bare year stepping) is a strict subset of DatePickerModal's existing year-view arithmetic. 13 ACs: AC-1 through AC-11 offline (jsdom render-test harness, new month-picker.render.test.js), AC-12/AC-13 interactive (staging live drive) — each with Verified by/Falsified by clauses. AC-10 pins DatePickerModal itself unmodified; AC-8 pins Annual unchanged."
+    }
+  ]
+}
