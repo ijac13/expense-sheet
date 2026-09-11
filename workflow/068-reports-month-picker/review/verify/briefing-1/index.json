@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:068:verify:attempt-1:revision-1",
+  "question": "Verify PASSED on staging for the Reports month picker — approve to merge?",
+  "artifacts": [
+    {
+      "id": "artifact:068:verify:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/8244dd018b98cabd991205dc1daf17ac3218f442/workflow/068-reports-month-picker/index.md",
+      "rev": "sha256:afdd906b20c92615ceffb0a68eebf5cd23ce0eb6b4fdca0fc376a76d3351144b",
+      "mediaType": "text/markdown",
+      "summary": "Verdict: PASSED. AC-1 through AC-11 fully verified with live evidence (curl HTTP responses, sha256 chunk-hash matches between local build and live staging, HTTP/2 200 checks) — not code inspection. Offline suite re-run fresh (221/221) and mutation-tested (flipped the grid-count and button-testid assertions to confirm they can fail, then reverted) to rule out a tautological suite. DatePickerModal.tsx confirmed byte-unchanged with its 34-test suite still green (AC-10). Deployed chunk hashes verified to match the built output (sha256 identical, fresh Last-Modified). Mandatory PII/secrets scan of the full branch diff is clean. AC-12/AC-13 are staging-ready, correctly left for the captain's own live-drive per the spec's interactive classification — numbered manual-test steps are written into the entity body. Staging URL: https://expense-sheet-staging.web.app."
+    }
+  ]
+}
