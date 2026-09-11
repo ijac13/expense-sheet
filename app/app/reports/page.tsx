@@ -20,6 +20,7 @@ import {
 } from "../lib/reportTypes";
 import { getMonthlySummary, getAnnualSummary } from "../lib/reportService";
 import DrillDown from "./DrillDown";
+import MonthPickerModal from "../components/MonthPickerModal";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { USERS } from "../lib/users";
 import { useTranslation } from "react-i18next";
@@ -399,6 +400,7 @@ export default function ReportsPage() {
   // Monthly navigation
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
 
   // Annual navigation
   const [annualYear, setAnnualYear] = useState(now.getFullYear());
@@ -551,13 +553,30 @@ export default function ReportsPage() {
               <button type="button" onClick={prevMonth} className="btn btn-ghost btn-sm">
                 <ChevronLeft size={18} />
               </button>
-              <span className="font-semibold text-base">
+              <button
+                type="button"
+                data-testid="reports-month-button"
+                onClick={() => setMonthPickerOpen(true)}
+                className="font-semibold text-base"
+              >
                 {monthly?.label ?? `${MONTH_SHORT[month - 1]} ${year}`}
-              </span>
+              </button>
               <button type="button" onClick={nextMonth} className="btn btn-ghost btn-sm">
                 <ChevronRight size={18} />
               </button>
             </div>
+
+            {monthPickerOpen && (
+              <MonthPickerModal
+                year={year}
+                month={month}
+                onPick={(y, m) => {
+                  setYear(y);
+                  setMonth(m);
+                }}
+                onClose={() => setMonthPickerOpen(false)}
+              />
+            )}
 
             {monthly && monthly.total === 0 ? (
               <div className="text-center py-16 text-base-content/40">

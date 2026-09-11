@@ -195,3 +195,29 @@ No spike needed: the design reuses DatePickerModal's already-proven mechanisms e
 ### Summary
 
 Spec resolves all four open questions from ideation: `MonthPickerModal` is a new sibling component (not a `DatePickerModal` mode prop, to protect its four-site pinned suite), reuses year/month as plain numbers matching Reports' existing state, exposes the same tap-title year-list DatePickerModal already has, and the Monthly trigger button supplements (does not replace) the existing chevrons — Annual gets no analogous control, closing that ideation question explicitly. Design decisions are grounded in direct reads of `DatePickerModal.tsx`, `reports/page.tsx`, and both locale files rather than assumption.
+
+## Stage Report: build
+
+- DONE: A brief implementation plan is written before coding begins.
+  Read `DatePickerModal.tsx`, `reports/page.tsx`, `reportService.ts`, `test/helpers/dom.js`, and `date-picker.render.test.js` first; planned component reuse, locale keys, Reports wiring, and test coverage before writing any code (recorded in-session before the first Write call).
+- DONE: Every acceptance criterion (AC-1 through AC-13) from the spec is explicitly checked off in the stage report with evidence — offline ACs actually run and passing, interactive ACs documented as pending.
+  AC-1..AC-9, AC-11 offline, run and passing: `node --test test/month-picker.render.test.js` — 13/13 tests green.
+  AC-1 (12-cell grid, scoped to year): `test/month-picker.render.test.js:139`.
+  AC-2 (onPick fires once with numbers, then closes): `:150`.
+  AC-3 (opening highlights exactly one matching cell): `:164`.
+  AC-4 (prev/next step exactly one year, full 12-month redraw): `:172`.
+  AC-5 (year list range/selection flow, no pick/close on year pick): `:185`.
+  AC-6 (backdrop/close/Escape never fire onPick, state unchanged): `:213`.
+  AC-7 (Reports label is a real button; pick updates period; chevrons rebase from the pick): `:274` — mounts the real `.test-build-ui/reports/page.js`.
+  AC-8 (Annual has no month-picker control; year stepping intact): `:304`.
+  AC-9 (`picker.previous_year`/`next_year` present in both locales, zh genuinely translated): `:245`.
+  AC-10 (`DatePickerModal.tsx` unmodified, its suite passes unchanged): `git diff 19b69f5 -- app/app/components/DatePickerModal.tsx` is empty; `node --test test/date-picker.render.test.js` — 34/34 passing, unchanged.
+  AC-11 (`npm test` clean, new file registered): `npm test` exits 0, 221/221 passing; in-file registration check at `:334`; `package.json`'s `test` script now lists `test/month-picker.render.test.js`.
+  AC-12 (staging visual parity with DatePickerModal's chrome): interactive — pending captain/live-drive verification on staging, not run here.
+  AC-13 (a year-list-reached month loads real staging data, including empty state): interactive — pending captain/live-drive verification on staging, not run here.
+- DONE: No regressions on existing features: `DatePickerModal.tsx` is unmodified (AC-10) and its existing 26-AC pinned suite still passes unchanged.
+  Same evidence as AC-10 above — zero-line diff and 34/34 passing; full `npm test` run is 221/221 passing with no other file's suite affected.
+
+### Summary
+
+Built `app/app/components/MonthPickerModal.tsx` as a new sibling of `DatePickerModal`, reusing its portal, backdrop-guard, and year-list mechanisms for a 12-month grid instead of a day grid. Reports' Monthly nav label became a real `<button data-testid="reports-month-button">` that opens the new modal at the current year/month, wired to `setYear`/`setMonth` directly; the existing prev/next chevrons are untouched and now rebase correctly from a picked month (AC-7). Added the two new locale keys (`picker.previous_year`/`next_year`, both genuinely translated), a 13-test offline suite (`test/month-picker.render.test.js`) covering AC-1 through AC-9 and AC-11, and registered the file in `package.json`'s `test` script. Full `npm test` is green (221/221), and `DatePickerModal.tsx` is byte-for-byte unchanged with its own 26-AC suite still passing. AC-12/AC-13 are staging-only and remain for the captain's live-drive review.
