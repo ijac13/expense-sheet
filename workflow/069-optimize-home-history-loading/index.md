@@ -303,3 +303,7 @@ Staging is running this exact branch: hosting and both functions are freshly dep
 3. Open a brand-new tab and go to https://expense-sheet-staging.web.app again, sign in if asked, and go straight to History.
 4. Watch the expense list closely from the moment it appears until it's fully settled.
 5. Pass: every category name and icon looks right from the very first instant — you never see a raw code like `cat_003` instead of a real category name, even for a split second. Fail: you see a raw code at any point — note which expense/category and report it back.
+
+### Closing addendum
+
+Per captain, direct: AC-11 and AC-12 checked on staging — both good. With AC-1 through AC-10 already PASSED on live-adjacent evidence, all 12 acceptance criteria are now met.
