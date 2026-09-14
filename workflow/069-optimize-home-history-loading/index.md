@@ -1,7 +1,7 @@
 ---
 id: 069
 title: Optimize Home, History, and Reports Loading Time
-status: build
+status: verify
 source: captain
 started: 2026-09-14T03:20:41Z
 completed:
