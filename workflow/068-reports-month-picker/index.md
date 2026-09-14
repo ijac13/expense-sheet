@@ -70,6 +70,8 @@ gates:
                 state: consumed
 ---
 
+**Deployed to production:** `firebase deploy --only hosting --project production` run 2026-09-14 (hosting only — this entity touches `app/` only, `functions/` untouched), from a fresh `npm run build` in the main checkout (not a worktree, per this repo's known pattern — real staging/production creds only resolve from `app/.env.local` at the repo root). Confirmed live, not just exit-code success: `sha256(app/out/index.html)` == `sha256(curl https://expense-sheet-b2db8.web.app/)` == `5b583f8...bf4bab`; `Last-Modified: Mon, 14 Sep 2026 02:28:19 GMT` (fresh, seconds after deploy). The chunk carrying the new code (`_next/static/chunks/0ca9c41l5i8.f.js`) is byte-identical to the local build (sha256 match) and its live content contains `reports-month-button` and `month-picker`. Both new locale keys are live: `curl .../locales/{en,zh}/common.json` returns `"previous_year": "Previous year"` / `"上一年"` and `"next_year": "Next year"` / `"下一年"`.
+
 Reports currently requires stepping month by month (Annual/Monthly navigation) to reach a specific month. The captain wants to jump straight to any month, using a picker UI similar to the day picker already used elsewhere in the app (`app/app/components/DatePickerModal.tsx`, used on Home, History, Subscriptions, and the expense-edit sheet).
 
 ## User Stories
