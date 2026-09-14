@@ -1,16 +1,16 @@
 ---
 id: 069
 title: Optimize Home, History, and Reports Loading Time
-status: verify
+status: done
 source: captain
 started: 2026-09-14T03:20:41Z
-completed:
-verdict:
+completed: 2026-09-14T08:54:37Z
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-069-optimize-home-history-loading
 issue:
 pr: pr-merge:40
-mod-block: merge:pr-merge
+mod-block:
 gates:
     version: 1
     records:
@@ -70,7 +70,8 @@ gates:
                 reason: 'Captain approved: staging deploy confirmed byte-identical, full suites green, invalidation mechanism independently re-verified and strengthened. AC-11/AC-12 to be checked on captain''s own staging visit.'
               application:
                 target-stage: done
-                state: pending
+                state: consumed
+archived: 2026-09-14T08:54:37Z
 ---
 
 The captain wants Home, History, and Reports to load faster. A concrete symptom surfaced while reviewing entity `067`'s work: History briefly showed a raw category id (`cat_003`) instead of its name on the production app, right after two large backfills (`066`: 203 rows, `067`: 18 rows) landed on production in quick succession. The categories API was independently confirmed live and responsive minutes later (401 in ~0.5s, normal), so this looks like a one-off failed category fetch, not an ongoing outage — but it's worth investigating as a real symptom of whatever is making these pages slow, not dismissed. Separately, the captain flagged that Reports triggers a new loading state every time she steps to a different month — she wants that fixed too.
