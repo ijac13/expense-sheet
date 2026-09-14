@@ -16,9 +16,7 @@ import { Expense } from "./expenses";
 import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory } from "./categories";
 import { getCategories } from "./categoryService";
 import { USERS } from "./users";
-import { apiFetch } from "./apiClient";
-
-const API_BASE = "/api";
+import { getSharedExpenses } from "./expensesCache";
 
 // ---------------------------------------------------------------------------
 // Category metadata — resolved live-list-first, DEFAULT_CATEGORIES as fallback
@@ -27,10 +25,21 @@ const API_BASE = "/api";
 // so a rename or a staging-only id (e.g. `cat_003`) resolves correctly. Falls back
 // to DEFAULT_CATEGORIES only if the live fetch fails (offline/API down), and to the
 // raw id only if the category genuinely isn't in either list (AC-1..AC-4).
+//
+// Cached per session, not per call (AC-5): stepping months must not re-issue
+// this request. Only a genuine success is cached — a failed fetch is retried
+// on the next call rather than pinning the page to DEFAULT_CATEGORIES for the
+// rest of the session.
+let cachedCategoryList: Category[] | null = null;
+
 async function fetchCategoryList(): Promise<Category[]> {
+  if (cachedCategoryList) return cachedCategoryList;
   try {
     const live = await getCategories();
-    if (live && live.length > 0) return live;
+    if (live && live.length > 0) {
+      cachedCategoryList = live;
+      return live;
+    }
   } catch {
     // GET /api/categories failed — fall through to the DEFAULT_CATEGORIES fallback.
   }
@@ -64,14 +73,11 @@ function resolvePayerName(payer: Exclude<PayerFilter, "all">): string {
 }
 
 // ---------------------------------------------------------------------------
-// Data fetcher — cached per call (no module-level cache to avoid stale data)
+// Data fetcher — the session-scoped cache shared with Home and History
+// (expensesCache.ts), invalidated on every local write.
 // ---------------------------------------------------------------------------
 async function fetchAllExpenses(): Promise<Expense[]> {
-  const res = await apiFetch(API_BASE);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch expenses: ${res.status} ${res.statusText}`);
-  }
-  return res.json() as Promise<Expense[]>;
+  return getSharedExpenses();
 }
 
 // ---------------------------------------------------------------------------

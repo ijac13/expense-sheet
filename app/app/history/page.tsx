@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { X, SlidersHorizontal, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getAllExpenses } from "../lib/historyService";
-import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory } from "../lib/categories";
+import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory, getCachedCategoriesFull, saveCachedCategoriesFull } from "../lib/categories";
 import { getCategories } from "../lib/categoryService";
 import { Expense } from "../lib/expenses";
 import { USERS } from "../lib/users";
@@ -323,7 +323,10 @@ export default function HistoryPage() {
   // The full live list, archived categories included — an expense on an archived
   // category still has to resolve its icon (AC-6). The `is_active` filter belongs
   // on the picker/filter UI below, not on the resolution source.
-  const [allCategories, setAllCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  // Seeded from this device's last-known-good full list (063-style cache, kept
+  // separately from Home's active-only one) so a live `cat_NNN` id resolves on
+  // the very first render, before this load's own categories fetch resolves.
+  const [allCategories, setAllCategories] = useState<Category[]>(() => getCachedCategoriesFull() ?? DEFAULT_CATEGORIES);
   const [selected, setSelected] = useState<Expense | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -341,10 +344,13 @@ export default function HistoryPage() {
     function loadCategories() {
       getCategories()
         .then((cats) => {
-          if (cats.length > 0) setAllCategories(cats);
+          if (cats.length > 0) {
+            setAllCategories(cats);
+            saveCachedCategoriesFull(cats);
+          }
         })
         .catch(() => {
-          // Keep the current categories (DEFAULT_CATEGORIES on first load) as fallback
+          // Keep the current categories (cache or DEFAULT_CATEGORIES) as fallback
         });
     }
     loadCategories();

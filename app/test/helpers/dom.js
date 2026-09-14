@@ -100,8 +100,10 @@ const SCHEDULER_OK = {
  *   deferCategories holds GET /api/categories open until releaseCategories() is
  *   called — the sub-second window before the live list resolves, which is
  *   otherwise unobservable because mount() flushes it away.
+ *   deferExpenses holds GET /api open until releaseExpenses() is called — same
+ *   purpose as deferCategories, for the shared expense cache's own fetch.
  */
-function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK, subscriptions: subFixture = SUBSCRIPTIONS, failSubscriptionWrites = false, expenses: expFixture = EXPENSES, deferCategories = false } = {}) {
+function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK, subscriptions: subFixture = SUBSCRIPTIONS, failSubscriptionWrites = false, expenses: expFixture = EXPENSES, deferCategories = false, deferExpenses = false } = {}) {
   const dom = installDom();
 
   // Mutable so a test can fail the categories fetch, then let a retry succeed
@@ -112,6 +114,10 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
   let release = null;
   const gate = deferCategories ? new Promise((r) => { release = r; }) : null;
   const releaseCategories = () => release?.();
+
+  let releaseExp = null;
+  const expGate = deferExpenses ? new Promise((r) => { releaseExp = r; }) : null;
+  const releaseExpenses = () => releaseExp?.();
 
   // jsdom implements neither API, so these records are the only way to observe a
   // page trying to move the viewport. A fix that keeps the captain's place must
@@ -136,11 +142,21 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
   const subscriptions = subFixture.map((s) => ({ ...s }));
   const subWrites = [];
   const expWrites = [];
+  // A per-run mutable copy, like `categories` above — a write via
+  // addExpense/updateExpense/deleteExpense has to actually change what a
+  // subsequent GET /api serves, so a test can prove the shared cache's
+  // invalidation (AC-8/AC-10) against real refetched data, not a static fixture.
+  const expenses = expFixture.map((e) => ({ ...e }));
+  // GET-only request log, method-aware — `requests` above also records writes
+  // to the same href, which would over-count a GET-request-dedup assertion
+  // (AC-5/AC-9) if used directly.
+  const getRequests = [];
 
   global.fetch = async (url, init = {}) => {
     const href = String(url);
     const method = init.method ?? "GET";
     requests.push(href);
+    if (method === "GET") getRequests.push(href);
 
     if (href === "/api/categories" && method === "GET") {
       if (gate) await gate;
@@ -191,18 +207,51 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
       Object.assign(target, body);
       return { ok: true, status: 200, json: async () => ({ ...target }) };
     }
-    // addExpense POSTs to bare "/api". Recorded rather than served by the
-    // fall-through, so a test can assert on the category_id that was actually
-    // SENT — the whole question this entity turns on.
+    // getTodayExpenses/getAllExpenses/reportService's fetchAllExpenses all read
+    // this same bare "/api" GET, through the shared session cache — gated the
+    // same way GET /api/categories is, so a test can observe the pre-resolution
+    // window and prove the cache dedupes concurrent/repeat callers.
+    if (href === "/api" && method === "GET") {
+      if (expGate) await expGate;
+      return { ok: true, status: 200, json: async () => expenses.map((e) => ({ ...e })) };
+    }
+    // addExpense POSTs, and updateExpense/deleteExpense PATCH/DELETE, bare
+    // "/api". Recorded rather than served by the fall-through, so a test can
+    // assert on the body that was actually SENT — the whole question this
+    // entity turns on — and mutated into `expenses` so a subsequent GET
+    // reflects the write, proving invalidation rather than a static fixture.
     if (href === "/api" && method !== "GET") {
       const body = JSON.parse(init.body);
       expWrites.push({ method, body });
-      return { ok: true, status: 201, json: async () => ({ id: `exp-${expWrites.length}`, created_at: "2026-08-24T00:00:00.000Z", ...body }) };
+      if (method === "POST") {
+        const created = { id: `exp-${expWrites.length}`, created_at: "2026-08-24T00:00:00.000Z", ...body };
+        expenses.push(created);
+        return { ok: true, status: 201, json: async () => ({ ...created }) };
+      }
+      if (method === "PATCH") {
+        const target = expenses.find((e) => e.id === body.id);
+        if (target) Object.assign(target, body);
+        return { ok: true, status: 200, json: async () => ({ ...target }) };
+      }
+      if (method === "DELETE") {
+        const idx = expenses.findIndex((e) => e.id === body.id);
+        if (idx !== -1) expenses.splice(idx, 1);
+        return { ok: true, status: 200, json: async () => ({}) };
+      }
     }
-    return { ok: true, status: 200, json: async () => expFixture.map((e) => ({ ...e })) };
+    return { ok: true, status: 200, json: async () => expenses.map((e) => ({ ...e })) };
   };
   mockApiClient();
-  return { dom, requests, writes, categories, setCategoryIcon, scrolls, subscriptions, subWrites, expWrites, setOffline, releaseCategories };
+  // Every test simulates a fresh page load/session by calling installGlobals —
+  // reset the shared in-memory expense cache (a real JS module singleton) so
+  // one test's fetch doesn't leak into the next. A test that deliberately wants
+  // to share the cache across pages (AC-9) mounts multiple pages after a SINGLE
+  // installGlobals() call instead of calling it again between mounts. Must run
+  // AFTER mockApiClient(): expensesCache.js is only ever required once per
+  // process, and it would otherwise permanently capture the real (unmocked)
+  // apiClient module from its first load.
+  require("../../.test-build-ui/lib/expensesCache.js").invalidateExpensesCache();
+  return { dom, requests, getRequests, writes, categories, setCategoryIcon, scrolls, subscriptions, subWrites, expenses, expWrites, setOffline, releaseCategories, releaseExpenses };
 }
 
 /**

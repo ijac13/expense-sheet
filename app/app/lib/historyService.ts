@@ -1,18 +1,14 @@
 import { Expense } from "./expenses";
-import { apiFetch } from "./apiClient";
-
-const API_BASE = "/api";
+import { getSharedExpenses } from "./expensesCache";
 
 /**
- * Fetch all expenses from the API, sorted by date descending.
+ * Fetch all expenses from the shared session cache, sorted by date descending.
+ * Clones before sorting — the cache may hand the same array reference to
+ * Home and Reports too, and Array#sort mutates in place.
  */
 export async function getAllExpenses(): Promise<Expense[]> {
-  const res = await apiFetch(API_BASE);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch expenses: ${res.status} ${res.statusText}`);
-  }
-  const all: Expense[] = await res.json();
-  return all.sort((a, b) => {
+  const all = await getSharedExpenses();
+  return [...all].sort((a, b) => {
     const dateDiff = b.date.localeCompare(a.date);
     if (dateDiff !== 0) return dateDiff;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();

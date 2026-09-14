@@ -1,5 +1,6 @@
 import { Expense } from "./expenses";
 import { apiFetch } from "./apiClient";
+import { invalidateExpensesCache } from "./expensesCache";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -16,7 +17,9 @@ export async function updateExpense(
     const err = await res.json().catch(() => ({})) as Record<string, string>;
     throw new Error(err.error ?? `Update failed (${res.status})`);
   }
-  return res.json();
+  const updated = await res.json();
+  invalidateExpensesCache();
+  return updated;
 }
 
 export async function deleteExpense(id: string): Promise<void> {
@@ -29,4 +32,5 @@ export async function deleteExpense(id: string): Promise<void> {
     const err = await res.json().catch(() => ({})) as Record<string, string>;
     throw new Error(err.error ?? `Delete failed (${res.status})`);
   }
+  invalidateExpensesCache();
 }
