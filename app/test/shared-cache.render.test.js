@@ -100,3 +100,19 @@ test("AC-8: deleting an expense via the shared expenseService write path is excl
   const after = await getMonthlySummary(YEAR, MONTH);
   assert.equal(after.total, 0, "the deleted expense no longer appears in a report computed afterward");
 });
+
+test("AC-8: updating an expense via the shared expenseService write path is reflected in a subsequently-computed Reports total", async () => {
+  const TO_UPDATE = { ...expense("upd-1", "cat_001", "to-update"), date: `${YEAR}-${pad(MONTH)}-05`, amount: 750 };
+  installGlobals({ expenses: [TO_UPDATE] });
+
+  const { getMonthlySummary } = require("../.test-build-ui/lib/reportService.js");
+  const { updateExpense } = require("../.test-build-ui/lib/expenseService.js");
+
+  const before = await getMonthlySummary(YEAR, MONTH);
+  assert.equal(before.total, 750, "the fixture expense is counted before the update");
+
+  await updateExpense("upd-1", { amount: 1000 });
+
+  const after = await getMonthlySummary(YEAR, MONTH);
+  assert.equal(after.total, 1000, "the updated amount is reflected in a report computed afterward, not the stale 750");
+});
