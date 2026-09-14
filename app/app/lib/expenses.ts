@@ -1,4 +1,5 @@
 import { apiFetch } from "./apiClient";
+import { getSharedExpenses, invalidateExpensesCache } from "./expensesCache";
 
 export interface Expense {
   id: string;
@@ -56,18 +57,16 @@ export async function addExpense(expense: Omit<Expense, "id" | "created_at">): P
   if (!res.ok) {
     throw new Error(`Failed to save expense: ${res.status} ${res.statusText}`);
   }
-  return res.json() as Promise<Expense>;
+  const created = (await res.json()) as Expense;
+  invalidateExpensesCache();
+  return created;
 }
 
 /**
  * Get all today's expenses from the API.
  */
 export async function getTodayExpenses(): Promise<Expense[]> {
-  const res = await apiFetch(API_BASE);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch expenses: ${res.status} ${res.statusText}`);
-  }
-  const all: Expense[] = await res.json();
+  const all = await getSharedExpenses();
   const today = new Date().toISOString().split("T")[0];
   return all
     .filter((e) => e.date === today)
