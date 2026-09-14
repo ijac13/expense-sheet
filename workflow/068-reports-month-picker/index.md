@@ -10,7 +10,7 @@ score:
 worktree: .worktrees/spacedock-ensign-068-reports-month-picker
 issue:
 pr: "#39"
-mod-block:
+mod-block: merge:pr-merge
 gates:
     version: 1
     records:
