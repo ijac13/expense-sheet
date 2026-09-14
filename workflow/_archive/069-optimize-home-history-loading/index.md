@@ -74,6 +74,8 @@ gates:
 archived: 2026-09-14T08:54:37Z
 ---
 
+**Production deploy:** `firebase deploy --only hosting --project production` run 2026-09-14 (hosting-only — this entity touched no `functions/src` code). Rebuilt fresh (`npm run build` in `app/`, using `app/.env.local`) before deploying. Confirmed live by content match, not just exit code: `sha256(app/out/index.html)` == `sha256(curl https://expense-sheet-b2db8.web.app/)` — `c0a512d2…c349a2` both sides. The chunk carrying this entity's new code (`04s1tlkupo45t.js`) is byte-identical between local and live, and the live-served chunk contains the new `expense_last_categories_full` cache-key string, confirming the new code actually shipped.
+
 The captain wants Home, History, and Reports to load faster. A concrete symptom surfaced while reviewing entity `067`'s work: History briefly showed a raw category id (`cat_003`) instead of its name on the production app, right after two large backfills (`066`: 203 rows, `067`: 18 rows) landed on production in quick succession. The categories API was independently confirmed live and responsive minutes later (401 in ~0.5s, normal), so this looks like a one-off failed category fetch, not an ongoing outage — but it's worth investigating as a real symptom of whatever is making these pages slow, not dismissed. Separately, the captain flagged that Reports triggers a new loading state every time she steps to a different month — she wants that fixed too.
 
 ## User Stories
