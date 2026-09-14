@@ -225,3 +225,38 @@ export function saveCachedCategories(categories: Category[]): void {
     // same as if nothing had ever been cached.
   }
 }
+
+export const LAST_CATEGORIES_FULL_KEY = "expense_last_categories_full";
+
+/**
+ * The same last-known-good pattern as getCachedCategories/saveCachedCategories
+ * above, keyed separately and holding the UNFILTERED list (active AND
+ * archived). History resolves expenses against archived categories too (an
+ * expense filed under a category since archived still needs its name/icon),
+ * so it needs a cache written before any `is_active` filtering — Home's
+ * active-only cache would miss those ids.
+ */
+export function getCachedCategoriesFull(): Category[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LAST_CATEGORIES_FULL_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    return parsed as Category[];
+  } catch {
+    return null;
+  }
+}
+
+/** Overwrites the cached full category list. Swallows a throwing localStorage
+ * rather than letting a full page crash on a successful fetch. */
+export function saveCachedCategoriesFull(categories: Category[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LAST_CATEGORIES_FULL_KEY, JSON.stringify(categories));
+  } catch {
+    // Storage unavailable or full — next load falls back to DEFAULT_CATEGORIES,
+    // same as if nothing had ever been cached.
+  }
+}
