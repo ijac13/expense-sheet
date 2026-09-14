@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:069:spec:attempt-1:revision-1",
+  "question": "Approve this spec to move to build?",
+  "artifacts": [
+    {
+      "id": "artifact:069:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/a715125a0baa1f0a6e87949e91815595399965cd/workflow/069-optimize-home-history-loading/index.md",
+      "rev": "sha256:6c786e219f773cc52b8debd119344756794854bc6b4176ac916ede97f4ecb1a0",
+      "mediaType": "text/markdown",
+      "summary": "Adds a shared session-scoped expense/category cache (plus a full-list category cache for History) so Home, History, and Reports stop redundantly re-fetching, fixes History's raw-category-id fallback, and makes Reports month/year stepping instant from already-fetched data. 12 ACs, 10 offline / 2 interactive (staging)."
+    }
+  ]
+}

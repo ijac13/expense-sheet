@@ -33,6 +33,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:069:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:069-spec-1
+              briefing:
+                id: briefing:069:spec:attempt-1:revision-1
+                digest: sha256:bbfdba9b48b3681d6ea705a880353939357368603cebf5925418fa1c077c1d2e
+                room-ref: ./review/spec/briefing-1
 ---
 
 The captain wants Home, History, and Reports to load faster. A concrete symptom surfaced while reviewing entity `067`'s work: History briefly showed a raw category id (`cat_003`) instead of its name on the production app, right after two large backfills (`066`: 203 rows, `067`: 18 rows) landed on production in quick succession. The categories API was independently confirmed live and responsive minutes later (401 in ~0.5s, normal), so this looks like a one-off failed category fetch, not an ongoing outage — but it's worth investigating as a real symptom of whatever is making these pages slow, not dismissed. Separately, the captain flagged that Reports triggers a new loading state every time she steps to a different month — she wants that fixed too.
