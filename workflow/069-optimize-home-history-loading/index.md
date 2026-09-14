@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-069-optimize-home-history-loading
 issue:
-pr: "#40"
+pr: pr-merge:40
 mod-block: merge:pr-merge
 gates:
     version: 1
