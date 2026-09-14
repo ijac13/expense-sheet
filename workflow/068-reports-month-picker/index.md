@@ -9,7 +9,7 @@ verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-068-reports-month-picker
 issue:
-pr: "#39"
+pr: pr-merge:39
 mod-block: merge:pr-merge
 gates:
     version: 1
