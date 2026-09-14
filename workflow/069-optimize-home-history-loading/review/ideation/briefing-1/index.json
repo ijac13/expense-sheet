@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:069:ideation:attempt-1:revision-1",
+  "question": "Approve this ideation to move to spec?",
+  "artifacts": [
+    {
+      "id": "artifact:069:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/282f1ad10bc14b118cadc8b1689f5a1380717b28/workflow/069-optimize-home-history-loading/index.md",
+      "rev": "sha256:c1d93d8d2cba4cf6967a66d63682083a47fd75575b6ecb9e757ab2e305a57347",
+      "mediaType": "text/markdown",
+      "summary": "Captain wants Home, History, and Reports to load faster; fix the raw category-id fallback bug seen on History; and stop Reports from showing a fresh loading state on every month step."
+    }
+  ]
+}
