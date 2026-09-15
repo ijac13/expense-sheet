@@ -212,3 +212,38 @@ No `functions/src` or `app/` files touched (`git diff --stat` against `main` sho
 ### Summary
 
 Built `scripts/provision.js`, a dependency-free Node script that provisions a new household's Firebase project, service account, and env files entirely under their own `gcloud`/`firebase` login — every network-facing action is a subprocess call to `gcloud`, `firebase`, `npm`, or `curl` against Google's or GitHub's own domains, never a captain-operated endpoint. `docs/provisioning-guide.md` is the captain-hosted static guide households follow; `scripts/fixtures/sheet-template.json` is the single source of truth for the Sheet template's structure, shared between the script's own validation and its test. 16 tests in `scripts/test/` cover AC-1 through AC-8 offline, using PATH-stubbed CLI binaries (this repo's existing no-mocking-library convention) rather than in-process mocks; AC-1 and AC-2 — the two carrying the isolation guarantee — are proven by static source scans with paired falsifying controls, not just by the absence of a bug today. AC-9/AC-10 need a live Google identity and are deferred to verify, as the spec itself specifies.
+
+## Stage Report: verify
+
+- DONE: Independently re-run the full offline test suite fresh AND re-falsify AC-1 and AC-2 (the isolation guarantee) yourself by attempting to break them — introduce a captain literal or a network/telemetry call and confirm the specific test, and only that test, goes red
+  `node --test scripts/test/` fresh → 16/16 pass, independent of build's claim. Falsified AC-1 by adding `if (false) { fetch('https://telemetry.captain-tracker.example.com/report'); }` to `scripts/provision.js` — only test 2 ("AC-1 every network target...") went red, the other 15 stayed green. Reverted (`git checkout -- scripts/provision.js`), confirmed `git status --short` empty. Falsified AC-2 by adding `if (false) { require('posthog-node'); }` — only test 4 ("AC-2 the script requires only node: builtins...") went red, the other 15 (including AC-2's own sibling raw-socket test) stayed green. Reverted, confirmed clean, re-ran full suite: 16/16 again.
+- DONE: Run the Mandatory PII/Secrets Check on the full diff, and confirm the regression claim (zero touch to functions/src or app/, no blast radius to production)
+  `git diff --stat main..HEAD` — 12 files changed, none under `functions/src/` or `app/` (`README.md`, `SETUP.md`, `docs/provisioning-guide.md`, `scripts/fixtures/sheet-template.json`, `scripts/provision.js`, `scripts/test/*`, this entity file); confirms build's regression claim independently. `node scripts/hooks/pre-commit` on the current tree → exit 0 (the repo's own PII hook, which flags TW phone numbers and non-allowlisted emails). Grepped the diff by hand for secret shapes (`api[_-]?key|secret|password|bearer|private[_-]?key|AIza…|sk-…|ghp_…|eyJ…`) — every hit is a variable/field name or an explicit placeholder (`FAKEKEYDATA`, `PRIORKEY`, `fake-api-key`), no real value. Grepped for email/phone shapes — zero real matches (all `@example.com`/`your-*@gmail.com`/`*.iam.gserviceaccount.com` placeholders). No `.env`, `.env.local`, or `*service-account*.json` file appears in the diff; `.gitignore` still excludes all three patterns. The one project-ID/GitHub-org literal that does appear (`expense-sheet-b2db8` in the test file's negative-assertion constant; `github.com/ijac13/expense-sheet` in the guide) is pre-existing public information already scattered across `.firebaserc`, `STAGING_SETUP.md`, and a dozen archived workflow entries on `main` — confirmed via `git grep expense-sheet-b2db8 main` / `git grep ijac13 main` — not a new leak, and it's exactly what AC-3/AC-8 test households' own generated output for the *absence* of.
+- DONE: Write plain-language manual-test steps for AC-9 (a live throwaway-account provisioning drive) and AC-10 (captain's own Firebase/GCP console before/after check) — both need the captain's own live Google identity, not obtainable by an ensign
+  See "Manual test steps for the captain (AC-9, AC-10)" below.
+
+### Manual test steps for the captain (AC-9, AC-10)
+
+There is no staging URL for this entity — the deliverable is a local script (`scripts/provision.js`) and a static guide (`docs/provisioning-guide.md`), not a deployed app. "Running" this means following the guide yourself (or having a delegate do it) on a throwaway Google account, and watching what the script prints.
+
+**AC-9 — the guide + script actually produce a working app for someone with no access to your accounts**
+
+1. Pick or create a Google account you're comfortable using as a "stranger" (not your own household's account) — a fresh Gmail works.
+2. On a machine where you are *not* already signed into `gcloud`/`firebase` as yourself, open `docs/provisioning-guide.md` and follow it top to bottom, step by step, exactly as a new household would.
+3. At Step 5 ("Preview your identity"), the script prints which Google account and project it's about to act as. Confirm it shows the throwaway account, not yours.
+4. Continue to Step 6. Watch the terminal output as it runs — it should either finish with a success line and a Hosting URL, or stop with a clear message telling you exactly what to fix (e.g., "billing is not enabled," "share the Sheet with this email"). Either outcome is informative; a silent hang or a generic crash is not.
+5. Open the Hosting URL it printed, sign in with one of the two emails you gave it, log one expense, and check it shows up on the reports page.
+6. Tear down the throwaway Firebase/GCP project afterward (Firebase console → Project settings → delete project) so it doesn't sit around costing money.
+7. Pass condition: sign-in, logging an expense, and viewing it in reports all worked, and at no point did the script or guide ask for anything from your own (captain) Google account.
+
+**AC-10 — the run above never touched your own Firebase/GCP account**
+
+1. Before starting the AC-9 drive above, open [console.firebase.google.com](https://console.firebase.google.com/) and [console.cloud.google.com](https://console.cloud.google.com/) signed in as yourself, and note your current project list.
+2. Run the AC-9 drive above to completion.
+3. Refresh both console project lists signed in as yourself again. Pass condition: no new project appears — the throwaway project only exists under the throwaway account.
+4. Open the throwaway project's IAM & Admin page (console.cloud.google.com → IAM & Admin → IAM, while signed in as the throwaway account) and scan the member list. Pass condition: your own email/account does not appear anywhere on that page.
+5. If either check fails — a new project shows up in your own console, or your account appears in the throwaway project's IAM — that's a REJECTED on AC-10 and the isolation guarantee is broken; stop and report back rather than proceeding to merge.
+
+### Summary
+
+Re-ran the full offline suite fresh (16/16, independent of build's claim) and went further than re-reading build's grep output: actually reintroduced an AC-1 violation (non-allowlisted network target) and an AC-2 violation (bare analytics `require`) one at a time, confirming each broke only its own specific test while the other 14 stayed green, then reverted both cleanly (`git status` clean throughout). The Mandatory PII/Secrets Check passed on the full diff — no secrets, no real PII, no `.env`/key files, and zero touch to `functions/src`/`app/` confirmed independently via `git diff --stat`. AC-9 and AC-10 need the captain's own live Google identity and are correctly deferred; manual steps for both are written above, pointing at the guide and the script's own printed output rather than a staging URL, since none exists for this entity. No blockers found — recommending PASSED.
