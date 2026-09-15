@@ -20,7 +20,7 @@ Currently the app is hardwired to a single Firebase project (`expense-sheet-b2db
 
 ## What success looks like
 
-- A new household can get a live instance without doing the full Firebase+Sheets setup alone — captain can host/operate whatever provisions or runs each instance, reducing their setup friction.
+- A new household can get a live instance without doing the full Firebase+Sheets setup alone — captain will host/operate the provisioning helper that creates each new instance, reducing their setup friction. See `docs/plans/023-product-packaging-architecture.md` for the reviewed architecture this decision is based on.
 - But no shared backend, credential, or infrastructure the captain runs ever reads or writes another household's data — each instance's Sheet, backend, and data stay fully isolated and inaccessible to her, with zero ongoing support obligation for their numbers.
 - A setup guide or provisioning script/tool that gets a new household from zero to their own live, fully isolated app.
 
