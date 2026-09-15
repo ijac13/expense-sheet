@@ -1,9 +1,9 @@
 ---
 id: "023"
 title: Post-Launch Product Packaging — Multi-Household Distribution
-status: ideation
+status: spec
 source: captain feedback
-started:
+started: 2026-09-15T08:28:38Z
 completed:
 verdict:
 score: 0.6
@@ -21,6 +21,17 @@ gates:
                 id: briefing:023:ideation:attempt-1:revision-1
                 digest: sha256:07a6ce9d4a06a159561656a38c1061a0f5f1d6dc1272bf121dafc9122ca570ba
                 room-ref: ./review/ideation/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:023:ideation:1
+                briefing: briefing:023:ideation:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-15T08:28:21.106628Z"
+                decision: approve
+                reason: 'Captain approved: architecture reviewed against the live codebase, isolation model confirmed, decision to host the provisioning helper made explicit.'
+              application:
+                target-stage: spec
+                state: consumed
 ---
 
 After launch for ijac's household, package the app and sheet setup so other users can self-serve their own instance — their own Google Sheet, their own Firebase project, their own deployed app.
