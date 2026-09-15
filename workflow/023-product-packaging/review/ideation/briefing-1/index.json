@@ -1,0 +1,24 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:023:ideation:attempt-1:revision-1",
+  "question": "Approve this ideation to move to spec?",
+  "artifacts": [
+    {
+      "id": "artifact:023:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/97c191bff83c4fff399db2d007b4217ad28600e1/workflow/023-product-packaging/index.md",
+      "rev": "sha256:243a385c9b35327de0b305a7aabcb528821d10a08ed8e34cd67dd9a84c4125ca",
+      "mediaType": "text/markdown",
+      "summary": "Package the app so other households can self-serve their own fully isolated instance — own Sheet, own Firebase project, own deployed app. Revised after review: captain will host a one-time provisioning helper (creates the new project + copies a blank Sheet template) but no shared backend or credential the captain runs may ever read/write another household's live data. Architecture reviewed and confirmed against the current codebase; see docs/plans/023-product-packaging-architecture.md."
+    }
+  ],
+  "context": [
+    {
+      "type": "Reference",
+      "id": "reference:023:ideation:attempt-1:revision-1:item-2",
+      "uri": "git-root://main/97c191bff83c4fff399db2d007b4217ad28600e1/docs/plans/023-product-packaging-architecture.md",
+      "mediaType": "text/markdown",
+      "rev": "sha256:b58a6cfc6d783197d018997921d5924cbaf678ccc8ae84fd3021a9f559f474e5"
+    }
+  ]
+}

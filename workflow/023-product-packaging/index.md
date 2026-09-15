@@ -10,6 +10,17 @@ score: 0.6
 worktree:
 issue:
 pr:
+gates:
+    version: 1
+    records:
+        - id: gate:023:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:023-ideation-1
+              briefing:
+                id: briefing:023:ideation:attempt-1:revision-1
+                digest: sha256:07a6ce9d4a06a159561656a38c1061a0f5f1d6dc1272bf121dafc9122ca570ba
+                room-ref: ./review/ideation/briefing-1
 ---
 
 After launch for ijac's household, package the app and sheet setup so other users can self-serve their own instance — their own Google Sheet, their own Firebase project, their own deployed app.
