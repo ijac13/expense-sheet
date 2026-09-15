@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:023:verify:attempt-1:revision-1",
+  "question": "Approve to merge to main?",
+  "artifacts": [
+    {
+      "id": "artifact:023:verify:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/f9f5d8736402c6b45e0d7c1559ec69d4360e8ae1/workflow/023-product-packaging/index.md",
+      "rev": "sha256:0fa8596cae8e65adad4ca6a89f36615c06502f9fbaa0218cff4ef52dfb3dc503",
+      "mediaType": "text/markdown",
+      "summary": "Verify independently re-ran the full offline suite (16/16) and adversarially re-falsified both isolation-guarantee ACs by introducing and reverting real violations — each broke only its own test. PII/secrets check clean; zero touch to functions/src or app/ confirmed. AC-9/AC-10 need your own live Google-identity drive and console check — manual steps below."
+    }
+  ]
+}
