@@ -16,16 +16,17 @@ After launch for ijac's household, package the app and sheet setup so other user
 
 ## Problem
 
-Currently the app is hardwired to a single Firebase project (`expense-sheet-b2db8`) and a single spreadsheet ID. Another household cannot use it without manually forking the repo, setting up Firebase, and configuring everything from scratch.
+Currently the app is hardwired to a single Firebase project (`expense-sheet-b2db8`) and a single spreadsheet ID. Another household cannot use it without forking the repo and setting up Firebase from scratch — real friction, but any fix has to keep every household's data 100% theirs: never stored, visible, or accessible through anything the captain operates or is responsible for.
 
 ## What success looks like
 
-- A setup guide or script that lets a new household go from zero to their own live app in under 30 minutes
-- Likely includes: one-click Google Sheets template copy, Firebase project setup steps, environment config, deploy instructions
-- Optionally: a single hosted "onboarding flow" that provisions their sheet and returns config values
+- A new household can get a live instance without doing the full Firebase+Sheets setup alone — captain can host/operate whatever provisions or runs each instance, reducing their setup friction.
+- But no shared backend, credential, or infrastructure the captain runs ever reads or writes another household's data — each instance's Sheet, backend, and data stay fully isolated and inaccessible to her, with zero ongoing support obligation for their numbers.
+- A setup guide or provisioning script/tool that gets a new household from zero to their own live, fully isolated app.
 
 ## Out of Scope (decide at spec time)
 
-- Shared multi-tenant hosting (everyone on the same Firebase project)
+- Any architecture where captain's infrastructure, backend, or credentials can read/write another household's data, even transiently in passthrough (rules out one shared backend proxying everyone's Sheet reads/writes)
 - Monetization or accounts
 - Mobile app store distribution
+- Exact hosting/provisioning mechanism (one-click? script? manual guide?) — decide at spec
