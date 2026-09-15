@@ -1,13 +1,13 @@
 ---
 id: "023"
 title: Post-Launch Product Packaging — Multi-Household Distribution
-status: spec
+status: build
 source: captain feedback
 started: 2026-09-15T08:28:38Z
 completed:
 verdict:
 score: 0.6
-worktree:
+worktree: .worktrees/spacedock-ensign-023-product-packaging
 issue:
 pr:
 gates:
@@ -40,6 +40,17 @@ gates:
                 id: briefing:023:spec:attempt-1:revision-1
                 digest: sha256:7e2d07d1df1fe226d1ae052fa28be3cd8ecbebb8827648281cd74a7838f0d3ab
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:023:spec:1
+                briefing: briefing:023:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-15T09:17:10.018679Z"
+                decision: approve
+                reason: 'Captain approved: mechanism resolves the isolation constraint structurally (no server in the credential path at all), riskiest claim verified against real repo code, zero blast radius to production.'
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 After launch for ijac's household, package the app and sheet setup so other users can self-serve their own instance — their own Google Sheet, their own Firebase project, their own deployed app.
