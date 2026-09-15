@@ -32,6 +32,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:023:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:023-spec-1
+              briefing:
+                id: briefing:023:spec:attempt-1:revision-1
+                digest: sha256:7e2d07d1df1fe226d1ae052fa28be3cd8ecbebb8827648281cd74a7838f0d3ab
+                room-ref: ./review/spec/briefing-1
 ---
 
 After launch for ijac's household, package the app and sheet setup so other users can self-serve their own instance — their own Google Sheet, their own Firebase project, their own deployed app.

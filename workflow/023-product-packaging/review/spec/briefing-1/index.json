@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:023:spec:attempt-1:revision-1",
+  "question": "Approve this spec to move to build?",
+  "artifacts": [
+    {
+      "id": "artifact:023:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/6b501d17db0272500be861b542624223152d04c2/workflow/023-product-packaging/index.md",
+      "rev": "sha256:8c2821adb7b23487b5a01c5d9e19d83cf0a4952c06aa3137ab06c62f1636c7bc",
+      "mediaType": "text/markdown",
+      "summary": "Resolves the mechanism question: a static captain-hosted guide + a provisioning script that runs on the new household's own machine under their own Google/Firebase/GitHub logins — no server the captain operates ever sits in the data or credential path. 10 ACs, 8 offline / 2 interactive (live throwaway-account drive). Zero blast radius to ijac's own production app."
+    }
+  ]
+}
