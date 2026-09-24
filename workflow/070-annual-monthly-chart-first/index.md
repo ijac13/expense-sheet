@@ -1,13 +1,13 @@
 ---
 id: 070
 title: Move monthly chart to the top of Report > Annual
-status: spec
+status: build
 source: captain
 started: 2026-09-24T07:53:13Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-070-annual-monthly-chart-first
 issue:
 pr:
 mod-block:
@@ -41,6 +41,17 @@ gates:
                 id: briefing:070:spec:attempt-1:revision-1
                 digest: sha256:6ef48f991005424a7595990d27ef60c260026b04844887fc15c5d75272de1f38
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:070:spec:1
+                briefing: briefing:070:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-24T08:14:39.181419Z"
+                decision: approve
+                reason: 'Captain approved the spec in the Subspace gate review (binding resolution, briefing:070:spec:attempt-1:revision-1): pure move of the monthly trend block under the year total, AC-1..AC-6.'
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 The monthly chart is the most useful view in Report > Annual, so it should be the first block people see.
