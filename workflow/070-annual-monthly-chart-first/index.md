@@ -183,3 +183,30 @@ Plan: (1) write the order test and watch it fail on the unchanged page, (2) cut 
 ### Summary
 
 Moved the Monthly trend block from after the Category list to directly under the year total in the Annual view, with no changes to its contents. Added a render test that failed on the old order and passes now, and that also pins the Monthly tab's order. AC-5/AC-6 (live staging) are for the verify stage.
+
+## Stage Report: verify
+
+verdict: PASSED (AC-1..AC-4 re-verified offline; AC-5/AC-6 verified against the live staging code, with the on-screen check left to the captain because Reports needs a captain Google sign-in)
+
+- DONE: Re-run `cd app && npm test` fresh and re-check the pure-move diff (AC-1..AC-4) independently of build's claims
+  Fresh `npm test`: 243/243, exit 0. Falsification re-run by this agent: swapped in main's `page.tsx`, recompiled, and ran `reports-annual-order.render.test.js`. AC-1/AC-2 went red (`not ok 1`) and AC-3a stayed green. That is the expected result, because the old code still has the old Annual order and an unchanged Monthly tab. Restored the file: 2/2 pass, tree clean. `git diff main...HEAD --color-moved=plain`: all 22 removed and 22 added lines are marked moved (1;35 / 1;36), with 0 plain adds or removes. The hunks sit at lines 766 and 829, outside MONTHLY VIEW (546–731), and the `-w` stat shows +22/−22. Surface: 3 code files, within the spec estimate.
+- DONE: Deploy the branch to staging and observe live that Report > Annual shows Monthly trend directly under the year total, above the Donut/Bar toggle (AC-5), with the deployed chunk hash matching the build
+  Fresh build with staging env (`app/.env.staging` from main checkout → `app/.env.local`, `rm -rf out .next`, `npm run build`), then `firebase deploy --only hosting --project staging` → "release complete". Functions untouched, so they were not deployed. sha256 match: `index.html` 9171f10b… local == live, `/reports.html` 0d729169… local == live, and all 13 JS chunks `/reports.html` loads are byte-identical. `Last-Modified: Thu, 24 Sep 2026 08:19:36 GMT`. In the live-served chunk `114dg7_3mynb3.js`, fetched by curl, the Annual labels come in the order `annual_total → monthly_trend → donut → by_category → by_payer`, so the trend now comes before the toggle. The on-screen check is for the captain: this agent cannot sign in to Reports (Google sign-in is limited to the two captain accounts, the same wall as 063/069). Steps below.
+- DONE: Observe live on staging that Report > Monthly block order is unchanged (AC-6), and write plain-language phone steps for the captain to confirm both
+  The same live chunk shows the Monthly labels as `total_spending → donut → by_category → by_payer → comparison` with no `monthly_trend`, identical to the spec's baseline. The on-screen check is again for the captain; steps below. PII/secrets: the diff touches no `.env*` file, and a scan of added lines for keys, PEM, password/secret/token, emails and URLs found 0 hits. `app/.env.local` was deleted after the build, and `git status` is clean.
+
+### Summary
+
+Staging runs exactly this branch (hashes match for the page and all its chunks). The live Reports code puts the monthly trend directly under the year total in Annual and leaves Monthly's order unchanged. Offline tests pass and go red on the old layout. This agent could not see the signed-in screen, so the captain's phone check below closes AC-5/AC-6.
+
+### How it works (plain language)
+
+Only the page layout changed. The monthly trend chart is the same chart, cut from lower on the Annual page and pasted right under the year total. No data, server, or saving code changed, so nothing new happens behind the scenes.
+
+### Phone steps for the captain
+
+1. On your phone, open https://expense-sheet-staging.web.app (orange "Staging" banner) and sign in.
+2. Tap **Reports**, then tap **Annual**.
+3. Pass (AC-5): under the year total you see the **Monthly Trend** bar chart first, then the Donut/Bar buttons, then the category chart. Fail: the Donut/Bar buttons or the category chart sit directly under the total.
+4. Tap **Monthly**.
+5. Pass (AC-6): the page looks like before: total, Donut/Bar buttons, chart, category list, by payer, comparison, AI insights, with no monthly trend chart. Fail: anything added, missing, or moved.
