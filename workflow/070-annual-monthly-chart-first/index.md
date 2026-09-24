@@ -1,9 +1,9 @@
 ---
 id: 070
 title: Move monthly chart to the top of Report > Annual
-status: ideation
+status: spec
 source: captain
-started:
+started: 2026-09-24T07:53:13Z
 completed:
 verdict:
 score:
@@ -22,6 +22,17 @@ gates:
                 id: briefing:070:ideation:attempt-1:revision-1
                 digest: sha256:b27ce0d7fe0de1017869d88162fa4ca4642accbd45ecabd79ca11cdd6b0ec19b
                 room-ref: ./review/ideation/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:070:ideation:1
+                briefing: briefing:070:ideation:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-24T07:52:55.148373Z"
+                decision: approve
+                reason: 'Captain approved: clear, small, single-page outcome. Placement decided: monthly trend chart goes directly under the year total (year picker -> total -> monthly trend -> rest in current order).'
+              application:
+                target-stage: spec
+                state: consumed
 ---
 
 The monthly chart is the most useful view in Report > Annual, so it should be the first block people see.
