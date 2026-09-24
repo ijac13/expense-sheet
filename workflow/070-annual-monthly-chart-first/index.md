@@ -168,3 +168,18 @@ Semantics this may change: none (layout only; no stored formats, API, auth, or s
 ### Summary
 
 Spec moves one existing JSX block (Monthly trend chart) up to sit under the year total in the Annual view; nothing else changes. Spiked the riskiest mechanism: the jsdom render harness does render the `mounted`-gated trend after clicking Annual, and today's order (`annual_total, by_category, monthly_trend, …`) makes the new AC-1 test fail on main. Monthly-tab baseline order also captured for AC-3.
+
+## Stage Report: build
+
+Plan: (1) write the order test and watch it fail on the unchanged page, (2) cut the `{/* Monthly trend chart */}` block plus its trailing blank line and paste it after the Summary header, (3) add the test to `npm test`, (4) check the diff is a pure move.
+
+- DONE: Add the Annual-order render test first and show it fails on main (AC-1/AC-2), plus the Monthly-order test (AC-3a); then move the Monthly trend block under the Summary header so both pass
+  `app/test/reports-annual-order.render.test.js`. Before the move, AC-1/AC-2 failed with actual `by_category, monthly_trend` vs expected `monthly_trend, by_category`. After the move in 47e47f6, both tests pass. AC-1/AC-2 checks the label order total → trend → by_category → by_payer → insights, plus year-picker < total, trend < Donut toggle, and Donut toggle < category list. It fails if the trend moves back below the category list or below the toggle, or if any other block moves. AC-3a checks that Monthly shows exactly total_spending → by_category → by_payer → comparison → insights. It fails if anything is added to Monthly or its blocks are reordered. The fixture uses current-month expenses because the default fixture leaves Monthly in its empty state.
+- DONE: Show the page.tsx diff is a pure move with no Monthly-view hunk (AC-3b, AC-4) via git diff main --color-moved=plain
+  There are two hunks, at lines 764 and 826/848, both inside the ANNUAL VIEW (Monthly spans 546–731). All 22 removed lines are marked moved-from (1;35) and all 22 added lines moved-to (1;36). No line shows as a plain add or remove, so the moved block matches byte for byte.
+- DONE: Full `cd app && npm test` green with pass counts, and surface vs. estimate (~+22/-22 plus one test file, ±30%)
+  243/243 pass, exit 0. Surface vs estimate: page.tsx +22/−22 (as estimated), package.json +1/−1, new test 77 lines (estimate 40–60, ±30% ceiling 78). That is 3 files, inside the 2–3 estimate.
+
+### Summary
+
+Moved the Monthly trend block from after the Category list to directly under the year total in the Annual view, with no changes to its contents. Added a render test that failed on the old order and passes now, and that also pins the Monthly tab's order. AC-5/AC-6 (live staging) are for the verify stage.
