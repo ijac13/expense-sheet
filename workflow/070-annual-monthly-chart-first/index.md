@@ -1,7 +1,7 @@
 ---
 id: 070
 title: Move monthly chart to the top of Report > Annual
-status: build
+status: verify
 source: captain
 started: 2026-09-24T07:53:13Z
 completed:
