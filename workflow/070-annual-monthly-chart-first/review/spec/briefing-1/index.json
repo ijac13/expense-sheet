@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:070:spec:attempt-1:revision-1",
+  "question": "Approve the spec (move the monthly trend block under the year total, 6 ACs) to start build?",
+  "artifacts": [
+    {
+      "id": "artifact:070:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/27138913fef01b3a25ac42fc3392b3089c5264da/workflow/070-annual-monthly-chart-first/index.md",
+      "rev": "sha256:421b903d1be247443548c0b7ebd729e01d20f7d0007ab1acbde6a5a11ee3421c",
+      "mediaType": "text/markdown",
+      "summary": "Pure move of one JSX block in app/app/reports/page.tsx (~22 lines) plus one render test; harness spike shows the new order test fails on main; AC-5/AC-6 live staging checks at verify."
+    }
+  ]
+}

@@ -33,6 +33,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:070:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:070-spec-1
+              briefing:
+                id: briefing:070:spec:attempt-1:revision-1
+                digest: sha256:6ef48f991005424a7595990d27ef60c260026b04844887fc15c5d75272de1f38
+                room-ref: ./review/spec/briefing-1
 ---
 
 The monthly chart is the most useful view in Report > Annual, so it should be the first block people see.
