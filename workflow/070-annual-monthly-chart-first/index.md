@@ -52,6 +52,14 @@ gates:
               application:
                 target-stage: build
                 state: consumed
+        - id: gate:070:verify
+          stage: verify
+          attempts:
+            - id: gate-attempt:070-verify-1
+              briefing:
+                id: briefing:070:verify:attempt-1:revision-1
+                digest: sha256:eba79c32a63e196e63742393a72d3ef45a556dfdf455d0559104a9130260ce3f
+                room-ref: ./review/verify/briefing-1
 ---
 
 The monthly chart is the most useful view in Report > Annual, so it should be the first block people see.
