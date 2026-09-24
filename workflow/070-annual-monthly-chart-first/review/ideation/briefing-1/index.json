@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:070:ideation:attempt-1:revision-1",
+  "question": "Should moving the monthly trend chart to the top of Report \u003e Annual go to spec?",
+  "artifacts": [
+    {
+      "id": "artifact:070:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/dd9895506b107fe3a25013087bf9a9babec1f3b8/workflow/070-annual-monthly-chart-first/index.md",
+      "rev": "sha256:ff11ca926297e3bc5475e624f021b7308ac10068f6fe9d54a760d3797d05c391",
+      "mediaType": "text/markdown",
+      "summary": "Seed: put the monthly trend chart first in the Annual report; other blocks keep their order; chart itself unchanged."
+    }
+  ]
+}

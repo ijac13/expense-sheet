@@ -11,6 +11,17 @@ worktree:
 issue:
 pr:
 mod-block:
+gates:
+    version: 1
+    records:
+        - id: gate:070:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:070-ideation-1
+              briefing:
+                id: briefing:070:ideation:attempt-1:revision-1
+                digest: sha256:b27ce0d7fe0de1017869d88162fa4ca4642accbd45ecabd79ca11cdd6b0ec19b
+                room-ref: ./review/ideation/briefing-1
 ---
 
 The monthly chart is the most useful view in Report > Annual, so it should be the first block people see.
