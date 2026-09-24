@@ -9,8 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-070-annual-monthly-chart-first
 issue:
-pr:
-mod-block:
+pr: "#41"
+mod-block: merge:pr-merge
 gates:
     version: 1
     records:
@@ -60,6 +60,17 @@ gates:
                 id: briefing:070:verify:attempt-1:revision-1
                 digest: sha256:eba79c32a63e196e63742393a72d3ef45a556dfdf455d0559104a9130260ce3f
                 room-ref: ./review/verify/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:070:verify:1
+                briefing: briefing:070:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-09-24T08:24:30.126932Z"
+                decision: approve
+                reason: 'Captain approved verify in the Subspace gate review (binding resolution, briefing:070:verify:attempt-1:revision-1): tests green, staging hash-matched, live order correct.'
+              application:
+                target-stage: done
+                state: pending
 ---
 
 The monthly chart is the most useful view in Report > Annual, so it should be the first block people see.
