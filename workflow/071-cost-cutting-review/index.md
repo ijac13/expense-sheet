@@ -11,6 +11,17 @@ worktree:
 issue:
 pr:
 mod-block:
+gates:
+    version: 1
+    records:
+        - id: gate:071:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:071-ideation-1
+              briefing:
+                id: briefing:071:ideation:attempt-1:revision-1
+                digest: sha256:444b94ff5cb1ae9a7703a07d6706506d1e136bf16f0d4684affff2a184edeb44
+                room-ref: ./review/ideation/briefing-1
 ---
 
 ## Decisions (captain, 2026-10-02 review)
