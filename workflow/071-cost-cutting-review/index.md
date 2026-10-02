@@ -1,9 +1,9 @@
 ---
 id: 071
 title: Split Report > Annual into fixed, big extras, and living costs
-status: ideation
+status: spec
 source: captain
-started:
+started: 2026-10-02T09:36:45Z
 completed:
 verdict:
 score:
@@ -22,6 +22,17 @@ gates:
                 id: briefing:071:ideation:attempt-1:revision-1
                 digest: sha256:444b94ff5cb1ae9a7703a07d6706506d1e136bf16f0d4684affff2a184edeb44
                 room-ref: ./review/ideation/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:071:ideation:1
+                briefing: briefing:071:ideation:attempt-1:revision-1
+                by: person:captain
+                at: "2026-10-02T09:36:25.443127Z"
+                decision: approve
+                reason: 'Captain approved in chat ("approve, move to spec") after reviewing 071 via /r and answering all ideation questions: Annual summary block above unchanged category list; Fixed via per-category Settings switch; Big extras via #大筆 note keyword (fixed category wins); Living costs per category; new group-share donut; Annual only.'
+              application:
+                target-stage: spec
+                state: consumed
 ---
 
 ## Decisions (captain, 2026-10-02 review)
