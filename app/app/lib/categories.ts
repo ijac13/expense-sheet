@@ -80,6 +80,9 @@ export interface Category {
   is_active: boolean;
   gov_category?: GovCategory;
   note?: string;
+  // The captain's "Fixed cost" switch. null/absent = never set: isFixedCategory
+  // then falls back to the default by name.
+  fixed?: boolean | null;
 }
 
 export const NOTE_MAX_LENGTH = 120;
@@ -112,6 +115,19 @@ export const DEFAULT_CATEGORIES: Category[] = [
 ];
 
 export const FALLBACK_ICON = "💰";
+
+// Categories that count as fixed until the captain sets their switch. Matched by
+// English name, not id: live ids are cat_NNN and differ between sheets.
+const DEFAULT_FIXED_NAMES = ["insurance", "babies", "mortgage", "tuition"].map(
+  (id) => DEFAULT_CATEGORIES.find((c) => c.id === id)!.name_en
+);
+
+/** Whether a category counts as Fixed: its stored switch, else the default by name. */
+export function isFixedCategory(category: Pick<Category, "name_en" | "fixed"> | undefined): boolean {
+  if (!category) return false;
+  if (typeof category.fixed === "boolean") return category.fixed;
+  return DEFAULT_FIXED_NAMES.includes(category.name_en);
+}
 
 /**
  * Resolve a stored `category_id` to the live category it belongs to.

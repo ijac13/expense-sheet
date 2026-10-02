@@ -11,10 +11,12 @@ import {
   PayerBreakdown,
   MonthlyTrend,
   PayerFilter,
+  CostGroup,
+  AnnualCostGroups,
 } from "./reportTypes";
 import { Expense } from "./expenses";
-import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory } from "./categories";
-import { getCategories } from "./categoryService";
+import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory, isFixedCategory } from "./categories";
+import { getSessionCategories } from "./categoryService";
 import { USERS } from "./users";
 import { getSharedExpenses } from "./expensesCache";
 
@@ -29,17 +31,12 @@ import { getSharedExpenses } from "./expensesCache";
 // Cached per session, not per call (AC-5): stepping months must not re-issue
 // this request. Only a genuine success is cached — a failed fetch is retried
 // on the next call rather than pinning the page to DEFAULT_CATEGORIES for the
-// rest of the session.
-let cachedCategoryList: Category[] | null = null;
-
+// rest of the session. The cache lives in categoryService so that every
+// category write clears it (071: a Fixed switch saved in Settings).
 async function fetchCategoryList(): Promise<Category[]> {
-  if (cachedCategoryList) return cachedCategoryList;
   try {
-    const live = await getCategories();
-    if (live && live.length > 0) {
-      cachedCategoryList = live;
-      return live;
-    }
+    const live = await getSessionCategories();
+    if (live && live.length > 0) return live;
   } catch {
     // GET /api/categories failed — fall through to the DEFAULT_CATEGORIES fallback.
   }
@@ -115,6 +112,56 @@ function buildCategoryBreakdown(expenses: Expense[], categories: Category[]): Ca
       };
     })
     .sort((a, b) => b.total - a.total);
+}
+
+// Either hash: Chinese keyboards often type the full-width ＃.
+const BIG_EXTRA_KEYWORDS = ["#大筆", "＃大筆"];
+
+// A fixed category wins over the keyword. An unresolvable category is living.
+function costGroupOf(e: Expense, categories: Category[]): CostGroup {
+  if (isFixedCategory(resolveCategory(e.category_id, categories))) return "fixed";
+  if (BIG_EXTRA_KEYWORDS.some((k) => (e.notes ?? "").includes(k))) return "big_extra";
+  return "living";
+}
+
+function buildCostGroups(expenses: Expense[], categories: Category[]): AnnualCostGroups {
+  const yearTotal = expenses.reduce((s, e) => s + e.amount, 0);
+  const of = (group: CostGroup) => expenses.filter((e) => costGroupOf(e, categories) === group);
+  const share = (list: Expense[]) => {
+    const total = list.reduce((s, e) => s + e.amount, 0);
+    return { total, percentage: yearTotal > 0 ? Math.round((total / yearTotal) * 100) : 0 };
+  };
+  const fixed = of("fixed");
+  const bigExtra = of("big_extra");
+  const living = of("living");
+  return {
+    fixed: { ...share(fixed), categories: buildCategoryBreakdown(fixed, categories) },
+    big_extra: {
+      ...share(bigExtra),
+      expenses: bigExtra
+        .sort((a, b) => b.amount - a.amount)
+        .map((e) => toReportExpense(e, categories)),
+    },
+    living: { ...share(living), categories: buildCategoryBreakdown(living, categories) },
+  };
+}
+
+function toReportExpense(e: Expense, categories: Category[]): ReportExpense {
+  const meta = getCatMeta(e.category_id, categories);
+  return {
+    id: e.id,
+    date: e.date,
+    amount: e.amount,
+    category_id: e.category_id,
+    category_name: meta.name_en,
+    category_name_zh: meta.name_zh,
+    icon: meta.icon,
+    paid_by: e.paid_by,
+    notes: e.notes ?? "",
+    created_by: e.created_by,
+    created_at: e.created_at,
+    subscription_id: e.subscription_id,
+  };
 }
 
 function buildPayerBreakdown(expenses: Expense[]): PayerBreakdown[] {
@@ -227,6 +274,7 @@ export async function getAnnualSummary(
     year,
     total: yearExpenses.reduce((s, e) => s + e.amount, 0),
     categories: buildCategoryBreakdown(yearExpenses, categories),
+    groups: buildCostGroups(yearExpenses, categories),
     payers: buildPayerBreakdown(yearExpenses),
     monthly_trend,
     expense_count: yearExpenses.length,
@@ -240,7 +288,10 @@ export async function getExpensesByCategory(
   year: number,
   month: number | null,
   categoryId: string,
-  payer: PayerFilter = "all"
+  payer: PayerFilter = "all",
+  // Narrows to one cost group, so a Living costs row drills into exactly the
+  // expenses behind its amount (its big extras left out).
+  group?: CostGroup
 ): Promise<ReportExpense[]> {
   const [allExpenses, categories] = await Promise.all([
     fetchAllExpenses(),
@@ -257,24 +308,9 @@ export async function getExpensesByCategory(
   }
 
   expenses = filterByPayer(expenses, payer);
+  if (group) expenses = expenses.filter((e) => costGroupOf(e, categories) === group);
 
   return expenses
     .sort((a, b) => b.date.localeCompare(a.date))
-    .map((e) => {
-      const meta = getCatMeta(e.category_id, categories);
-      return {
-        id: e.id,
-        date: e.date,
-        amount: e.amount,
-        category_id: e.category_id,
-        category_name: meta.name_en,
-        category_name_zh: meta.name_zh,
-        icon: meta.icon,
-        paid_by: e.paid_by,
-        notes: e.notes ?? "",
-        created_by: e.created_by,
-        created_at: e.created_at,
-        subscription_id: e.subscription_id,
-      };
-    });
+    .map((e) => toReportExpense(e, categories));
 }

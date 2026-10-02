@@ -38,7 +38,7 @@ async function openAnnual(container) {
   await React.act(async () => {});
 }
 
-test("AC-1/AC-2: Annual shows year picker, total, monthly trend, toggle, category list, by payer, insights — in that order", async () => {
+test("AC-1/AC-2: Annual shows year picker, total, monthly trend, toggle, cost groups (071), category list, by payer, insights — in that order", async () => {
   installGlobals({ expenses: EXPENSES });
   const page = await mount(loadPage("reports/page.js"));
   await openAnnual(page);
@@ -46,6 +46,7 @@ test("AC-1/AC-2: Annual shows year picker, total, monthly trend, toggle, categor
   assert.deepEqual(sectionLabels(page), [
     "reports.annual_total",
     "reports.monthly_trend",
+    "reports.cost_groups",
     "reports.by_category",
     "reports.by_payer",
     "reports.insights_title",

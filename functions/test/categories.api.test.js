@@ -347,5 +347,88 @@ test("AC-9: a row shorter than the header reads as empty defaults, not shifted v
     is_active: true,
     gov_category: null,
     note: "",
+    fixed: null,
   });
+});
+
+// ---------------------------------------------------------------------------
+// 071 AC-4 — the per-category `fixed` switch. No live Categories tab has a
+// `fixed` header, so the first save creates it, past the widest occupied row.
+// ---------------------------------------------------------------------------
+
+// Staging: A-F named, nothing beyond.
+const STAGING_HEADER = HEADER_WITH_NOTE.slice(0, 6);
+const STAGING_ROWS = ROWS.map((r) => r.slice(0, 6));
+// Production: A-G named, `note` data under a blank H1 — row 1 is 7 wide, the
+// widest data row 8.
+const PRODUCTION_ROWS = [
+  ["cat_001", "Eating Out", "外食", "🍕", "1", "true", "restaurants_accommodation", "phone bills"],
+  ["cat_023", "Insurance", "保險", "🛡️", "23", "true", "insurance_financial", "壽險, 車險"],
+];
+
+test("071 AC-4: on a staging-shaped tab, PATCH fixed adds the header at G and writes true", async () => {
+  const { grids, sheets } = makeSheets({ Categories: { header: STAGING_HEADER, rows: STAGING_ROWS } });
+  const api = loadApi(sheets);
+  const before = grids.Categories.map((r) => r.slice(0, 6));
+
+  const { status, body } = await call(api, "PATCH", "/api/categories/cat_003", { fixed: true });
+  assert.equal(status, 200);
+  assert.equal(body.fixed, true);
+  assert.equal(grids.Categories[0][6], "fixed", "the header was created at G");
+  assert.equal(grids.Categories[3][6], "true", "the cell holds the switch");
+  assert.deepEqual(grids.Categories.map((r) => r.slice(0, 6)), before, "A-F untouched on every row");
+
+  const get = await call(api, "GET", "/api/categories");
+  assert.deepEqual(get.body.map((c) => c.fixed), [null, null, true], "never-set rows read null, not false");
+});
+
+test("071 AC-4: on a production-shaped tab, fixed lands at I and the unnamed H note is byte-identical", async () => {
+  const { grids, sheets } = makeSheets({ Categories: { header: HEADER_NO_NOTE, rows: PRODUCTION_ROWS } });
+  const api = loadApi(sheets);
+  const notesBefore = grids.Categories.map((r) => r[7]);
+
+  const { status } = await call(api, "PATCH", "/api/categories/cat_023", { fixed: false });
+  assert.equal(status, 200);
+  assert.equal(grids.Categories[0][7], undefined, "H1 stays blank — not claimed for the new header");
+  assert.equal(grids.Categories[0][8], "fixed", "the header went past the widest row, to I");
+  assert.equal(grids.Categories[2][8], "false");
+  assert.deepEqual(grids.Categories.map((r) => r[7]), notesBefore, "every H note survived byte-identical");
+
+  const get = await call(api, "GET", "/api/categories");
+  assert.deepEqual(get.body.map((c) => c.fixed), [null, false]);
+});
+
+test("071 AC-4: a later rename keeps the fixed cell; a second switch reuses the column", async () => {
+  const { grids, sheets } = makeSheets({ Categories: { header: HEADER_NO_NOTE, rows: PRODUCTION_ROWS } });
+  const api = loadApi(sheets);
+
+  await call(api, "PATCH", "/api/categories/cat_023", { fixed: true });
+  const rename = await call(api, "PATCH", "/api/categories/cat_023", { name_en: "Insurances" });
+  assert.equal(rename.status, 200);
+  assert.equal(rename.body.fixed, true);
+  assert.equal(grids.Categories[2][8], "true", "the rename carried the fixed cell forward");
+
+  await call(api, "PATCH", "/api/categories/cat_001", { fixed: true });
+  assert.deepEqual(grids.Categories[0].filter((h) => h === "fixed"), ["fixed"], "one fixed header, never two");
+  assert.equal(grids.Categories[1][8], "true");
+  assert.equal(grids.Categories[1][7], "phone bills");
+});
+
+test("071 AC-4: a PATCH without fixed creates no column", async () => {
+  const { grids, sheets } = makeSheets({ Categories: { header: STAGING_HEADER, rows: STAGING_ROWS } });
+  const api = loadApi(sheets);
+
+  await call(api, "PATCH", "/api/categories/cat_001", { name_en: "Dining Out" });
+  assert.equal(grids.Categories[0].length, 6, "the header row was not widened");
+});
+
+test("071 AC-4: POST with fixed creates the column and writes the new row's switch", async () => {
+  const { grids, sheets } = makeSheets({ Categories: { header: STAGING_HEADER, rows: STAGING_ROWS } });
+  const api = loadApi(sheets);
+
+  const { status, body } = await call(api, "POST", "/api/categories", { name_en: "Rent", name_zh: "房租", fixed: true });
+  assert.equal(status, 201);
+  assert.equal(body.fixed, true);
+  assert.equal(grids.Categories[0][6], "fixed");
+  assert.equal(grids.Categories[grids.Categories.length - 1][6], "true");
 });

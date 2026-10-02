@@ -41,10 +41,26 @@ export interface MonthlyTrend {
   total: number;
 }
 
+// The captain's planning-sheet split of a year: Fixed (categories switched on as
+// fixed), Big extras (other expenses noted #大筆), Living costs (the rest).
+export type CostGroup = "fixed" | "big_extra" | "living";
+
+export interface CostGroupTotal {
+  total: number;
+  percentage: number; // share of the year total
+}
+
+export interface AnnualCostGroups {
+  fixed: CostGroupTotal & { categories: CategoryBreakdown[] };
+  big_extra: CostGroupTotal & { expenses: ReportExpense[] };
+  living: CostGroupTotal & { categories: CategoryBreakdown[] };
+}
+
 export interface AnnualSummary {
   year: number;
   total: number;
   categories: CategoryBreakdown[];
+  groups: AnnualCostGroups;
   payers: PayerBreakdown[];
   monthly_trend: MonthlyTrend[];
   expense_count: number;
