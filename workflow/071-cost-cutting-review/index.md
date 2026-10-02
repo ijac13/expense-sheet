@@ -33,6 +33,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:071:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:071-spec-1
+              briefing:
+                id: briefing:071:spec:attempt-1:revision-1
+                digest: sha256:25bf2d0930f2d291231b3b819f7ccc86f18e51b972e853379cf0b6ac0f5d5435
+                room-ref: ./review/spec/briefing-1
 ---
 
 ## Spec question (captain, at gate)

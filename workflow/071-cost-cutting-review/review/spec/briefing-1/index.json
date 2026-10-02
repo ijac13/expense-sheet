@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:071:spec:attempt-1:revision-1",
+  "question": "Approve the 071 spec (three-group Annual split; fixed column on Categories created on first save; #大筆/＃大筆 keyword; AC-1..AC-13) and advance to build?",
+  "artifacts": [
+    {
+      "id": "artifact:071:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/dba997950f26464f4e6accfa110fe1da9beff1b9/workflow/071-cost-cutting-review/index.md",
+      "rev": "sha256:4ce1252218f0465bbd1455963cfd19a00d06b26ff85394f018fed7a7fc25ac8f",
+      "mediaType": "text/markdown",
+      "summary": "Spec: optional 'fixed' Categories column created on first save past the widest row (production H note safe); blank defaults to fixed for Insurance/Babies/Mortgage/Tuition by name, no migration; client-side grouping on loaded data incl. notes; summary block between existing chart and unchanged By-category list; living rows exclude big extras with filtered drill-down; Settings switch clears report category cache. 12 files ~660±230 lines. Spike: today's PATCH silently drops 'fixed'; column lands at G (staging) / I (production). Open: count full-width ＃大筆 too (recommended yes)."
+    }
+  ]
+}
