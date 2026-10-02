@@ -54,9 +54,9 @@ gates:
                 state: consumed
 ---
 
-## Spec question (captain, at gate)
+## Spec question (captain, at gate) — answered
 
-- **Full-width hash:** Chinese keyboards often type `＃` instead of `#`. Should `＃大筆` also count as a big extra? **Recommended: yes** (one extra match, avoids silent misses). The ACs assume yes; answer "no" and AC-3's last case flips.
+- **Full-width hash:** `＃大筆` also counts as a big extra. Captain answered **yes** at the spec gate (2026-10-02); AC-3's last case stands.
 
 ## Decisions (captain, 2026-10-02 review)
 
