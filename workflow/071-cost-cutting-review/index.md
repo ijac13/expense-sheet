@@ -262,3 +262,60 @@ Spec stores "fixed" as an optional `fixed` Categories column created on first sa
 ### Summary
 
 The backend reads and writes `fixed` as true/false/null. The first save creates the column past the widest row, using the shared `ensureColumns` (renamed from the subscriptions-only helper). The app groups each Annual expense with `resolveCategory` → `isFixedCategory` → keyword. Annual gets a summary block with a group donut, and living rows drill into a group-filtered list. Settings gets a Fixed switch and badge. Decisions to note: (1) the session category cache moved from `reportService` to `categoryService` so every category write clears it without an import cycle. (2) The form writes `fixed` only when the switch differs from the category's resolved value, so untouched defaults stay blank. As the spec's edge case says, renaming a never-set Babies drops its default. (3) Two existing tests were updated for the new field: the 047 AC-9 deepEqual gains `fixed: null`, and the sheetColumns golden JSON.
+
+## Stage Report: verify
+
+verdict: BLOCKED — offline ACs re-verified and falsified independently. The staging deploy was denied by the session's permission classifier, so AC-10..AC-13 have no live evidence yet. No AC failed.
+
+- DONE: Re-run `npm test` in app/ and functions/ and `npm run build` fresh, and independently falsify the key offline ACs (AC-1 totals sum, AC-3 keyword incl. ＃大筆 with fixed winning, AC-4 production-shaped H note byte-identical) rather than restating build's claims
+  Fresh: functions 365/365, app 259/259, `rm -rf out .next lib` then app + functions builds exit 0 (app built with staging env). This agent's own mutations, run in a throwaway `git archive` copy so the branch bytes stayed unchanged:
+  - AC-4: column placed at row-1 width instead of the widest row → `071 AC-4 production-shaped … H note byte-identical` and `later rename keeps the fixed cell` go red, plus 2 older blank-H guards.
+  - AC-3: `＃大筆` dropped → AC-1, AC-3 and AC-6 go red. Keyword checked before category → AC-1 and AC-3 go red. Note equality instead of contains → AC-1, AC-3, AC-5 and AC-6 go red.
+  - AC-1: unresolvable category kept out of Living → AC-1 goes red.
+  - Every mutation was reverted and the baseline is green again. In the copy, functions test 68 (gitignore/tree-clean) fails on baseline too, because the copy has no git repo. That is environment-only.
+- FAILED: Deploy the branch to staging (fresh build with staging env, hosting and functions as separate deploys), confirm deployed chunk hashes match the build, and verify AC-10..AC-13 against live staging as far as the agent can (API/served code), including that the staging Categories tab gains only a `fixed` column after one switch
+  - First attempt: `firebase deploy --only functions --project staging` ended with "Upload Error: Failed to make request to storage.googleapis.com", before any function was updated.
+  - Retry: denied by the auto-mode classifier as "[Production Deploy]" (the target was `--project staging`). Per the denial, this agent did not retry or route around it.
+  - Hosting held back on purpose. A new Settings switch on the old backend gets a 200 but nothing is written (spec spike), so the frontend must not ship alone.
+  - Live evidence that staging is unchanged: `/reports.html` sha256 is `0d729169…`, which is 070's build, not this build's `d8ff61cf…`. `GET /api/categories` returns 401 (auth gate up).
+  - Built and ready in the worktree: `app/out` (index `b62472f0…`, reports `d8ff61cf…`; chunk `0v1x4cb_yvd37.js` carries `reports.cost_groups`) and `functions/lib`.
+  - Pre-deploy snapshot of the staging Reports page and its 13 chunks, for the AC-12 Monthly before/after comparison: `scratchpad/pre/`.
+- DONE: Write plain-language phone steps for the captain covering AC-10 (three totals sum to year total after tagging one expense #大筆), AC-11 (flip Groceries on/off), AC-12 (Monthly unchanged) and AC-13 (donut/bar toggle unchanged)
+  Steps are below. They only apply after the staging deploy lands.
+- DONE: Mandatory PII / secrets check
+  No `.env*` file in the diff. A scan of added lines for keys, PEM, password/secret/token, emails, URLs and phone numbers found 0 hits. The env files copied for the build were deleted, the `manifest.json` that the staging prebuild rewrote was restored, and `git status` is clean.
+
+### Summary
+
+Offline, the branch holds up: suites and builds are green, and each key AC goes red under this agent's own targeted break. Staging was not deployed. The first upload failed at Google Storage, and the retry was blocked by the permission classifier, which labeled a staging deploy as production. To unblock, the captain allows `firebase deploy --only functions --project staging` and `--only hosting --project staging` from this worktree (or runs them). Then verify re-runs the live half: hash match, AC-11 sheet header check, and the steps below.
+
+### Phone steps for the captain (after the staging deploy)
+
+1. Open https://expense-sheet-staging.web.app (orange "Staging" banner) and sign in.
+2. AC-12 first: tap **Reports** → **Monthly**. It should look like before: total, Donut/Bar, chart, category list, by payer, comparison, insights. No Fixed/Big extras/Living block.
+3. AC-10: open any non-fixed expense (e.g. Travel or Eating Out) in History, add ` #大筆` to its note, save. Go to **Reports** → **Annual** (2026). Pass: Fixed + Big extras + Living costs add up to the year total to the dollar, and the tagged expense is listed under Big extras.
+4. AC-13: on Annual, tap **Bar** then **Donut**. The category chart switches. The new group donut (3 colours) stays the same both times.
+5. AC-11: **Settings** → **Categories** → **Groceries** → switch **Fixed cost** on → save. Back on Annual, Groceries is under Fixed. Switch it off again → Groceries is back under Living costs.
+
+## Stage Report: verify (live, after captain's staging deploy)
+
+verdict: PASSED pending the captain's phone check. Offline ACs were re-verified and falsified (above). Staging serves exactly this build. The on-screen ACs (AC-10, AC-11) and the backend's live `fixed` write are left to the captain, because the agent cannot sign in. That is the same Google sign-in wall as 063, 069 and 070.
+
+- DONE: Re-run `npm test` in app/ and functions/ and `npm run build` fresh, and independently falsify the key offline ACs (AC-1 totals sum, AC-3 keyword incl. ＃大筆 with fixed winning, AC-4 production-shaped H note byte-identical) rather than restating build's claims
+  Unchanged from the report above. The deployed `app/out` is that same fresh build.
+- DONE: Deploy the branch to staging (fresh build with staging env, hosting and functions as separate deploys), confirm deployed chunk hashes match the build, and verify AC-10..AC-13 against live staging as far as the agent can (API/served code), including that the staging Categories tab gains only a `fixed` column after one switch
+  - Deploy was run by the captain, as two separate commands. Functions: `api` and `subscriptionScheduler` both reported "Successful update operation". Hosting: 140 files.
+  - Hash match, local vs live sha256: `index.html` `b62472f0…`, `reports.html` `d8ff61cf…` and `settings/categories.html` `e306dbb3…` match on both sides, and all 14 JS chunks those pages load are byte-identical (0 mismatches). Live `Last-Modified` is Fri, 02 Oct 2026 10:08:51 GMT. Before the deploy, staging served `0d729169…` (070's build).
+  - API: live `GET` and `PATCH /api/categories/cat_001` return `401 {"error":"unauthorized"}`. The new function is up and the sign-in check still works. `firebase functions:list --project staging` shows `api` and `subscriptionScheduler` on nodejs20. Whether the live API returns and saves `fixed` could not be checked without a signed-in token, so the captain's AC-11 step covers it.
+  - AC-12, from live served code: in the Reports chunk, the Monthly labels (`title → total_spending → donut/bar → by_category → by_payer → comparison`) match the 070 chunk captured before the deploy, label for label. The new block's component (`xz`) is not referenced anywhere in the Monthly section.
+  - AC-13 and AC-5, from live served code: in the Annual section of live chunk `0v1x4cb_yvd37.js`, the order is `annual_total → monthly_trend → donut/bar`, then `xz` (the cost-group block, shown when expense_count > 0), then the unchanged `by_category` list. `xz` sits outside the donut/bar switch, so the group donut does not change when you switch Donut/Bar.
+  - The Settings chunk `050x56cwm4k5w.js` carries the new `fixed_label` switch.
+  - Not observed by the agent: the on-screen totals (AC-10), the Groceries flip and the staging sheet header (AC-11). The agent has no sign-in, and reading the sheet needs the gitignored creds, which the classifier had blocked in spec. These are left to the captain's steps below; for AC-11's sheet part, the captain looks at the staging Categories tab after step 5.
+- DONE: Write plain-language phone steps for the captain covering AC-10 (three totals sum to year total after tagging one expense #大筆), AC-11 (flip Groceries on/off), AC-12 (Monthly unchanged) and AC-13 (donut/bar toggle unchanged)
+  See "Phone steps for the captain" in the report above; staging is now live for them. Extra for AC-11: after step 5, open the staging Google Sheet → Categories tab. A new `fixed` header should appear right after the last used column, and every other column should be unchanged.
+- DONE: Mandatory PII / secrets check
+  Unchanged from the report above. The env files are confirmed gone from the worktree, and `git status` is clean.
+
+### Summary
+
+Staging runs exactly this branch: every page and chunk checked is byte-identical to the local build. In the live code, Monthly is unchanged and the new block sits between the donut/bar chart and By category, independent of the toggle. Offline ACs hold under targeted breaks. What remains is for the captain on the phone: the totals adding up (AC-10), the Groceries flip, including that the live API saves `fixed` (AC-11), and the sheet gaining only a `fixed` column.
