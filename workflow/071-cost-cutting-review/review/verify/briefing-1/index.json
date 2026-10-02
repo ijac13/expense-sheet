@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:071:verify:attempt-1:revision-1",
+  "question": "071 verify: after your staging phone check (AC-10 totals, AC-11 Groceries flip + sheet fixed column), approve to open the PR, merge, and deploy to production?",
+  "artifacts": [
+    {
+      "id": "artifact:071:verify:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/2f326454688428725590e632c0c36a98136ee586/workflow/071-cost-cutting-review/index.md",
+      "rev": "sha256:badf288a3e9eff48ae3c22ac50240b42a765e13aaf8e288e7d73990a9ceb0d3e",
+      "mediaType": "text/markdown",
+      "summary": "Verify: functions 365/365, app 259/259, builds green; agent's own targeted breaks turn AC-1/3/4 red. Staging (captain-deployed) is byte-identical to the build for index, reports, settings/categories and all 14 chunks. Live code: Monthly labels unchanged vs 070; cost-group block sits between donut/bar and By category, outside the toggle; Settings carries the Fixed switch. Not agent-observable (sign-in wall): AC-10 on-screen totals, AC-11 Groceries flip + live fixed save + staging sheet column — captain's phone steps."
+    }
+  ]
+}

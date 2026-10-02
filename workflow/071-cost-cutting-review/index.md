@@ -52,6 +52,14 @@ gates:
               application:
                 target-stage: build
                 state: consumed
+        - id: gate:071:verify
+          stage: verify
+          attempts:
+            - id: gate-attempt:071-verify-1
+              briefing:
+                id: briefing:071:verify:attempt-1:revision-1
+                digest: sha256:5d246556d58b35ab85a3f43922c846856477c9bf412b9c6c14c713fb920c0c99
+                room-ref: ./review/verify/briefing-1
 ---
 
 ## Spec question (captain, at gate) — answered
