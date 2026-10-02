@@ -5,13 +5,16 @@ status: ideation
 source: captain
 started:
 completed:
-verdict:
+verdict: REJECTED
 score:
 worktree:
 issue:
 pr:
 mod-block:
+archived: 2026-10-02T06:53:12Z
 ---
+
+**Archived 2026-10-02 by captain:** not needed — the captain already has a forecast covering when fixed costs end.
 
 Project spending year by year so the household can plan around the years when big fixed costs (mortgage, tuition, baby costs) end or drop.
 
