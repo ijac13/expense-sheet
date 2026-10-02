@@ -13,17 +13,12 @@ pr:
 mod-block:
 ---
 
-## Open questions (captain answers inline)
-
-1. **Big-extra keyword:** what exact text in the note marks an expense as a big extra? Recommended: `#大筆` (short, easy on a phone, the `#` avoids matching ordinary note text).
-   - Answer:
-
 ## Decisions (captain, 2026-10-02 review)
 
 - **Placement:** keep today's "By category" list as is; add a new summary block above it.
 - **Fixed detail:** show the fixed total plus each fixed category underneath (tap opens drill-down, as today).
 - **Who sets "fixed":** an on/off "fixed" switch per category in Settings. Starts on for insurance, babies, mortgage, tuition.
-- **Big extras (大筆額外):** marked by a keyword in the expense's existing note field (no new tick or column). Replaces the earlier per-expense tick idea.
+- **Big extras (大筆額外):** marked by the keyword `#大筆` in the expense's existing note field (no new tick or column). Replaces the earlier per-expense tick idea.
 - **Past expenses:** captain adds the keyword by hand in the app's expense edit screen; no bulk backfill.
 - **Fixed vs. keyword:** the category wins. An expense in a fixed category stays Fixed even if its note has the keyword.
 - **Scope:** Annual tab only this round.
@@ -36,7 +31,7 @@ In Report > Annual, split the year into the same three groups the captain's own 
 | Captain's sheet column | In the app |
 |---|---|
 | Insurance 保費, Babies, Mortgage 房貸, Tuition 學費 → Total 固定 | **Fixed:** categories switched on as fixed in Settings, each listed, plus their total |
-| 大筆額外 | **Big extras:** non-fixed expenses whose note has the keyword, plus their total |
+| 大筆額外 | **Big extras:** non-fixed expenses whose note has `#大筆`, plus their total |
 | 生活費預估 | **Living costs:** everything else, each category listed, plus their total |
 | Total Spending | The year total already shown |
 
@@ -78,4 +73,4 @@ The three group totals add up to the year total. The monthly trend chart stays a
 
 ### Feedback Cycles
 
-- 2026-10-02 review: captain answered the five ideation questions and added the big-extras group (per-expense tick, chosen over category-level or amount threshold). Follow-up same day: captain switched the tick to a keyword in the note; past expenses marked by hand in the app; fixed category wins over the keyword.
+- 2026-10-02 review: captain answered the five ideation questions and added the big-extras group (per-expense tick, chosen over category-level or amount threshold). Follow-up same day: captain switched the tick to a keyword in the note; past expenses marked by hand in the app; fixed category wins over the keyword; keyword is `#大筆`.
