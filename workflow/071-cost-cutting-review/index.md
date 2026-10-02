@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-071-cost-cutting-review
 issue:
-pr: "#42"
+pr: pr-merge:42
 mod-block: merge:pr-merge
 gates:
     version: 1
