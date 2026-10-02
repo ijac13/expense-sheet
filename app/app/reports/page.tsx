@@ -764,6 +764,28 @@ export default function ReportsPage() {
                   </div>
                 </div>
 
+                {/* Monthly trend chart */}
+                {mounted && (
+                  <div className="bg-base-200 rounded-2xl p-4">
+                    <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-3">
+                      {t("reports.monthly_trend")}
+                    </div>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <BarChart
+                        data={annual.monthly_trend}
+                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                      >
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} width={50} />
+                        <Tooltip
+                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, t("reports.amount")]}
+                        />
+                        <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
                 {/* Chart type toggle */}
                 <div className="flex justify-end gap-1">
                   {(["pie", "bar"] as ChartType[]).map((ct) => (
@@ -825,28 +847,6 @@ export default function ReportsPage() {
                     ))}
                   </div>
                 </div>
-
-                {/* Monthly trend chart */}
-                {mounted && (
-                  <div className="bg-base-200 rounded-2xl p-4">
-                    <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-3">
-                      {t("reports.monthly_trend")}
-                    </div>
-                    <ResponsiveContainer width="100%" height={160}>
-                      <BarChart
-                        data={annual.monthly_trend}
-                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                      >
-                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} width={50} />
-                        <Tooltip
-                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, t("reports.amount")]}
-                        />
-                        <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
 
                 {/* By payer */}
                 <div className="bg-base-200 rounded-2xl p-4">
