@@ -9,8 +9,8 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-071-cost-cutting-review
 issue:
-pr:
-mod-block:
+pr: "#42"
+mod-block: merge:pr-merge
 gates:
     version: 1
     records:
@@ -60,6 +60,17 @@ gates:
                 id: briefing:071:verify:attempt-1:revision-1
                 digest: sha256:5d246556d58b35ab85a3f43922c846856477c9bf412b9c6c14c713fb920c0c99
                 room-ref: ./review/verify/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:071:verify:1
+                briefing: briefing:071:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-10-02T10:11:56.27975Z"
+                decision: approve
+                reason: Captain approved verify in the Subspace gate review (binding resolution, briefing:071:verify:attempt-1:revision-1) after the staging phone check, and said "good . deploy to prod" in chat.
+              application:
+                target-stage: done
+                state: pending
 ---
 
 ## Spec question (captain, at gate) — answered
