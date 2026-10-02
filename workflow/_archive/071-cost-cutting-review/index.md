@@ -1,16 +1,16 @@
 ---
 id: 071
 title: Split Report > Annual into fixed, big extras, and living costs
-status: verify
+status: done
 source: captain
 started: 2026-10-02T09:36:45Z
-completed:
-verdict:
+completed: 2026-10-02T10:40:52Z
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-071-cost-cutting-review
 issue:
 pr: pr-merge:42
-mod-block: merge:pr-merge
+mod-block:
 gates:
     version: 1
     records:
@@ -70,8 +70,11 @@ gates:
                 reason: Captain approved verify in the Subspace gate review (binding resolution, briefing:071:verify:attempt-1:revision-1) after the staging phone check, and said "good . deploy to prod" in chat.
               application:
                 target-stage: done
-                state: pending
+                state: consumed
+archived: 2026-10-02T10:40:52Z
 ---
+
+**Production deploy:** run by the captain 2026-10-02 after PR #42 merged (`c86d44e`), as two separate commands: `firebase deploy --only functions --project production` (`api` and `subscriptionScheduler` "Successful update operation", env from `.env`) then `firebase deploy --only hosting --project production` (140 files). Rebuilt fresh first (`rm -rf out .next && npm run build` in `app/` with `app/.env.local`; `rm -rf lib && npm run build` in `functions/`). Confirmed live by content match: `index.html` `da3c42b3…`, `reports.html` `a9ad66d8…`, `settings/categories.html` `57cae180…` local == live; all 14 JS chunks those pages load byte-identical (0 mismatches); live Reports chunks carry `cost_groups`; `Last-Modified: Fri, 02 Oct 2026 10:40:14 GMT`; `/api/categories` answers 401 (new function up, auth gate intact).
 
 ## Spec question (captain, at gate) — answered
 
