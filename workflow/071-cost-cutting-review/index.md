@@ -1,7 +1,7 @@
 ---
 id: 071
 title: Split Report > Annual into fixed, big extras, and living costs
-status: build
+status: verify
 source: captain
 started: 2026-10-02T09:36:45Z
 completed:
