@@ -17,6 +17,8 @@ import {
   PayerFilter,
   ChartType,
   ReportPeriod,
+  CostGroup,
+  AnnualCostGroups,
 } from "../lib/reportTypes";
 import { getMonthlySummary, getAnnualSummary } from "../lib/reportService";
 import DrillDown from "./DrillDown";
@@ -29,6 +31,13 @@ import { useTranslation } from "react-i18next";
 // Constants
 // ---------------------------------------------------------------------------
 const DONUT_COLORS = ["#1e6d4a", "#5ea87f", "#f9c440", "#d97757", "#7dc6b8", "#bfdba8"];
+
+const COST_GROUPS: CostGroup[] = ["fixed", "big_extra", "living"];
+const COST_GROUP_COLORS: Record<CostGroup, string> = {
+  fixed: "#1e6d4a",
+  big_extra: "#f9c440",
+  living: "#d97757",
+};
 
 const MONTH_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -45,13 +54,23 @@ function segmentProps(percent: number, offset: number, total: number) {
   return { strokeDasharray: `${dash} ${circumference - dash}`, strokeDashoffset: dashOffset };
 }
 
-function DonutChart({ categories, totalLabel }: { categories: CategoryBreakdown[]; totalLabel: string }) {
+function DonutChart({
+  categories,
+  totalLabel,
+  colors = DONUT_COLORS,
+  testId,
+}: {
+  categories: Pick<CategoryBreakdown, "category_id" | "total">[];
+  totalLabel: string;
+  colors?: string[];
+  testId?: string;
+}) {
   const total = categories.reduce((s, c) => s + c.total, 0);
   if (total === 0) return null;
 
   let offset = 0;
   return (
-    <div className="flex justify-center">
+    <div className="flex justify-center" data-testid={testId}>
       <svg width={240} height={240} viewBox="0 0 240 240">
         {/* Track */}
         <circle
@@ -68,7 +87,7 @@ function DonutChart({ categories, totalLabel }: { categories: CategoryBreakdown[
               key={cat.category_id}
               cx={120} cy={120} r={88}
               fill="none"
-              stroke={DONUT_COLORS[i % DONUT_COLORS.length]}
+              stroke={colors[i % colors.length]}
               strokeWidth={22}
               strokeDasharray={props.strokeDasharray}
               strokeDashoffset={props.strokeDashoffset}
@@ -141,6 +160,88 @@ function CategoryRow({
         <div className="text-xs text-base-content/50 mt-0.5">{cat.percentage}%</div>
       </div>
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cost groups (Annual) — Fixed / Big extras / Living costs
+// ---------------------------------------------------------------------------
+function CostGroupsCard({
+  groups,
+  lang,
+  onDrillDown,
+}: {
+  groups: AnnualCostGroups;
+  lang: string;
+  onDrillDown: (cat: CategoryBreakdown, group: CostGroup) => void;
+}) {
+  const { t } = useTranslation();
+  const name = (zh: string, en: string) => (lang === "zh" && zh ? zh : en);
+  // An empty group has no segment; colors stay paired with their group.
+  const segments = COST_GROUPS.filter((g) => groups[g].total > 0).map((g) => ({ category_id: g, total: groups[g].total }));
+
+  function categoryRows(group: "fixed" | "living") {
+    return groups[group].categories.map((cat) => (
+      <button
+        type="button"
+        key={cat.category_id}
+        data-testid={`${group}-row`}
+        onClick={() => onDrillDown(cat, group)}
+        className="w-full flex justify-between items-baseline py-2 px-2 hover:bg-base-300 transition-colors rounded-lg text-left"
+      >
+        <span className="text-sm truncate">{name(cat.category_name_zh, cat.category_name)}</span>
+        <span className="font-mono text-sm ml-2 shrink-0">NT${cat.total.toLocaleString()}</span>
+      </button>
+    ));
+  }
+
+  return (
+    <div data-testid="cost-groups" className="bg-base-200 rounded-2xl p-4 space-y-4">
+      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">
+        {t("reports.cost_groups")}
+      </div>
+      <DonutChart
+        testId="group-donut"
+        categories={segments}
+        colors={segments.map((s) => COST_GROUP_COLORS[s.category_id])}
+        totalLabel={t("reports.total")}
+      />
+      {COST_GROUPS.map((group) => (
+        <div key={group}>
+          <div className="flex justify-between items-baseline px-2">
+            <span className="flex items-center gap-2 text-sm font-semibold">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COST_GROUP_COLORS[group] }} />
+              {t(`reports.group_${group}`)}
+            </span>
+            <span className="flex items-baseline gap-2">
+              <span className="text-xs text-base-content/50">{groups[group].percentage}%</span>
+              <span data-testid={`group-total-${group}`} className="font-mono font-semibold text-sm">
+                NT${groups[group].total.toLocaleString()}
+              </span>
+            </span>
+          </div>
+          {group === "big_extra" ? (
+            groups.big_extra.expenses.length === 0 ? (
+              <p className="text-xs text-base-content/50 px-2 mt-1">{t("reports.group_big_extra_hint")}</p>
+            ) : (
+              groups.big_extra.expenses.map((e) => (
+                <div key={e.id} data-testid="big-extra-row" className="flex justify-between items-start py-2 px-2">
+                  <div className="min-w-0">
+                    <div className="text-xs text-base-content/50">
+                      {e.date} · {name(e.category_name_zh, e.category_name)}
+                    </div>
+                    <div className="text-sm truncate">{e.notes}</div>
+                  </div>
+                  <span className="font-mono text-sm ml-2 shrink-0">NT${e.amount.toLocaleString()}</span>
+                </div>
+              ))
+            )
+          ) : (
+            categoryRows(group)
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -412,6 +513,8 @@ export default function ReportsPage() {
 
   // Drill-down state
   const [drillDownCategory, setDrillDownCategory] = useState<CategoryBreakdown | null>(null);
+  // Set when the drill-down was opened from a cost-group row (071).
+  const [drillDownGroup, setDrillDownGroup] = useState<CostGroup | undefined>(undefined);
 
   // Bumped when the drill-down writes an expense, so summaries refetch instead of
   // showing figures the edit already invalidated.
@@ -488,7 +591,8 @@ export default function ReportsPage() {
             : String(annualYear)
         }
         payer={payer}
-        onBack={() => setDrillDownCategory(null)}
+        group={drillDownGroup}
+        onBack={() => { setDrillDownCategory(null); setDrillDownGroup(undefined); }}
         onDataChanged={() => setDataVersion(v => v + 1)}
       />
     );
@@ -828,6 +932,18 @@ export default function ReportsPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   )
+                )}
+
+                {/* Cost groups — Fixed / Big extras / Living costs (071) */}
+                {annual.expense_count > 0 && (
+                  <CostGroupsCard
+                    groups={annual.groups}
+                    lang={lang}
+                    onDrillDown={(cat, group) => {
+                      setDrillDownGroup(group);
+                      setDrillDownCategory(cat);
+                    }}
+                  />
                 )}
 
                 {/* Category list */}

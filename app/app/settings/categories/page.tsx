@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Category, GovCategory, GOV_CATEGORY_LABELS, GOV_CATEGORY_OPTIONS, NOTE_MAX_LENGTH, categoryIcon } from "../../lib/categories";
+import { Category, GovCategory, GOV_CATEGORY_LABELS, GOV_CATEGORY_OPTIONS, NOTE_MAX_LENGTH, categoryIcon, isFixedCategory } from "../../lib/categories";
 import {
   getCategories,
   addCategory,
@@ -22,10 +22,11 @@ interface FormState {
   name_zh: string;
   gov_category: GovCategory | "";
   note: string;
+  fixed: boolean;
   error: string;
 }
 
-const emptyForm: FormState = { icon: "", name_en: "", name_zh: "", gov_category: "", note: "", error: "" };
+const emptyForm: FormState = { icon: "", name_en: "", name_zh: "", gov_category: "", note: "", fixed: false, error: "" };
 
 type SaveStatus = { type: "success" | "error"; message: string } | null;
 
@@ -65,7 +66,7 @@ export default function CategoryManagementPage() {
   }
 
   function openEdit(cat: Category) {
-    setForm({ icon: cat.icon, name_en: cat.name_en, name_zh: cat.name_zh, gov_category: cat.gov_category ?? "", note: cat.note ?? "", error: "" });
+    setForm({ icon: cat.icon, name_en: cat.name_en, name_zh: cat.name_zh, gov_category: cat.gov_category ?? "", note: cat.note ?? "", fixed: isFixedCategory(cat), error: "" });
     setFormMode({ type: "edit", id: cat.id });
   }
 
@@ -104,6 +105,9 @@ export default function CategoryManagementPage() {
         name_zh: form.name_zh.trim(),
         gov_category: form.gov_category as GovCategory,
         note: form.note.trim(),
+        // Written only when it differs from the default by name, so an untouched
+        // switch stays unset and keeps following the name rule.
+        ...(form.fixed !== isFixedCategory({ name_en: form.name_en.trim() }) && { fixed: form.fixed }),
       };
 
       // Optimistic update with a placeholder
@@ -127,7 +131,7 @@ export default function CategoryManagementPage() {
         setCategories((prev) => prev.filter((c) => c.id !== placeholder.id));
         const msg = err instanceof Error ? err.message : "Failed to save category";
         setFormMode({ type: "add" });
-        setForm({ ...data, error: msg });
+        setForm({ ...data, fixed: form.fixed, error: msg });
       }
     } else if (formMode?.type === "edit") {
       const editId = formMode.id;
@@ -138,19 +142,21 @@ export default function CategoryManagementPage() {
         setForm((f) => ({ ...f, error: t("cat_mgmt.error_duplicate") }));
         return;
       }
+      // Snapshot the pre-edit category so a failed save can revert deterministically
+      // (AC-12) — do not depend on a second network call (the old rollback-via-refetch)
+      // succeeding, since a failed PATCH can coincide with a failed GET, which would
+      // silently leave the failed edit displayed as if it had saved.
+      const preEditCat = categories.find((c) => c.id === editId);
+
       const data = {
         icon: form.icon.trim() || "📦",
         name_en: form.name_en.trim(),
         name_zh: form.name_zh.trim(),
         gov_category: form.gov_category as GovCategory,
         note: form.note.trim(),
+        // Only a flipped switch is written; the first one creates the sheet column.
+        ...(form.fixed !== isFixedCategory(preEditCat) && { fixed: form.fixed }),
       };
-
-      // Snapshot the pre-edit category so a failed save can revert deterministically
-      // (AC-12) — do not depend on a second network call (the old rollback-via-refetch)
-      // succeeding, since a failed PATCH can coincide with a failed GET, which would
-      // silently leave the failed edit displayed as if it had saved.
-      const preEditCat = categories.find((c) => c.id === editId);
 
       // Optimistic update
       setCategories((prev) =>
@@ -334,6 +340,19 @@ export default function CategoryManagementPage() {
                   onChange={(e) => setForm((f) => ({ ...f, note: e.target.value.slice(0, NOTE_MAX_LENGTH), error: "" }))}
                 />
               </div>
+              <label className="label cursor-pointer justify-start gap-3">
+                <input
+                  type="checkbox"
+                  data-testid="category-fixed-toggle"
+                  className="toggle toggle-primary toggle-sm"
+                  checked={form.fixed}
+                  onChange={(e) => setForm((f) => ({ ...f, fixed: e.target.checked }))}
+                />
+                <span className="label-text">
+                  {t("cat_mgmt.fixed_label")}
+                  <span className="block text-xs text-base-content/50">{t("cat_mgmt.fixed_hint")}</span>
+                </span>
+              </label>
               {form.error && (
                 <p className="text-error text-sm">{form.error}</p>
               )}
@@ -380,6 +399,9 @@ export default function CategoryManagementPage() {
                       ? <span className="text-xs text-base-content/60">{GOV_CATEGORY_LABELS[cat.gov_category as GovCategory]}</span>
                       : <span className="badge badge-warning badge-xs text-xs">{t("cat_mgmt.gov_category_unset")}</span>
                     }
+                    {isFixedCategory(cat) && (
+                      <span className="badge badge-primary badge-outline badge-xs text-xs ml-2">{t("cat_mgmt.fixed_badge")}</span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1">

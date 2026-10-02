@@ -52,7 +52,10 @@ const fixture = (over = {}) => makeSheets({
 // ---------------------------------------------------------------------------
 
 const BEFORE = {
-  "/api/categories": '[{"id":"cat_001","name_en":"Eating Out","name_zh":"外食","icon":"🍕","sort_order":1,"is_active":true,"gov_category":"restaurants_accommodation","note":"phone bills"},{"id":"cat_002","name_en":"Digital","name_zh":"數位","icon":"💻","sort_order":2,"is_active":true,"gov_category":"transport_communication","note":""},{"id":"cat_003","name_en":"Groceries","name_zh":"食材","icon":"🥕","sort_order":3,"is_active":true,"gov_category":"food_beverage_tobacco","note":""},{"id":"cat_004","name_en":"Archived","name_zh":"封存","icon":"📦","sort_order":4,"is_active":false,"gov_category":null,"note":""}]',
+  // Entity 071 added `fixed`; CATEGORIES_HEADER has no `fixed` column, so every
+  // row reads null (never set) — the shape both live sheets have until the
+  // first Settings save creates the column.
+  "/api/categories": '[{"id":"cat_001","name_en":"Eating Out","name_zh":"外食","icon":"🍕","sort_order":1,"is_active":true,"gov_category":"restaurants_accommodation","note":"phone bills","fixed":null},{"id":"cat_002","name_en":"Digital","name_zh":"數位","icon":"💻","sort_order":2,"is_active":true,"gov_category":"transport_communication","note":"","fixed":null},{"id":"cat_003","name_en":"Groceries","name_zh":"食材","icon":"🥕","sort_order":3,"is_active":true,"gov_category":"food_beverage_tobacco","note":"","fixed":null},{"id":"cat_004","name_en":"Archived","name_zh":"封存","icon":"📦","sort_order":4,"is_active":false,"gov_category":null,"note":"","fixed":null}]',
   "/api": '[{"id":"exp-1","date":"2026-08-01","amount":250,"category_id":"cat_001","paid_by":"ijac","created_by":"ijac","notes":"lunch","created_at":"2026-08-01T02:00:00.000Z"},{"id":"exp-2","date":"2026-07-30","amount":1200,"category_id":"cat_002","paid_by":"wei","created_by":"ijac","notes":"","created_at":"2026-07-30T09:00:00.000Z"},{"id":"exp-3","date":"2026-07-29","amount":80,"category_id":"cat_003","paid_by":"wei","created_by":"wei","notes":"","created_at":""}]',
   // Entity 053 added start_date / end_date to every subscription; entity 059
   // added notes. SUBS_HEADER still carries only the nine legacy columns, so the

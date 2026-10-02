@@ -5,6 +5,7 @@ import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
 import { parseInsightsPeriod, buildInsightsPrompt } from "./insights";
 import {
+  Cell,
   Row,
   ColumnMap,
   TabSpec,
@@ -101,7 +102,8 @@ function endsBeforeStart(start: string, end: string): boolean {
   return end < start;
 }
 
-// Creates a missing `start_date` / `end_date` header on demand, following
+// Creates a missing optional header on demand (`start_date` / `end_date` /
+// `notes` on Subscriptions, `fixed` on Categories), following
 // ensureSchedulerLog: the captain never has to touch the sheet by hand, and a
 // production-sheet precondition is exactly the thing that blocks a deploy.
 //
@@ -110,9 +112,10 @@ function endsBeforeStart(start: string, end: string): boolean {
 // cell is invisible in row 1's length — placing by that length would claim the
 // column and destroy its cells. Production already has this shape: CATEGORIES
 // carries `note` data under a blank H1 (see sheetSchema.ts).
-async function ensureSubscriptionColumns(
+async function ensureColumns(
   sheets: ReturnType<typeof google.sheets>,
   spreadsheetId: string,
+  tabName: string,
   map: ColumnMap,
   rows: Row[],
   fields: string[]
@@ -123,7 +126,7 @@ async function ensureSubscriptionColumns(
   const first = rows.reduce((widest, r) => Math.max(widest, r.length), map.width);
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${SUBSCRIPTIONS_TAB}!${columnLetter(first)}1:${columnLetter(first + missing.length - 1)}1`,
+    range: `${tabName}!${columnLetter(first)}1:${columnLetter(first + missing.length - 1)}1`,
     valueInputOption: "RAW",
     requestBody: { values: [missing] },
   });
@@ -203,7 +206,16 @@ function rowToCategory(row: Row, map: ColumnMap): Record<string, unknown> {
     is_active: cell(row, map, "is_active") !== "false",
     gov_category: cell(row, map, "gov_category") ?? null,
     note: cell(row, map, "note") ?? "",
+    // null = never set (blank cell or no column yet): the app then applies the
+    // default by name, so the three states must stay distinct.
+    fixed: fixedCell(cell(row, map, "fixed")),
   };
+}
+
+function fixedCell(value: Cell): boolean | null {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
 }
 
 // Insert a data row at position 2 (right after the header) so the sheet stays DESC.
@@ -370,8 +382,14 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         // rather than a silent discard.
         if (body.gov_category !== undefined) updates.gov_category = String(body.gov_category);
         if (body.note !== undefined) updates.note = String(body.note);
+        if (body.fixed !== undefined) updates.fixed = String(body.fixed === true || body.fixed === "true");
 
-        const row = buildWriteRow([], map, updates);
+        // `fixed` is created on demand, unlike gov_category/note: no live sheet
+        // has it, and the Settings switch must work without a manual sheet edit.
+        const writeMap = updates.fixed !== undefined
+          ? await ensureColumns(sheets, spreadsheetId, CATEGORIES_TAB, map, rows, ["fixed"])
+          : map;
+        const row = buildWriteRow([], writeMap, updates);
 
         // Append row at the end (categories are ordered by sort_order, not insertion order)
         await sheets.spreadsheets.values.append({
@@ -381,7 +399,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           requestBody: { values: [row] },
         });
 
-        res.status(201).json(rowToCategory(row, map));
+        res.status(201).json(rowToCategory(row, writeMap));
         return;
       }
 
@@ -406,7 +424,11 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         for (const field of ["name_en", "name_zh", "icon", "sort_order", "is_active", "gov_category", "note"]) {
           if (body[field] !== undefined) updates[field] = String(body[field]);
         }
-        const updated = buildWriteRow(rows[rowIndex], map, updates);
+        if (body.fixed !== undefined) updates.fixed = String(body.fixed === true || body.fixed === "true");
+        const writeMap = updates.fixed !== undefined
+          ? await ensureColumns(sheets, spreadsheetId, CATEGORIES_TAB, map, rows, ["fixed"])
+          : map;
+        const updated = buildWriteRow(rows[rowIndex], writeMap, updates);
 
         await sheets.spreadsheets.values.update({
           spreadsheetId,
@@ -415,7 +437,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           requestBody: { values: [updated] },
         });
 
-        res.status(200).json(rowToCategory(updated, map));
+        res.status(200).json(rowToCategory(updated, writeMap));
         return;
       }
 
@@ -438,7 +460,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       if (req.method === "POST") {
         const body = req.body as Record<string, unknown>;
 
-        // Before ensureSubscriptionColumns, which itself writes a header row: a
+        // Before ensureColumns, which itself writes a header row: a
         // rejected request must leave the sheet byte-identical.
         const catError = await categoryIdError(sheets, spreadsheetId, body.category_id);
         if (catError) { res.status(400).json({ error: catError }); return; }
@@ -448,8 +470,8 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         // A full-tab read, not just row 1: the header placement below has to see
         // data sitting under a blank header cell, which row 1 alone cannot show.
         const { rows: subRows, map: readMap } = await readTab(sheets, spreadsheetId, SUBSCRIPTIONS_SPEC);
-        const map = await ensureSubscriptionColumns(
-          sheets, spreadsheetId, readMap, subRows, ["start_date", "end_date", "notes"]
+        const map = await ensureColumns(
+          sheets, spreadsheetId, SUBSCRIPTIONS_TAB, readMap, subRows, ["start_date", "end_date", "notes"]
         );
 
         const paidById = String(body.paid_by ?? "");
@@ -522,8 +544,8 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           }
         }
 
-        const writeMap = await ensureSubscriptionColumns(
-          sheets, spreadsheetId, map, rows, Object.keys(updates)
+        const writeMap = await ensureColumns(
+          sheets, spreadsheetId, SUBSCRIPTIONS_TAB, map, rows, Object.keys(updates)
         );
         const updated = buildWriteRow(rows[rowIndex], writeMap, updates);
 
