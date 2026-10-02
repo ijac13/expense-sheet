@@ -1,16 +1,16 @@
 ---
 id: 070
 title: Move monthly chart to the top of Report > Annual
-status: verify
+status: done
 source: captain
 started: 2026-09-24T07:53:13Z
-completed:
-verdict:
+completed: 2026-10-02T06:52:52Z
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-070-annual-monthly-chart-first
 issue:
 pr: pr-merge:41
-mod-block: merge:pr-merge
+mod-block:
 gates:
     version: 1
     records:
@@ -70,8 +70,11 @@ gates:
                 reason: 'Captain approved verify in the Subspace gate review (binding resolution, briefing:070:verify:attempt-1:revision-1): tests green, staging hash-matched, live order correct.'
               application:
                 target-stage: done
-                state: pending
+                state: consumed
+archived: 2026-10-02T06:52:52Z
 ---
+
+**Production deploy:** `firebase deploy --only hosting --project production` run by the captain 2026-10-02 (hosting-only — this entity touched no `functions/src` code), after PR #41 merged (`fd22d03`). Rebuilt fresh (`rm -rf out .next && npm run build` in `app/`, using `app/.env.local`) before deploying. Confirmed live by content match: `sha256(app/out/index.html)` == live `/` (`3b2df382…`) and `sha256(app/out/reports.html)` == live `/reports.html` (`f66098a2…`); `Last-Modified: Fri, 02 Oct 2026 06:52:05 GMT`. The Reports chunk `0kxhesx.ue0zx.js` is byte-identical local vs. live, and its Annual labels run `annual_total → monthly_trend → donut → by_category → by_payer`, confirming the new order shipped.
 
 The monthly chart is the most useful view in Report > Annual, so it should be the first block people see.
 
