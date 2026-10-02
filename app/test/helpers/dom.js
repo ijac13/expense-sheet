@@ -251,6 +251,9 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
   // process, and it would otherwise permanently capture the real (unmocked)
   // apiClient module from its first load.
   require("../../.test-build-ui/lib/expensesCache.js").invalidateExpensesCache();
+  // Same for Reports' session category list (071), which would otherwise carry
+  // one test's fixed switches into the next.
+  require("../../.test-build-ui/lib/categoryService.js").invalidateSessionCategories();
   return { dom, requests, getRequests, writes, categories, setCategoryIcon, scrolls, subscriptions, subWrites, expenses, expWrites, setOffline, releaseCategories, releaseExpenses };
 }
 

@@ -39,6 +39,12 @@ async function openEdit(container, name) {
   return toggle;
 }
 
+// A bare Event("click") skips a checkbox's activation behaviour in jsdom, so the
+// box never flips; HTMLElement.click() runs it, the way a real tap does.
+async function flip(toggle) {
+  await React.act(async () => { toggle.click(); });
+}
+
 const button = (c, label) => [...c.querySelectorAll("button")].find((b) => b.textContent.trim() === label);
 
 test("AC-8: the switch opens on the resolved value — default by name, else the stored switch", async () => {
@@ -67,7 +73,8 @@ test("AC-8: toggling the switch and saving sends fixed in the PATCH body", async
   const page = await mount(loadPage());
 
   const toggle = await openEdit(page, "Groceries");
-  await click(toggle);
+  await flip(toggle);
+  assert.equal(toggle.checked, true);
   await click(button(page, "common.save"));
 
   const patch = g.writes.filter((w) => w.method === "PATCH").pop();
@@ -76,7 +83,7 @@ test("AC-8: toggling the switch and saving sends fixed in the PATCH body", async
   assert.ok(rowFor(page, "Groceries").textContent.includes("cat_mgmt.fixed_badge"), "the badge follows the save");
 
   const off = await openEdit(page, "Insurance");
-  await click(off);
+  await flip(off);
   await click(button(page, "common.save"));
   assert.equal(g.writes.filter((w) => w.method === "PATCH").pop().body.fixed, false, "switching a default off is stored");
 });

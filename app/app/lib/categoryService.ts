@@ -3,6 +3,22 @@ import { apiFetch } from "./apiClient";
 
 const API_BASE = "/api/categories";
 
+// Reports reads categories once per session. Every write here clears that copy,
+// so a switch saved in Settings shows on the next report load without a reload.
+let sessionCategories: Category[] | null = null;
+
+export async function getSessionCategories(): Promise<Category[]> {
+  if (sessionCategories) return sessionCategories;
+  const live = await getCategories();
+  // Only a non-empty success is kept; an empty list is retried next call.
+  if (live.length > 0) sessionCategories = live;
+  return live;
+}
+
+export function invalidateSessionCategories(): void {
+  sessionCategories = null;
+}
+
 export async function getCategories(): Promise<Category[]> {
   const res = await apiFetch(API_BASE);
   if (!res.ok) throw new Error(`Failed to load categories: ${res.status}`);
@@ -18,12 +34,13 @@ export async function addCategory(
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`Failed to add category: ${res.status}`);
+  invalidateSessionCategories();
   return res.json() as Promise<Category>;
 }
 
 export async function updateCategory(
   id: string,
-  data: Partial<Pick<Category, "name_en" | "name_zh" | "icon" | "sort_order" | "is_active" | "gov_category" | "note">>
+  data: Partial<Pick<Category, "name_en" | "name_zh" | "icon" | "sort_order" | "is_active" | "gov_category" | "note" | "fixed">>
 ): Promise<Category> {
   const res = await apiFetch(`${API_BASE}/${id}`, {
     method: "PATCH",
@@ -31,6 +48,7 @@ export async function updateCategory(
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`Failed to update category: ${res.status}`);
+  invalidateSessionCategories();
   return res.json() as Promise<Category>;
 }
 

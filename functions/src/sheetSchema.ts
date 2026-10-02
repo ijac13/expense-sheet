@@ -26,9 +26,10 @@ export const CATEGORIES_SPEC: TabSpec = {
   tab: "Categories",
   // gov_category and note are optional: staging's Categories tab has neither,
   // and production has `note` data under a blank H1. Requiring them would 500
-  // every categories request on both sheets.
+  // every categories request on both sheets. `fixed` exists on neither sheet
+  // until the first save of a category's Fixed switch creates it.
   required: ["id", "name_en", "name_zh", "icon", "sort_order", "is_active"],
-  optional: ["gov_category", "note"],
+  optional: ["gov_category", "note", "fixed"],
 };
 
 export const SUBSCRIPTIONS_SPEC: TabSpec = {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ReportExpense, PayerFilter } from "../lib/reportTypes";
+import { ReportExpense, PayerFilter, CostGroup } from "../lib/reportTypes";
 import { getExpensesByCategory } from "../lib/reportService";
 import { DEFAULT_CATEGORIES, Category } from "../lib/categories";
 import { getCategories } from "../lib/categoryService";
@@ -17,6 +17,7 @@ interface Props {
   icon: string;
   periodLabel: string;
   payer: PayerFilter;
+  group?: CostGroup; // set when opened from a cost-group row
   onBack: () => void;
   onDataChanged: () => void;
 }
@@ -29,6 +30,7 @@ export default function DrillDown({
   icon,
   periodLabel,
   payer,
+  group,
   onBack,
   onDataChanged,
 }: Props) {
@@ -59,18 +61,18 @@ export default function DrillDown({
   function load() {
     setLoading(true);
     setError(null);
-    getExpensesByCategory(year, month, categoryId, payer)
+    getExpensesByCategory(year, month, categoryId, payer, group)
       .then((data) => { setExpenses(data); setLoading(false); })
       .catch(() => { setError("load_failed"); setLoading(false); });
   }
 
-  useEffect(load, [year, month, categoryId, payer]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(load, [year, month, categoryId, payer, group]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refetch after a write so rows, the header total, and the transaction count come from
   // server truth — an edit can move an expense out of this category, period, or payer filter.
   function refreshAfterWrite() {
     onDataChanged();
-    getExpensesByCategory(year, month, categoryId, payer)
+    getExpensesByCategory(year, month, categoryId, payer, group)
       .then(setExpenses)
       .catch(() => setError("load_failed"));
   }
