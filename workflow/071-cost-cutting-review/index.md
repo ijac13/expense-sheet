@@ -237,3 +237,28 @@ Riskiest mechanism: storing the per-category "fixed" switch so it round-trips Se
 ### Summary
 
 Spec stores "fixed" as an optional `fixed` Categories column created on first save (past the widest row, so production's unnamed note column is safe), with blank cells defaulting to fixed for Insurance/Babies/Mortgage/Tuition by name, so no data migration. Grouping runs client side on data already loaded (notes included); living rows exclude big extras and their drill-down is filtered to match, and saving a category clears Reports' session category cache. Key spike finding: today's backend silently accepts and drops a `fixed` field, so backend and Settings must ship together.
+
+## Stage Report: build
+
+- DONE: Write the offline tests first (cost-groups, reports-annual-groups render, category-fixed render, categories API round-trip on staging and production header shapes) and show each fails on main before implementing; then implement until AC-1..AC-9 pass, with full `npm test` in app/ and functions/ plus `npm run build` in app/ exiting 0
+  Tests committed alone in f4fdd61: on unchanged code app 16 fail / functions 5 fail (only the two "nothing appears" guards passed). Implementation 6e75fb0: functions 365/365, app 259/259, `npm run build` exit 0.
+- DONE: Prove the fixed column round-trip does not disturb other columns (AC-4: production-shaped header keeps the unnamed H note byte-identical, fixed lands past the widest row) and that full-width ＃大筆 counts as a big extra (captain resolved the spec question yes)
+  `categories.api.test.js` 071 AC-4: staging shape → `fixed` header at G, A–F identical; production shape → header at I, H1 stays blank, every H note byte-identical; rename keeps the cell; second switch reuses the column. Placing by row-1 width instead fails 2 of them. `cost-groups` AC-3: `＃大筆` → Big extras; dropping the full-width keyword fails 3 tests.
+- DONE: Report surface vs. the spec estimate (12 files, ~660 ±230 lines) and confirm the existing By-category list, donut/bar toggle and Monthly tab are untouched
+  Surface: 19 files, +817 −67 = 884 changed lines (134% of 660; inside the 890 upper bound). The spec's single "tests" row covers 7 test files. Three changes the spec did not list: the `sheetColumns` golden JSON gains `"fixed":null` (same approach as 053/059), `test/helpers/dom.js` resets the category cache, and `toReportExpense` is pulled out of `getExpensesByCategory` to share it. `reports/page.tsx` diff has no hunk in the Monthly section or the By-category rows. DonutChart only gains optional `colors`/`testId` props whose defaults keep today's output. Render test shows By-category rows identical with and without the feature data.
+
+### Acceptance criteria evidence (one line per claim, with the change that breaks it)
+
+- AC-1 `cost-groups`: fixed + big extras + living = year total for all/user1/user2, and each group's rows add up to its total. Fails if unresolvable categories are dropped from Living or a keyword expense counts twice.
+- AC-2 `cost-groups`: stored true/false wins; blank Insurance/Babies/Mortgage/Tuition → fixed; legacy slug `insurance` follows `cat_023`. Matching the switch by stored id only fails 1 test.
+- AC-3 `cost-groups`: `機票 #大筆` → Big extras; `#大筆` in Insurance → Fixed; `大筆` without a hash → Living; `＃大筆` → Big extras. Checking the keyword before the category fails 2 tests.
+- AC-4 see the second checklist item.
+- AC-5 `reports-annual-groups`: three totals, 4-circle group donut (3 when a group is empty), fixed/big-extra/living rows, block between the chart and By category, group donut stays when Bar is on, no block when the year is empty. `reports-annual-order` lists `reports.cost_groups` in its expected order.
+- AC-6 `reports-annual-groups` + `cost-groups`: the Travel living row drills to NT$1,200 without the tagged trip; By category Travel still drills to NT$31,200. Removing the group filter from DrillDown fails it.
+- AC-7 `cost-groups`: `updateCategory` → next Annual load refetches categories and moves Groceries to Fixed. Removing the cache clear fails it.
+- AC-8 `category-fixed`: Insurance (blank) opens on, Groceries off, stored-false Mortgage off; toggling and saving sends `fixed`; untouched switch sends no `fixed`; badge follows. Dropping `fixed` from the save fails it.
+- AC-9: suites and build above. AC-10..AC-13 are interactive (staging) and belong to verify.
+
+### Summary
+
+The backend reads and writes `fixed` as true/false/null. The first save creates the column past the widest row, using the shared `ensureColumns` (renamed from the subscriptions-only helper). The app groups each Annual expense with `resolveCategory` → `isFixedCategory` → keyword. Annual gets a summary block with a group donut, and living rows drill into a group-filtered list. Settings gets a Fixed switch and badge. Decisions to note: (1) the session category cache moved from `reportService` to `categoryService` so every category write clears it without an import cycle. (2) The form writes `fixed` only when the switch differs from the category's resolved value, so untouched defaults stay blank. As the spec's edge case says, renaming a never-set Babies drops its default. (3) Two existing tests were updated for the new field: the 047 AC-9 deepEqual gains `fixed: null`, and the sheetColumns golden JSON.
