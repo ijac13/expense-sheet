@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-070-annual-monthly-chart-first
 issue:
-pr: "#41"
+pr: pr-merge:41
 mod-block: merge:pr-merge
 gates:
     version: 1
