@@ -1,13 +1,13 @@
 ---
 id: 071
 title: Split Report > Annual into fixed, big extras, and living costs
-status: spec
+status: build
 source: captain
 started: 2026-10-02T09:36:45Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-071-cost-cutting-review
 issue:
 pr:
 mod-block:
@@ -41,6 +41,17 @@ gates:
                 id: briefing:071:spec:attempt-1:revision-1
                 digest: sha256:25bf2d0930f2d291231b3b819f7ccc86f18e51b972e853379cf0b6ac0f5d5435
                 room-ref: ./review/spec/briefing-1
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:071:spec:1
+                briefing: briefing:071:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-10-02T09:47:49.014374Z"
+                decision: approve
+                reason: 'Captain approved the spec in chat ("approve, yes on ＃大筆") after the gate review: AC-1..AC-13 as written; spec question resolved yes — full-width ＃大筆 also counts as a big extra (AC-3 last case stands).'
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 ## Spec question (captain, at gate)
