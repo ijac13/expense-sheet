@@ -35,8 +35,6 @@ const byTestId = (c, id) => c.querySelector(`[data-testid="${id}"]`);
 const allByTestId = (c, id) => [...c.querySelectorAll(`[data-testid="${id}"]`)];
 const sectionLabels = (c) =>
   [...c.querySelectorAll(".uppercase.tracking-wide")].map((el) => el.textContent.trim());
-const precedes = (a, b) =>
-  Boolean(a.compareDocumentPosition(b) & global.window.Node.DOCUMENT_POSITION_FOLLOWING);
 
 async function click(el) {
   await React.act(async () => {
@@ -50,12 +48,6 @@ async function openAnnual(fixture) {
   const page = await mount(loadPage("reports/page.js"));
   await click(byText(page, "button", "reports.annual"));
   return page;
-}
-
-/** Each "By category" row as name + amount, in render order. */
-function byCategoryRows(page) {
-  const label = byText(page, ".uppercase.tracking-wide", "reports.by_category");
-  return [...label.parentElement.querySelectorAll("button")].map((b) => b.textContent.trim());
 }
 
 test("AC-5: Annual shows three group totals, a 3-segment group donut and each group's rows", async () => {
@@ -86,38 +78,23 @@ test("AC-5: Annual shows three group totals, a 3-segment group donut and each gr
   assert.match(living[1], /Eating Out.*NT\$300/);
 });
 
-test("AC-5: the block sits after the chart and before the unchanged By category list", async () => {
+test("the block follows the monthly trend and replaces the Donut/Bar chart and By category list", async () => {
   const page = await openAnnual({ categories: CATEGORIES, expenses: EXPENSES });
 
   assert.deepEqual(sectionLabels(page), [
     "reports.annual_total",
     "reports.monthly_trend",
     "reports.cost_groups",
-    "reports.by_category",
     "reports.by_payer",
     "reports.insights_title",
   ]);
-  const toggle = byText(page, "button", "reports.donut");
-  const block = byTestId(page, "cost-groups");
-  const list = byText(page, ".uppercase.tracking-wide", "reports.by_category");
-  assert.ok(precedes(toggle, block), "Donut/Bar toggle and chart come first");
-  assert.ok(precedes(block, list), "the block comes before By category");
-
-  const withFeature = byCategoryRows(page);
-  // Same expenses with no keyword and no fixed category: By category must not move.
-  const plain = await openAnnual({
-    categories: CATEGORIES.map((c) => ({ ...c, name_en: c.name_en, fixed: false })),
-    expenses: EXPENSES.map((e) => ({ ...e, notes: e.notes.replace("#大筆", "") })),
-  });
-  assert.deepEqual(withFeature, byCategoryRows(plain), "By category rows: same count, order and amounts");
-  assert.equal(withFeature.length, 3);
-  assert.match(withFeature[0], /Travel.*NT\$31,200/, "By category keeps Travel's full amount");
-});
-
-test("AC-5: the group donut does not follow the Donut/Bar toggle", async () => {
-  const page = await openAnnual({ categories: CATEGORIES, expenses: EXPENSES });
-  await click(byText(page, "button", "reports.bar"));
-  assert.ok(byTestId(page, "group-donut"), "the group donut stays on Bar");
+  assert.equal(byText(page, "button", "reports.donut"), undefined, "no Donut/Bar toggle on Annual");
+  assert.equal(byText(page, "button", "reports.bar"), undefined);
+  assert.ok(byTestId(page, "group-donut"), "the group donut stays");
+  // Every category of the year shows under its group: Travel's living part,
+  // Eating Out under living, Insurance under fixed.
+  const rows = [...allByTestId(page, "fixed-row"), ...allByTestId(page, "living-row")];
+  assert.equal(rows.length, 3);
 });
 
 test("AC-5 edge: an empty group shows NT$0 with no rows and no donut segment", async () => {
@@ -133,7 +110,7 @@ test("AC-5 edge: a year with no expenses has no summary block", async () => {
   assert.equal(byTestId(page, "cost-groups"), null);
 });
 
-test("AC-6: a living row drills into exactly its own expenses; By category still drills into all", async () => {
+test("AC-6: a living row drills into exactly its own expenses", async () => {
   const page = await openAnnual({ categories: CATEGORIES, expenses: EXPENSES });
   const drillTotal = () => page.querySelector(".text-3xl.font-mono").textContent;
 
@@ -142,11 +119,4 @@ test("AC-6: a living row drills into exactly its own expenses; By category still
   assert.equal(drillTotal(), "NT$1,200", "the drill-down total matches the living row");
   assert.ok(page.textContent.includes("高鐵"));
   assert.ok(!page.textContent.includes("日本機票"), "the tagged trip is not in the living drill-down");
-
-  await click(byText(page, "button", "← reports.back"));
-  const label = byText(page, ".uppercase.tracking-wide", "reports.by_category");
-  const travelAll = [...label.parentElement.querySelectorAll("button")].find((b) => b.textContent.includes("Travel"));
-  await click(travelAll);
-  assert.equal(drillTotal(), "NT$31,200", "today's drill-down is unfiltered");
-  assert.ok(page.textContent.includes("日本機票"));
 });

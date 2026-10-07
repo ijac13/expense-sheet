@@ -242,7 +242,8 @@ export async function getMonthlySummary(
 // ---------------------------------------------------------------------------
 export async function getAnnualSummary(
   year: number,
-  payer: PayerFilter = "all"
+  payer: PayerFilter = "all",
+  today: Date = new Date()
 ): Promise<AnnualSummary> {
   const [allExpenses, categories] = await Promise.all([
     fetchAllExpenses(),
@@ -260,15 +261,31 @@ export async function getAnnualSummary(
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
   ];
 
-  const monthly_trend: MonthlyTrend[] = MONTH_SHORT.map((label, i) => {
-    const mo = i + 1;
-    const ym = makeDate(year, mo, 1).slice(0, 7);
-    const total = filterByPayer(
+  const monthTotal = (y: number, mo: number) => {
+    const ym = makeDate(y, mo, 1).slice(0, 7);
+    return filterByPayer(
       allExpenses.filter((e) => e.date.startsWith(ym)),
       payer
     ).reduce((s, e) => s + e.amount, 0);
-    return { month: mo, label, total };
-  });
+  };
+  const monthly_trend: MonthlyTrend[] = MONTH_SHORT.map((label, i) => ({
+    month: i + 1,
+    label,
+    total: monthTotal(year, i + 1),
+    prev_total: monthTotal(year - 1, i + 1),
+  }));
+
+  // While the viewed year is running, last year is cut at today's month-day so
+  // both sides cover the same days. A string compare keeps Feb 29 safe.
+  const todayIso = makeDate(today.getFullYear(), today.getMonth() + 1, today.getDate());
+  const through = today.getFullYear() === year ? todayIso.slice(5) : null;
+  const prevPrefix = String(year - 1);
+  const prevExpenses = filterByPayer(
+    allExpenses.filter(
+      (e) => e.date.startsWith(prevPrefix) && (through === null || e.date.slice(5, 10) <= through)
+    ),
+    payer
+  );
 
   return {
     year,
@@ -277,6 +294,12 @@ export async function getAnnualSummary(
     groups: buildCostGroups(yearExpenses, categories),
     payers: buildPayerBreakdown(yearExpenses),
     monthly_trend,
+    comparison: {
+      year: year - 1,
+      through,
+      total: prevExpenses.reduce((s, e) => s + e.amount, 0),
+      groups: buildCostGroups(prevExpenses, categories),
+    },
     expense_count: yearExpenses.length,
   };
 }

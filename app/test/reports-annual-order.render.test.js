@@ -38,7 +38,7 @@ async function openAnnual(container) {
   await React.act(async () => {});
 }
 
-test("AC-1/AC-2: Annual shows year picker, total, monthly trend, toggle, cost groups (071), category list, by payer, insights — in that order", async () => {
+test("AC-1/AC-2: Annual shows year picker, total, monthly trend, cost groups, by payer, insights — in that order", async () => {
   installGlobals({ expenses: EXPENSES });
   const page = await mount(loadPage("reports/page.js"));
   await openAnnual(page);
@@ -47,21 +47,14 @@ test("AC-1/AC-2: Annual shows year picker, total, monthly trend, toggle, cost gr
     "reports.annual_total",
     "reports.monthly_trend",
     "reports.cost_groups",
-    "reports.by_category",
     "reports.by_payer",
     "reports.insights_title",
   ]);
 
   const year = byText(page, "span.font-semibold", String(now.getFullYear()));
   const total = byText(page, ".uppercase.tracking-wide", "reports.annual_total");
-  const trend = byText(page, ".uppercase.tracking-wide", "reports.monthly_trend");
-  const donut = byText(page, "button", "reports.donut");
-  const categoryList = byText(page, ".uppercase.tracking-wide", "reports.by_category");
-  assert.ok(year && donut, "year picker label and Donut toggle are rendered");
-
+  assert.ok(year, "year picker label is rendered");
   assert.ok(precedes(year, total), "year picker comes before the year total");
-  assert.ok(precedes(trend, donut), "monthly trend comes before the Donut/Bar toggle");
-  assert.ok(precedes(donut, categoryList), "Donut/Bar toggle stays above the category list");
 });
 
 test("AC-3a: Monthly keeps its current block order and has no monthly trend", async () => {
