@@ -100,7 +100,7 @@ async function openAnnual() {
 
 test("Compare shows last year's amounts and deltas, and lists categories gone this year", async () => {
   const page = await openAnnual();
-  const toggle = byTestId(page, "compare-toggle");
+  const toggle = byTestId(page, "compare-last_year");
   assert.equal(toggle.textContent, "reports.compare_partial");
   assert.equal(byTestId(page, "group-compare-fixed"), null, "off by default");
   assert.equal(allByTestId(page, "living-row").length, 1);

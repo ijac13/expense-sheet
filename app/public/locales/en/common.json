@@ -73,7 +73,11 @@
     "compare_partial": "vs Jan 1 – {{mon}} {{d}}, {{year}}",
     "enlarge": "Enlarge chart",
     "close": "Close",
-    "trend_tap_hint": "Tap a month to see both years"
+    "trend_tap_hint": "Tap a month to see both years",
+    "compare_vs": "vs {{range}}",
+    "range_days": "{{mon}} 1–{{d}}",
+    "range_days_year": "{{mon}} 1–{{d}}, {{year}}",
+    "range_month": "{{mon}} {{year}}"
   },
   "subscriptions": {
     "title": "Subscriptions",

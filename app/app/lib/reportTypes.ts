@@ -17,11 +17,14 @@ export interface PayerBreakdown {
   percentage: number;
 }
 
-export interface MonthlyComparison {
-  prev_month_total: number;
-  prev_month_label: string;
-  same_month_last_year_total: number;
-  same_month_last_year_label: string;
+// A month to compare against, cut to the viewed month's days while that month
+// is still running: viewing Oct on Oct 7 compares Sep 1–7 and Oct 1–7 last year.
+export interface MonthComparison {
+  year: number;
+  month: number;
+  through_day: number | null; // inclusive cutoff; null = the whole month
+  total: number;
+  groups: AnnualCostGroups;
 }
 
 export interface MonthlySummary {
@@ -30,8 +33,9 @@ export interface MonthlySummary {
   label: string; // e.g. "April 2026"
   total: number;
   categories: CategoryBreakdown[];
+  groups: AnnualCostGroups;
   payers: PayerBreakdown[];
-  comparison: MonthlyComparison;
+  comparison: { prev_month: MonthComparison; last_year: MonthComparison };
   expense_count: number;
 }
 

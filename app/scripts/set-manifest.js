@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Prebuild script: swaps in manifest.staging.json when NEXT_PUBLIC_APP_ENV=staging.
+// Prebuild script: copies manifest.staging.json or manifest.production.json over
+// manifest.json, so a production build after a staging one never ships the
+// staging name and colors.
 // Runs as "prebuild" in package.json so it executes before every `next build`.
 
 const fs = require("fs");
@@ -25,5 +27,6 @@ if (env === "staging") {
   fs.copyFileSync(stagingManifest, manifestDest);
   console.log("[set-manifest] Staging build — copied manifest.staging.json → manifest.json");
 } else {
-  console.log("[set-manifest] Production build — manifest.json unchanged");
+  fs.copyFileSync(path.join(publicDir, "manifest.production.json"), manifestDest);
+  console.log("[set-manifest] Production build — copied manifest.production.json → manifest.json");
 }
