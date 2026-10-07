@@ -15,11 +15,11 @@ import {
   AnnualSummary,
   CategoryBreakdown,
   PayerFilter,
-  ChartType,
   ReportPeriod,
   CostGroup,
   AnnualCostGroups,
   AnnualComparison,
+  MonthComparison,
   MonthlyTrend,
 } from "../lib/reportTypes";
 import { getMonthlySummary, getAnnualSummary } from "../lib/reportService";
@@ -32,8 +32,6 @@ import { useTranslation } from "react-i18next";
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const DONUT_COLORS = ["#1e6d4a", "#5ea87f", "#f9c440", "#d97757", "#7dc6b8", "#bfdba8"];
-
 const COST_GROUPS: CostGroup[] = ["fixed", "big_extra", "living"];
 const COST_GROUP_COLORS: Record<CostGroup, string> = {
   fixed: "#1e6d4a",
@@ -62,12 +60,12 @@ function segmentProps(percent: number, offset: number, total: number) {
 function DonutChart({
   categories,
   totalLabel,
-  colors = DONUT_COLORS,
+  colors,
   testId,
 }: {
   categories: Pick<CategoryBreakdown, "category_id" | "total">[];
   totalLabel: string;
-  colors?: string[];
+  colors: string[];
   testId?: string;
 }) {
   const total = categories.reduce((s, c) => s + c.total, 0);
@@ -129,48 +127,8 @@ function DeltaBadge({ current, previous }: { current: number; previous: number }
 }
 
 // ---------------------------------------------------------------------------
-// Category row
-// ---------------------------------------------------------------------------
-function CategoryRow({
-  cat,
-  onDrillDown,
-  lang,
-  color,
-}: {
-  cat: CategoryBreakdown;
-  onDrillDown: (cat: CategoryBreakdown) => void;
-  lang: string;
-  color: string;
-}) {
-  const displayName = lang === "zh" && cat.category_name_zh ? cat.category_name_zh : cat.category_name;
-  return (
-    <button
-      type="button"
-      className="w-full flex items-center gap-3 py-3 px-4 hover:bg-base-200 transition-colors rounded-xl text-left"
-      onClick={() => onDrillDown(cat)}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex justify-between items-baseline">
-          <span className="font-medium text-sm truncate">{displayName}</span>
-          <span className="font-mono font-semibold text-sm ml-2 shrink-0">
-            NT${cat.total.toLocaleString()}
-          </span>
-        </div>
-        <div className="mt-1 h-1.5 bg-base-300 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full"
-            style={{ width: `${cat.percentage}%`, backgroundColor: color }}
-          />
-        </div>
-        <div className="text-xs text-base-content/50 mt-0.5">{cat.percentage}%</div>
-      </div>
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Cost groups (Annual) — Fixed / Big extras / Living costs, the year's only
-// category breakdown. "Compare" lays last year's matching days beside it.
+// Cost groups — Fixed / Big extras / Living costs, the period's only category
+// breakdown. Each Compare button lays one earlier period's matching days beside it.
 // ---------------------------------------------------------------------------
 function compareLabel(c: AnnualComparison, t: (k: string, o?: Record<string, unknown>) => string) {
   if (c.through === null) return t("reports.compare_full", { year: c.year });
@@ -179,28 +137,50 @@ function compareLabel(c: AnnualComparison, t: (k: string, o?: Record<string, unk
   return t("reports.compare_partial", { year: c.year, m, d, mon: MONTH_SHORT[m - 1] });
 }
 
+/** "Sep 1–7", "Oct 1–7, 2025" or "Sep 2026" — the year shown only when it differs. */
+function monthRangeLabel(
+  c: MonthComparison,
+  viewedYear: number,
+  t: (k: string, o?: Record<string, unknown>) => string
+) {
+  const opts = { year: c.year, m: c.month, d: c.through_day, mon: MONTH_SHORT[c.month - 1] };
+  if (c.through_day === null) return t("reports.range_month", opts);
+  return t(c.year === viewedYear ? "reports.range_days" : "reports.range_days_year", opts);
+}
+
+interface CardComparison {
+  key: string;
+  button: string; // the toggle's label
+  label: string;  // the short label beside each group's compared amount
+  total: number;
+  groups: AnnualCostGroups;
+}
+
 function CostGroupsCard({
   groups,
-  comparison,
-  yearTotal,
+  comparisons,
+  periodTotal,
   lang,
   onDrillDown,
 }: {
   groups: AnnualCostGroups;
-  comparison: AnnualComparison;
-  yearTotal: number;
+  comparisons: CardComparison[];
+  periodTotal: number;
   lang: string;
   onDrillDown: (cat: CategoryBreakdown, group: CostGroup) => void;
 }) {
   const { t } = useTranslation();
-  const [comparing, setComparing] = useState(false);
+  // One comparison at a time; tapping the active button turns it off.
+  const [selected, setSelected] = useState<string | null>(null);
+  const comparison = comparisons.find((c) => c.key === selected) ?? null;
+  const comparing = comparison !== null;
   const name = (zh: string, en: string) => (lang === "zh" && zh ? zh : en);
   // An empty group has no segment; colors stay paired with their group.
   const segments = COST_GROUPS.filter((g) => groups[g].total > 0).map((g) => ({ category_id: g, total: groups[g].total }));
 
   function categoryRows(group: "fixed" | "living") {
     const current = groups[group].categories;
-    const previous = comparison.groups[group].categories;
+    const previous = comparison?.groups[group].categories ?? [];
     const prevTotal = new Map(previous.map((c) => [c.category_id, c.total]));
     // While comparing, a category spent on only last year shows as NT$0 so a drop is visible.
     const goneThisYear = previous
@@ -208,7 +188,7 @@ function CostGroupsCard({
       .map((p) => ({ ...p, total: 0, count: 0, percentage: 0 }));
     const rows = comparing ? [...current, ...goneThisYear] : current;
     return rows.map((cat) => {
-      const share = yearTotal > 0 ? Math.round((cat.total / yearTotal) * 100) : 0;
+      const share = periodTotal > 0 ? Math.round((cat.total / periodTotal) * 100) : 0;
       const prev = prevTotal.get(cat.category_id) ?? 0;
       return (
         <button
@@ -242,19 +222,24 @@ function CostGroupsCard({
 
   return (
     <div data-testid="cost-groups" className="bg-base-200 rounded-2xl p-4 space-y-4">
-      <div className="flex justify-between items-center gap-2">
+      <div className="flex flex-wrap justify-between items-center gap-2">
         <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">
           {t("reports.cost_groups")}
         </div>
-        <button
-          type="button"
-          data-testid="compare-toggle"
-          aria-pressed={comparing}
-          onClick={() => setComparing((c) => !c)}
-          className={`btn btn-xs ${comparing ? "btn-primary" : "btn-ghost border border-base-300"}`}
-        >
-          {compareLabel(comparison, t)}
-        </button>
+        <div className="flex flex-wrap justify-end gap-1">
+          {comparisons.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              data-testid={`compare-${c.key}`}
+              aria-pressed={selected === c.key}
+              onClick={() => setSelected((s) => (s === c.key ? null : c.key))}
+              className={`btn btn-xs ${selected === c.key ? "btn-primary" : "btn-ghost border border-base-300"}`}
+            >
+              {c.button}
+            </button>
+          ))}
+        </div>
       </div>
       <DonutChart
         testId="group-donut"
@@ -262,13 +247,13 @@ function CostGroupsCard({
         colors={segments.map((s) => COST_GROUP_COLORS[s.category_id])}
         totalLabel={t("reports.total")}
       />
-      {comparing && (
+      {comparison && (
         <div data-testid="total-compare" className="flex justify-between items-center px-2 text-sm">
           <span className="text-base-content/70">{t("reports.total")}</span>
           <span className="flex items-center gap-1.5">
             <span className="font-mono text-xs text-base-content/50">NT${comparison.total.toLocaleString()} →</span>
-            <span className="font-mono font-semibold">NT${yearTotal.toLocaleString()}</span>
-            <DeltaBadge current={yearTotal} previous={comparison.total} />
+            <span className="font-mono font-semibold">NT${periodTotal.toLocaleString()}</span>
+            <DeltaBadge current={periodTotal} previous={comparison.total} />
           </span>
         </div>
       )}
@@ -286,9 +271,9 @@ function CostGroupsCard({
               </span>
             </span>
           </div>
-          {comparing && (
+          {comparison && (
             <div data-testid={`group-compare-${group}`} className="flex justify-end items-center gap-1.5 px-2 text-xs text-base-content/50">
-              <span>{comparison.year}</span>
+              <span>{comparison.label}</span>
               <span className="font-mono">NT${comparison.groups[group].total.toLocaleString()}</span>
               <DeltaBadge current={groups[group].total} previous={comparison.groups[group].total} />
             </div>
@@ -696,7 +681,6 @@ export default function ReportsPage() {
   const [mounted, setMounted] = useState(false);
   const [period, setPeriod] = useState<ReportPeriod>("monthly");
   const [payer, setPayer] = useState<PayerFilter>("all");
-  const [chartType, setChartType] = useState<ChartType>("pie");
 
   // Monthly navigation
   const [year, setYear] = useState(now.getFullYear());
@@ -901,74 +885,28 @@ export default function ReportsPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-1.5">
-                    <DeltaBadge current={monthly.total} previous={monthly.comparison.prev_month_total} />
+                    <DeltaBadge current={monthly.total} previous={monthly.comparison.prev_month.total} />
                     <span className="text-xs text-base-content/50">
-                      vs {monthly.comparison.prev_month_label} · NT${Math.round(monthly.total / 30).toLocaleString()}{t("reports.day_avg")}
+                      vs {monthRangeLabel(monthly.comparison.prev_month, year, t)} · NT${Math.round(monthly.total / 30).toLocaleString()}{t("reports.day_avg")}
                     </span>
                   </div>
                 </div>
 
-                {/* Chart type toggle */}
-                <div className="flex justify-end gap-1">
-                  {(["pie", "bar"] as ChartType[]).map((ct) => (
-                    <button
-                      key={ct}
-                      type="button"
-                      onClick={() => setChartType(ct)}
-                      className={`btn btn-xs ${chartType === ct ? "btn-primary" : "btn-ghost"}`}
-                    >
-                      {ct === "pie" ? t("reports.donut") : t("reports.bar")}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Chart */}
-                {mounted && (
-                  chartType === "pie" ? (
-                    <DonutChart categories={monthly.categories} totalLabel={t("reports.total")} />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart
-                        data={monthly.categories.map(c => ({
-                          ...c,
-                          display_name: lang === "zh" && c.category_name_zh ? c.category_name_zh : c.category_name,
-                        }))}
-                        margin={{ top: 4, right: 8, left: 0, bottom: 40 }}
-                      >
-                        <XAxis
-                          dataKey="display_name"
-                          tick={{ fontSize: 10 }}
-                          angle={-35}
-                          textAnchor="end"
-                          interval={0}
-                        />
-                        <YAxis tick={{ fontSize: 10 }} width={50} />
-                        <Tooltip
-                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, t("reports.amount")]}
-                        />
-                        <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )
-                )}
-
-                {/* Category list */}
-                <div className="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
-                  <div className="px-4 pt-3 pb-1 text-xs text-base-content/50 uppercase tracking-wide font-semibold">
-                    {t("reports.by_category")}
-                  </div>
-                  <div className="divide-y divide-base-300">
-                    {monthly.categories.map((cat, i) => (
-                      <CategoryRow
-                        key={cat.category_id}
-                        cat={cat}
-                        onDrillDown={setDrillDownCategory}
-                        lang={lang}
-                        color={DONUT_COLORS[i % DONUT_COLORS.length]}
-                      />
-                    ))}
-                  </div>
-                </div>
+                {/* Cost groups + compare to last month / same month last year */}
+                <CostGroupsCard
+                  groups={monthly.groups}
+                  comparisons={(["prev_month", "last_year"] as const).map((key) => {
+                    const c = monthly.comparison[key];
+                    const range = monthRangeLabel(c, year, t);
+                    return { key, button: t("reports.compare_vs", { range }), label: range, total: c.total, groups: c.groups };
+                  })}
+                  periodTotal={monthly.total}
+                  lang={lang}
+                  onDrillDown={(cat, group) => {
+                    setDrillDownGroup(group);
+                    setDrillDownCategory(cat);
+                  }}
+                />
 
                 {/* By payer */}
                 <div className="bg-base-200 rounded-2xl p-4">
@@ -996,34 +934,15 @@ export default function ReportsPage() {
                     {t("reports.comparison")}
                   </div>
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-base-content/70">
-                        vs {monthly.comparison.prev_month_label}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm">
-                          NT${monthly.comparison.prev_month_total.toLocaleString()}
-                        </span>
-                        <DeltaBadge
-                          current={monthly.total}
-                          previous={monthly.comparison.prev_month_total}
-                        />
+                    {[monthly.comparison.prev_month, monthly.comparison.last_year].map((c) => (
+                      <div key={`${c.year}-${c.month}`} data-testid="month-compare-line" className="flex justify-between items-center">
+                        <span className="text-sm text-base-content/70">vs {monthRangeLabel(c, year, t)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm">NT${c.total.toLocaleString()}</span>
+                          <DeltaBadge current={monthly.total} previous={c.total} />
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-base-content/70">
-                        vs {monthly.comparison.same_month_last_year_label}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm">
-                          NT${monthly.comparison.same_month_last_year_total.toLocaleString()}
-                        </span>
-                        <DeltaBadge
-                          current={monthly.total}
-                          previous={monthly.comparison.same_month_last_year_total}
-                        />
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1075,8 +994,14 @@ export default function ReportsPage() {
                 {annual.expense_count > 0 && (
                   <CostGroupsCard
                     groups={annual.groups}
-                    comparison={annual.comparison}
-                    yearTotal={annual.total}
+                    comparisons={[{
+                      key: "last_year",
+                      button: compareLabel(annual.comparison, t),
+                      label: String(annual.comparison.year),
+                      total: annual.comparison.total,
+                      groups: annual.comparison.groups,
+                    }]}
+                    periodTotal={annual.total}
                     lang={lang}
                     onDrillDown={(cat, group) => {
                       setDrillDownGroup(group);

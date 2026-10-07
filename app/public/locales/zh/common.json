@@ -73,7 +73,11 @@
     "compare_partial": "對比 {{year}} 年 1/1–{{m}}/{{d}}",
     "enlarge": "放大圖表",
     "close": "關閉",
-    "trend_tap_hint": "點選月份查看兩年金額"
+    "trend_tap_hint": "點選月份查看兩年金額",
+    "compare_vs": "對比 {{range}}",
+    "range_days": "{{m}}/1–{{m}}/{{d}}",
+    "range_days_year": "{{year}}/{{m}}/1–{{m}}/{{d}}",
+    "range_month": "{{year}} 年 {{m}} 月"
   },
   "subscriptions": {
     "title": "訂閱",

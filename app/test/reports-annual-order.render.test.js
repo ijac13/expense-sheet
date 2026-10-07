@@ -57,13 +57,13 @@ test("AC-1/AC-2: Annual shows year picker, total, monthly trend, cost groups, by
   assert.ok(precedes(year, total), "year picker comes before the year total");
 });
 
-test("AC-3a: Monthly keeps its current block order and has no monthly trend", async () => {
+test("AC-3a: Monthly shows total, cost groups, by payer, comparison, insights — and no monthly trend", async () => {
   installGlobals({ expenses: EXPENSES });
   const page = await mount(loadPage("reports/page.js"));
 
   assert.deepEqual(sectionLabels(page), [
     "reports.total_spending",
-    "reports.by_category",
+    "reports.cost_groups",
     "reports.by_payer",
     "reports.comparison",
     "reports.insights_title",

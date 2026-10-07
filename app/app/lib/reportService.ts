@@ -184,7 +184,8 @@ function buildPayerBreakdown(expenses: Expense[]): PayerBreakdown[] {
 export async function getMonthlySummary(
   year: number,
   month: number,
-  payer: PayerFilter = "all"
+  payer: PayerFilter = "all",
+  today: Date = new Date()
 ): Promise<MonthlySummary> {
   const [allExpenses, categories] = await Promise.all([
     fetchAllExpenses(),
@@ -197,27 +198,30 @@ export async function getMonthlySummary(
     payer
   );
 
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevYear = month === 1 ? year - 1 : year;
-  const prevYm = makeDate(prevYear, prevMonth, 1).slice(0, 7);
-  const prevExpenses = filterByPayer(
-    allExpenses.filter((e) => e.date.startsWith(prevYm)),
-    payer
-  );
-
-  const sameMonthLastYm = makeDate(year - 1, month, 1).slice(0, 7);
-  const sameMonthLastYExpenses = filterByPayer(
-    allExpenses.filter((e) => e.date.startsWith(sameMonthLastYm)),
-    payer
-  );
+  // While the viewed month is running, both comparisons stop at today's day;
+  // a shorter month simply runs out first (Mar 1–30 vs Feb 1–28).
+  const isCurrent = today.getFullYear() === year && today.getMonth() + 1 === month;
+  const through_day = isCurrent ? today.getDate() : null;
+  const compareWith = (y: number, mo: number) => {
+    const prefix = makeDate(y, mo, 1).slice(0, 7);
+    const list = filterByPayer(
+      allExpenses.filter(
+        (e) => e.date.startsWith(prefix) && (through_day === null || Number(e.date.slice(8, 10)) <= through_day)
+      ),
+      payer
+    );
+    return {
+      year: y,
+      month: mo,
+      through_day,
+      total: list.reduce((s, e) => s + e.amount, 0),
+      groups: buildCostGroups(list, categories),
+    };
+  };
 
   const MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
-  ];
-  const MONTH_SHORT = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
   ];
 
   return {
@@ -226,12 +230,11 @@ export async function getMonthlySummary(
     label: `${MONTH_NAMES[month - 1]} ${year}`,
     total: monthExpenses.reduce((s, e) => s + e.amount, 0),
     categories: buildCategoryBreakdown(monthExpenses, categories),
+    groups: buildCostGroups(monthExpenses, categories),
     payers: buildPayerBreakdown(monthExpenses),
     comparison: {
-      prev_month_total: prevExpenses.reduce((s, e) => s + e.amount, 0),
-      prev_month_label: `${MONTH_SHORT[prevMonth - 1]} ${prevYear}`,
-      same_month_last_year_total: sameMonthLastYExpenses.reduce((s, e) => s + e.amount, 0),
-      same_month_last_year_label: `${MONTH_SHORT[month - 1]} ${year - 1}`,
+      prev_month: month === 1 ? compareWith(year - 1, 12) : compareWith(year, month - 1),
+      last_year: compareWith(year - 1, month),
     },
     expense_count: monthExpenses.length,
   };
