@@ -68,7 +68,12 @@
     "insights_error": "Something went wrong. Please try again.",
     "regenerate": "Regenerate",
     "insights_generated_at": "Generated:",
-    "amount": "Amount"
+    "amount": "Amount",
+    "compare_full": "vs {{year}}",
+    "compare_partial": "vs Jan 1 – {{mon}} {{d}}, {{year}}",
+    "enlarge": "Enlarge chart",
+    "close": "Close",
+    "trend_tap_hint": "Tap a month to see both years"
   },
   "subscriptions": {
     "title": "Subscriptions",

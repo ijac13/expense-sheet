@@ -39,6 +39,7 @@ export interface MonthlyTrend {
   month: number;
   label: string; // e.g. "Jan"
   total: number;
+  prev_total: number; // the same month, one year earlier
 }
 
 // The captain's planning-sheet split of a year: Fixed (categories switched on as
@@ -56,6 +57,15 @@ export interface AnnualCostGroups {
   living: CostGroupTotal & { categories: CategoryBreakdown[] };
 }
 
+// The year before, cut to the same stretch of days: Jan 1 to today's date while
+// the viewed year is still running, the whole year once it has ended.
+export interface AnnualComparison {
+  year: number;
+  through: string | null; // "MM-DD" cutoff, inclusive; null = the full year
+  total: number;
+  groups: AnnualCostGroups;
+}
+
 export interface AnnualSummary {
   year: number;
   total: number;
@@ -63,6 +73,7 @@ export interface AnnualSummary {
   groups: AnnualCostGroups;
   payers: PayerBreakdown[];
   monthly_trend: MonthlyTrend[];
+  comparison: AnnualComparison;
   expense_count: number;
 }
 

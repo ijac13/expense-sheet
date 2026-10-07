@@ -19,11 +19,13 @@ import {
   ReportPeriod,
   CostGroup,
   AnnualCostGroups,
+  AnnualComparison,
+  MonthlyTrend,
 } from "../lib/reportTypes";
 import { getMonthlySummary, getAnnualSummary } from "../lib/reportService";
 import DrillDown from "./DrillDown";
 import MonthPickerModal from "../components/MonthPickerModal";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
 import { USERS } from "../lib/users";
 import { useTranslation } from "react-i18next";
 
@@ -38,6 +40,9 @@ const COST_GROUP_COLORS: Record<CostGroup, string> = {
   big_extra: "#f9c440",
   living: "#d97757",
 };
+
+const THIS_YEAR_COLOR = "#1e6d4a";
+const LAST_YEAR_COLOR = "#c2c7c0";
 
 const MONTH_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -164,41 +169,92 @@ function CategoryRow({
 }
 
 // ---------------------------------------------------------------------------
-// Cost groups (Annual) — Fixed / Big extras / Living costs
+// Cost groups (Annual) — Fixed / Big extras / Living costs, the year's only
+// category breakdown. "Compare" lays last year's matching days beside it.
 // ---------------------------------------------------------------------------
+function compareLabel(c: AnnualComparison, t: (k: string, o?: Record<string, unknown>) => string) {
+  if (c.through === null) return t("reports.compare_full", { year: c.year });
+  const m = Number(c.through.slice(0, 2));
+  const d = Number(c.through.slice(3));
+  return t("reports.compare_partial", { year: c.year, m, d, mon: MONTH_SHORT[m - 1] });
+}
+
 function CostGroupsCard({
   groups,
+  comparison,
+  yearTotal,
   lang,
   onDrillDown,
 }: {
   groups: AnnualCostGroups;
+  comparison: AnnualComparison;
+  yearTotal: number;
   lang: string;
   onDrillDown: (cat: CategoryBreakdown, group: CostGroup) => void;
 }) {
   const { t } = useTranslation();
+  const [comparing, setComparing] = useState(false);
   const name = (zh: string, en: string) => (lang === "zh" && zh ? zh : en);
   // An empty group has no segment; colors stay paired with their group.
   const segments = COST_GROUPS.filter((g) => groups[g].total > 0).map((g) => ({ category_id: g, total: groups[g].total }));
 
   function categoryRows(group: "fixed" | "living") {
-    return groups[group].categories.map((cat) => (
-      <button
-        type="button"
-        key={cat.category_id}
-        data-testid={`${group}-row`}
-        onClick={() => onDrillDown(cat, group)}
-        className="w-full flex justify-between items-baseline py-2 px-2 hover:bg-base-300 transition-colors rounded-lg text-left"
-      >
-        <span className="text-sm truncate">{name(cat.category_name_zh, cat.category_name)}</span>
-        <span className="font-mono text-sm ml-2 shrink-0">NT${cat.total.toLocaleString()}</span>
-      </button>
-    ));
+    const current = groups[group].categories;
+    const previous = comparison.groups[group].categories;
+    const prevTotal = new Map(previous.map((c) => [c.category_id, c.total]));
+    // While comparing, a category spent on only last year shows as NT$0 so a drop is visible.
+    const goneThisYear = previous
+      .filter((p) => !current.some((c) => c.category_id === p.category_id))
+      .map((p) => ({ ...p, total: 0, count: 0, percentage: 0 }));
+    const rows = comparing ? [...current, ...goneThisYear] : current;
+    return rows.map((cat) => {
+      const share = yearTotal > 0 ? Math.round((cat.total / yearTotal) * 100) : 0;
+      const prev = prevTotal.get(cat.category_id) ?? 0;
+      return (
+        <button
+          type="button"
+          key={cat.category_id}
+          data-testid={`${group}-row`}
+          disabled={cat.total === 0}
+          onClick={() => onDrillDown(cat, group)}
+          className="w-full py-2 px-2 hover:bg-base-300 transition-colors rounded-lg text-left disabled:hover:bg-transparent"
+        >
+          <div className="flex justify-between items-baseline">
+            <span className="text-sm truncate">{name(cat.category_name_zh, cat.category_name)}</span>
+            <span className="font-mono text-sm ml-2 shrink-0">NT${cat.total.toLocaleString()}</span>
+          </div>
+          <div className="mt-1 h-1.5 bg-base-300 rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${share}%`, backgroundColor: COST_GROUP_COLORS[group] }} />
+          </div>
+          <div className="flex justify-between items-center text-xs text-base-content/50 mt-0.5">
+            <span>{share}%</span>
+            {comparing && (
+              <span data-testid="row-compare" className="flex items-center gap-1.5">
+                <span className="font-mono">NT${prev.toLocaleString()}</span>
+                <DeltaBadge current={cat.total} previous={prev} />
+              </span>
+            )}
+          </div>
+        </button>
+      );
+    });
   }
 
   return (
     <div data-testid="cost-groups" className="bg-base-200 rounded-2xl p-4 space-y-4">
-      <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">
-        {t("reports.cost_groups")}
+      <div className="flex justify-between items-center gap-2">
+        <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">
+          {t("reports.cost_groups")}
+        </div>
+        <button
+          type="button"
+          data-testid="compare-toggle"
+          aria-pressed={comparing}
+          onClick={() => setComparing((c) => !c)}
+          className={`btn btn-xs ${comparing ? "btn-primary" : "btn-ghost border border-base-300"}`}
+        >
+          {compareLabel(comparison, t)}
+        </button>
       </div>
       <DonutChart
         testId="group-donut"
@@ -206,6 +262,16 @@ function CostGroupsCard({
         colors={segments.map((s) => COST_GROUP_COLORS[s.category_id])}
         totalLabel={t("reports.total")}
       />
+      {comparing && (
+        <div data-testid="total-compare" className="flex justify-between items-center px-2 text-sm">
+          <span className="text-base-content/70">{t("reports.total")}</span>
+          <span className="flex items-center gap-1.5">
+            <span className="font-mono text-xs text-base-content/50">NT${comparison.total.toLocaleString()} →</span>
+            <span className="font-mono font-semibold">NT${yearTotal.toLocaleString()}</span>
+            <DeltaBadge current={yearTotal} previous={comparison.total} />
+          </span>
+        </div>
+      )}
       {COST_GROUPS.map((group) => (
         <div key={group}>
           <div className="flex justify-between items-baseline px-2">
@@ -220,6 +286,13 @@ function CostGroupsCard({
               </span>
             </span>
           </div>
+          {comparing && (
+            <div data-testid={`group-compare-${group}`} className="flex justify-end items-center gap-1.5 px-2 text-xs text-base-content/50">
+              <span>{comparison.year}</span>
+              <span className="font-mono">NT${comparison.groups[group].total.toLocaleString()}</span>
+              <DeltaBadge current={groups[group].total} previous={comparison.groups[group].total} />
+            </div>
+          )}
           {group === "big_extra" ? (
             groups.big_extra.expenses.length === 0 ? (
               <p className="text-xs text-base-content/50 px-2 mt-1">{t("reports.group_big_extra_hint")}</p>
@@ -241,6 +314,133 @@ function CostGroupsCard({
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Monthly trend (Annual) — this year beside last year, with a full-screen
+// landscape view. iOS pages can't rotate the screen, so in portrait the
+// enlarged chart is drawn turned 90°: the captain turns the phone to read it.
+// ---------------------------------------------------------------------------
+function TrendLegend({ year }: { year: number }) {
+  return (
+    <span className="flex items-center gap-3 text-xs text-base-content/60">
+      <span className="flex items-center gap-1">
+        <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: LAST_YEAR_COLOR }} />
+        {year - 1}
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: THIS_YEAR_COLOR }} />
+        {year}
+      </span>
+    </span>
+  );
+}
+
+function TrendBars({ year, onPick }: { year: number; onPick?: (index: number) => void }) {
+  return (
+    <>
+      <Bar dataKey="prev_total" name={String(year - 1)} fill={LAST_YEAR_COLOR} radius={[3, 3, 0, 0]}
+        onClick={onPick ? (_: unknown, i: number) => onPick(i) : undefined} />
+      <Bar dataKey="total" name={String(year)} fill={THIS_YEAR_COLOR} radius={[3, 3, 0, 0]}
+        onClick={onPick ? (_: unknown, i: number) => onPick(i) : undefined} />
+    </>
+  );
+}
+
+// The enlarged chart's long and short side, from the window rather than from
+// the rotated box: Recharts measures on-screen size, which rotation swaps.
+function useLandscapeSize() {
+  const read = () => ({
+    long: Math.max(window.innerWidth, window.innerHeight),
+    short: Math.min(window.innerWidth, window.innerHeight),
+  });
+  const [size, setSize] = useState(read);
+  useEffect(() => {
+    const onResize = () => setSize(read());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return size;
+}
+
+function TrendFullscreen({ data, year, onClose }: { data: MonthlyTrend[]; year: number; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { long, short } = useLandscapeSize();
+  const [picked, setPicked] = useState<number | null>(null);
+  const pick = picked === null ? null : data[picked];
+  return (
+    <div data-testid="trend-fullscreen" className="fixed inset-0 z-[1000] bg-base-100 overflow-hidden">
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90 landscape:rotate-0 flex flex-col p-4"
+        style={{ width: long, height: short }}
+      >
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div className="flex items-center gap-4 min-w-0">
+            <span className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">
+              {t("reports.monthly_trend")}
+            </span>
+            <TrendLegend year={year} />
+          </div>
+          <span data-testid="trend-picked" className="text-sm truncate">
+            {pick ? (
+              <>
+                <span className="font-semibold">{pick.label}</span>
+                <span className="text-base-content/60"> · {year - 1} </span>
+                <span className="font-mono">NT${pick.prev_total.toLocaleString()}</span>
+                <span className="text-base-content/60"> · {year} </span>
+                <span className="font-mono">NT${pick.total.toLocaleString()}</span>
+              </>
+            ) : (
+              <span className="text-base-content/50">{t("reports.trend_tap_hint")}</span>
+            )}
+          </span>
+          <button type="button" aria-label={t("reports.close")} onClick={onClose} className="btn btn-ghost btn-sm btn-circle shrink-0">
+            <X size={20} />
+          </button>
+        </div>
+        <BarChart width={long - 32} height={short - 80} data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+          <YAxis tick={{ fontSize: 11 }} width={56} />
+          {TrendBars({ year, onPick: setPicked })}
+        </BarChart>
+      </div>
+    </div>
+  );
+}
+
+function TrendCard({ data, year }: { data: MonthlyTrend[]; year: number }) {
+  const { t } = useTranslation();
+  const [enlarged, setEnlarged] = useState(false);
+  return (
+    <div className="bg-base-200 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">
+          {t("reports.monthly_trend")}
+        </div>
+        <div className="flex items-center gap-2">
+          <TrendLegend year={year} />
+          <button
+            type="button"
+            data-testid="trend-enlarge"
+            aria-label={t("reports.enlarge")}
+            onClick={() => setEnlarged(true)}
+            className="btn btn-ghost btn-xs btn-square"
+          >
+            <Maximize2 size={14} />
+          </button>
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={160}>
+        <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={1}>
+          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} width={50} />
+          <Tooltip formatter={(value, name) => [`NT$${Number(value).toLocaleString()}`, name]} />
+          {TrendBars({ year })}
+        </BarChart>
+      </ResponsiveContainer>
+      {enlarged && <TrendFullscreen data={data} year={year} onClose={() => setEnlarged(false)} />}
     </div>
   );
 }
@@ -868,76 +1068,15 @@ export default function ReportsPage() {
                   </div>
                 </div>
 
-                {/* Monthly trend chart */}
-                {mounted && (
-                  <div className="bg-base-200 rounded-2xl p-4">
-                    <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold mb-3">
-                      {t("reports.monthly_trend")}
-                    </div>
-                    <ResponsiveContainer width="100%" height={160}>
-                      <BarChart
-                        data={annual.monthly_trend}
-                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                      >
-                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} width={50} />
-                        <Tooltip
-                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, t("reports.amount")]}
-                        />
-                        <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                {/* Chart type toggle */}
-                <div className="flex justify-end gap-1">
-                  {(["pie", "bar"] as ChartType[]).map((ct) => (
-                    <button
-                      key={ct}
-                      type="button"
-                      onClick={() => setChartType(ct)}
-                      className={`btn btn-xs ${chartType === ct ? "btn-primary" : "btn-ghost"}`}
-                    >
-                      {ct === "pie" ? t("reports.donut") : t("reports.bar")}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Chart — annual */}
-                {mounted && (
-                  chartType === "pie" ? (
-                    <DonutChart categories={annual.categories} totalLabel={t("reports.total")} />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart
-                        data={annual.categories.map(c => ({
-                          ...c,
-                          display_name: lang === "zh" && c.category_name_zh ? c.category_name_zh : c.category_name,
-                        }))}
-                        margin={{ top: 4, right: 8, left: 0, bottom: 40 }}
-                      >
-                        <XAxis
-                          dataKey="display_name"
-                          tick={{ fontSize: 10 }}
-                          angle={-35}
-                          textAnchor="end"
-                          interval={0}
-                        />
-                        <YAxis tick={{ fontSize: 10 }} width={50} />
-                        <Tooltip
-                          formatter={(value) => [`NT$${Number(value).toLocaleString()}`, t("reports.amount")]}
-                        />
-                        <Bar dataKey="total" fill="#1e6d4a" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )
-                )}
+                {/* Monthly trend chart — this year vs last year */}
+                {mounted && <TrendCard data={annual.monthly_trend} year={annualYear} />}
 
                 {/* Cost groups — Fixed / Big extras / Living costs (071) */}
                 {annual.expense_count > 0 && (
                   <CostGroupsCard
                     groups={annual.groups}
+                    comparison={annual.comparison}
+                    yearTotal={annual.total}
                     lang={lang}
                     onDrillDown={(cat, group) => {
                       setDrillDownGroup(group);
@@ -945,24 +1084,6 @@ export default function ReportsPage() {
                     }}
                   />
                 )}
-
-                {/* Category list */}
-                <div className="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
-                  <div className="px-4 pt-3 pb-1 text-xs text-base-content/50 uppercase tracking-wide font-semibold">
-                    {t("reports.by_category")}
-                  </div>
-                  <div className="divide-y divide-base-300">
-                    {annual.categories.map((cat, i) => (
-                      <CategoryRow
-                        key={cat.category_id}
-                        cat={cat}
-                        onDrillDown={setDrillDownCategory}
-                        lang={lang}
-                        color={DONUT_COLORS[i % DONUT_COLORS.length]}
-                      />
-                    ))}
-                  </div>
-                </div>
 
                 {/* By payer */}
                 <div className="bg-base-200 rounded-2xl p-4">

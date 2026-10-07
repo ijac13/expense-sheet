@@ -68,7 +68,12 @@
     "insights_error": "發生錯誤，請再試一次。",
     "regenerate": "重新產生",
     "insights_generated_at": "產生時間：",
-    "amount": "金額"
+    "amount": "金額",
+    "compare_full": "對比 {{year}} 年",
+    "compare_partial": "對比 {{year}} 年 1/1–{{m}}/{{d}}",
+    "enlarge": "放大圖表",
+    "close": "關閉",
+    "trend_tap_hint": "點選月份查看兩年金額"
   },
   "subscriptions": {
     "title": "訂閱",
