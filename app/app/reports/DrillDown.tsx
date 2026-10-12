@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReportExpense, PayerFilter, CostGroup } from "../lib/reportTypes";
-import { getExpensesByCategory } from "../lib/reportService";
-import { DEFAULT_CATEGORIES, Category, categoriesOfKind } from "../lib/categories";
+import { getExpensesByCategory, getIncomesByCategory } from "../lib/reportService";
+import { DEFAULT_CATEGORIES, Category } from "../lib/categories";
 import { getCategories } from "../lib/categoryService";
 import { USERS } from "../lib/users";
 import ExpenseEditSheet from "../components/ExpenseEditSheet";
@@ -18,6 +18,7 @@ interface Props {
   periodLabel: string;
   payer: PayerFilter;
   group?: CostGroup; // set when opened from a cost-group row
+  kind?: "expense" | "income"; // income lists the category's income rows (077)
   onBack: () => void;
   onDataChanged: () => void;
 }
@@ -31,6 +32,7 @@ export default function DrillDown({
   periodLabel,
   payer,
   group,
+  kind = "expense",
   onBack,
   onDataChanged,
 }: Props) {
@@ -41,10 +43,15 @@ export default function DrillDown({
   const [allCategories, setAllCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [selected, setSelected] = useState<ReportExpense | null>(null);
 
+  // Every active category: the edit sheet narrows its picker to the row's own kind.
   const categories = useMemo(
-    () => categoriesOfKind(allCategories, "expense").filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order),
+    () => allCategories.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order),
     [allCategories]
   );
+  const isIncome = kind === "income";
+  const fetchRows = () => (isIncome
+    ? getIncomesByCategory(year, month, categoryId)
+    : getExpensesByCategory(year, month, categoryId, payer, group));
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
@@ -61,18 +68,18 @@ export default function DrillDown({
   function load() {
     setLoading(true);
     setError(null);
-    getExpensesByCategory(year, month, categoryId, payer, group)
+    fetchRows()
       .then((data) => { setExpenses(data); setLoading(false); })
       .catch(() => { setError("load_failed"); setLoading(false); });
   }
 
-  useEffect(load, [year, month, categoryId, payer, group]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(load, [year, month, categoryId, payer, group, kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refetch after a write so rows, the header total, and the transaction count come from
   // server truth — an edit can move an expense out of this category, period, or payer filter.
   function refreshAfterWrite() {
     onDataChanged();
-    getExpensesByCategory(year, month, categoryId, payer, group)
+    fetchRows()
       .then(setExpenses)
       .catch(() => setError("load_failed"));
   }
@@ -100,8 +107,8 @@ export default function DrillDown({
         {!loading && !error && (
           <div className="mt-3">
             <div className="text-sm opacity-70">{t("reports.total")}</div>
-            <div className="text-3xl font-mono font-bold">
-              NT${total.toLocaleString()}
+            <div data-testid="drill-total" className="text-3xl font-mono font-bold">
+              {isIncome ? "+" : ""}NT${total.toLocaleString()}
             </div>
             <div className="text-sm opacity-70 mt-1">{expenses.length} {t("reports.transactions")}</div>
           </div>
@@ -153,8 +160,8 @@ export default function DrillDown({
                       </div>
                     </div>
                     <div className="text-right ml-4">
-                      <div className="font-mono font-semibold">
-                        NT${expense.amount.toLocaleString()}
+                      <div className={`font-mono font-semibold ${isIncome ? "text-success" : ""}`}>
+                        {isIncome ? "+" : ""}NT${expense.amount.toLocaleString()}
                       </div>
                     </div>
                   </div>
@@ -167,7 +174,7 @@ export default function DrillDown({
 
       {selected && (
         <ExpenseEditSheet
-          expense={selected}
+          expense={isIncome ? { ...selected, kind: "income" } : selected}
           categories={categories}
           allCategories={allCategories}
           onClose={() => setSelected(null)}
