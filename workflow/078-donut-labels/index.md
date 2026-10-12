@@ -20,16 +20,18 @@ The cost-group donut on Reports shows only coloured slices and the total in the 
 ## Plan
 
 - `app/app/reports/page.tsx` `DonutChart`: optional `labels` mode that places a two-line label (`57%` over `17.5K`) at each slice's mid-angle, just outside the ring; the SVG grows a margin so labels fit at phone width.
-- Rename the Living costs group to **Life** (captain, 2026-10-12: "rename Living costs to Life, so these 2 names are consistent" with For: ❤️ Life): `reports.group_living` en "Living costs" → "Life"; zh 生活費 → 生活 (matches `home.for_life`). Key and data unchanged; label only.
+- ~~Rename Living costs to Life~~ — dropped by the captain the same day ("Don't rename Living costs to Life").
 - A small `shortAmount(n)` helper (17,500 → `17.5K`), unit-tested.
 - Render test: each group's slice label shows its % and short amount; the % matches the legend's.
 
 Open questions for ideation:
 
-1. Very small slices (say under 5%) can't fit a label without overlapping — hide the label on those (the list below still shows them), or always show every label?
+1. Very small slices — hide their label or always show? — **captain: always show every label** (2026-10-12).
 
 ## Acceptance criteria
 
 {Written at the `spec` stage.}
 
 ### Feedback Cycles
+
+- 2026-10-12: built on branch donut-labels (65bcbbc, on top of 077's earnings-drilldown so staging shows both). App tests 290/290. Deployed to staging; served index.html matches build, chunk carries slice-label.
