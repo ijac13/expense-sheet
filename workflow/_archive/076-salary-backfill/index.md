@@ -4,6 +4,8 @@ status: done
 source: captain, 2026-10-12 — "backfill my InfuseAI salary, 所得稅預扣 and 勞退自提"
 score: 0.7
 id: 076
+completed: 2026-10-12T09:43:58Z
+verdict: PASSED
 archived: 2026-10-12T09:43:58Z
 ---
 
