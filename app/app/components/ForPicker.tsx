@@ -2,10 +2,10 @@
 import { useTranslation } from "react-i18next";
 import { Business, BUSINESSES, BUSINESS_ICONS } from "../lib/categories";
 
-/** The label for a For choice: 💙 Life, 🚗 Uber or 🏠 Rent. */
+/** The label for a For choice: ❤️ Life, 🚗 Uber or 🏠 Rent. */
 export function useForLabel(): (b: Business) => string {
   const { t } = useTranslation();
-  return (b) => (b ? `${BUSINESS_ICONS[b]} ${t(`earnings.business_${b}`)}` : `💙 ${t("home.for_life")}`);
+  return (b) => (b ? `${BUSINESS_ICONS[b]} ${t(`earnings.business_${b}`)}` : `❤️ ${t("home.for_life")}`);
 }
 
 /**
