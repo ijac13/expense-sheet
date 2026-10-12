@@ -1,9 +1,10 @@
 ---
 title: Backfill InfuseAI salary, 所得稅預扣 and 勞退自提 from 2025-01
-status: ideation
+status: done
 source: captain, 2026-10-12 — "backfill my InfuseAI salary, 所得稅預扣 and 勞退自提"
 score: 0.7
 id: 076
+archived: 2026-10-12T09:43:58Z
 ---
 
 Salary, tax withholding and the voluntary pension contribution are entered as monthly subscriptions starting 2025-01-01, but the daily logger only writes the day it runs, so Income & earnings shows no salary for any past month and Life spending misses the two payroll deductions.
@@ -38,3 +39,5 @@ Open questions for ideation:
 {Written at the `spec` stage.}
 
 ### Feedback Cycles
+
+- 2026-10-12: applied to production — 22 salary income rows + 44 expense rows (所得稅預扣, 勞退自提), 2025-01 to 2026-10, verified present once; rerun writes nothing. Amounts read from the live subscriptions (captain: unchanged since 2025-01). Captain: "076 is good." Script kept local.
