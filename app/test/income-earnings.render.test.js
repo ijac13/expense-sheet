@@ -254,3 +254,30 @@ test("an old backend answering /api/income with expenses shows no income at all"
   const { getSharedIncomes } = lib("incomes");
   assert.deepEqual(await getSharedIncomes(), []);
 });
+
+// ---------------------------------------------------------------------------
+// Reports: the Income & earnings row sits under the total and shows 結餘 only
+// ---------------------------------------------------------------------------
+
+test("Reports puts the Income & earnings row right under the total, showing only what is left over", async () => {
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  installGlobals({
+    categories: CATEGORIES,
+    expenses: [row("r1", "cat_001", 1000, today), row("r2", "cat_026", 30000, today)],
+    incomes: [inc("r3", "cat_030", 5000, today), inc("r4", "cat_032", 38000, today)],
+  });
+  const container = await mount(loadPage("reports/page.js"));
+  await React.act(async () => {});
+  await React.act(async () => {});
+
+  const link = container.querySelector('[data-testid="earnings-link"]');
+  assert.ok(link, "the row is on the page");
+  assert.ok(
+    link.previousElementSibling.querySelector('[data-testid="scope-toggle"]'),
+    "it follows the total spending card directly"
+  );
+  // Money in 5,000 + Rent earnings 8,000 = 13,000, less Life spending 1,000.
+  assert.equal(link.querySelector('[data-testid="earnings-left-over"]').textContent, "+NT$12,000");
+  assert.ok(!/earnings\.money_in/.test(link.textContent), "no breakdown on the row itself");
+});

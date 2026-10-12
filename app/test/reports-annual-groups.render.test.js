@@ -83,6 +83,7 @@ test("the block follows the monthly trend and replaces the Donut/Bar chart and B
 
   assert.deepEqual(sectionLabels(page), [
     "reports.annual_total",
+    "earnings.left_over",
     "reports.monthly_trend",
     "reports.cost_groups",
     "reports.by_payer",

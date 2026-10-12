@@ -342,30 +342,25 @@ function ScopeToggle({ includeBusiness, onChange }: { includeBusiness: boolean; 
   );
 }
 
-// The second-level Income & earnings page, summarised in one tappable row.
+// The second-level Income & earnings page, summarised as its bottom line: what
+// is left over once Life spending is taken from money in. Tap for the detail.
 function EarningsLink({ summary, year, month }: { summary: EarningsSummary | null; year: number; month: number | null }) {
   const { t } = useTranslation();
   const href = `/reports/earnings?y=${year}${month === null ? "" : `&m=${month}`}`;
-  const businesses = (summary?.cards ?? []).filter((c) => c.type === "business");
   return (
     <Link href={href} data-testid="earnings-link" className="flex items-center justify-between gap-3 bg-base-200 rounded-2xl p-4">
-      <span className="min-w-0">
-        <span className="block font-semibold">{t("earnings.title")}</span>
+      <span className="font-semibold">{t("earnings.title")}</span>
+      <span className="flex items-center gap-2 shrink-0">
         {summary && (
-          <span className="block text-xs text-base-content/60 mt-1">
-            {t("earnings.money_in")} NT${summary.money_in.toLocaleString()}
-            {businesses.map((b) => b.type === "business" && (
-              <span key={b.business}>
-                {" · "}{t(`earnings.business_${b.business}`)}{" "}
-                <span className={b.earnings < 0 ? "text-error" : "text-success"}>
-                  {b.earnings < 0 ? "−" : "+"}NT${Math.abs(b.earnings).toLocaleString()}
-                </span>
-              </span>
-            ))}
+          <span className="text-right">
+            <span className="block text-[11px] text-base-content/50 uppercase tracking-wide font-semibold">{t("earnings.left_over")}</span>
+            <span data-testid="earnings-left-over" className={`font-mono font-semibold ${summary.left_over < 0 ? "text-error" : "text-success"}`}>
+              {summary.left_over < 0 ? "−" : "+"}NT${Math.abs(summary.left_over).toLocaleString()}
+            </span>
           </span>
         )}
+        <ChevronRight size={20} className="text-primary" />
       </span>
-      <ChevronRight size={20} className="text-primary shrink-0" />
     </Link>
   );
 }
@@ -975,6 +970,8 @@ export default function ReportsPage() {
                   <ScopeToggle includeBusiness={includeBusiness} onChange={setIncludeBusiness} />
                 </div>
 
+                <EarningsLink summary={earnings} year={year} month={month} />
+
                 {/* Cost groups + compare to last month / same month last year */}
                 <CostGroupsCard
                   groups={monthly.groups}
@@ -991,8 +988,6 @@ export default function ReportsPage() {
                     setDrillDownCategory(cat);
                   }}
                 />
-
-                <EarningsLink summary={earnings} year={year} month={month} />
 
                 {/* By payer */}
                 <div className="bg-base-200 rounded-2xl p-4">
@@ -1074,6 +1069,8 @@ export default function ReportsPage() {
                   <ScopeToggle includeBusiness={includeBusiness} onChange={setIncludeBusiness} />
                 </div>
 
+                <EarningsLink summary={earnings} year={annualYear} month={null} />
+
                 {/* Monthly trend chart — this year vs last year */}
                 {mounted && <TrendCard data={annual.monthly_trend} year={annualYear} />}
 
@@ -1097,8 +1094,6 @@ export default function ReportsPage() {
                     }}
                   />
                 )}
-
-                <EarningsLink summary={earnings} year={annualYear} month={null} />
 
                 {/* By payer */}
                 <div className="bg-base-200 rounded-2xl p-4">
