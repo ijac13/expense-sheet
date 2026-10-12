@@ -93,7 +93,8 @@ export type CategoryKind = "expense" | "income";
 
 // A small business with its own earnings. "" is Life: household spending.
 export type Business = "" | "rent" | "uber";
-export const BUSINESSES: Exclude<Business, "">[] = ["rent", "uber"];
+// The order every For choice is offered in: Life, then Uber, then Rent.
+export const BUSINESSES: Exclude<Business, "">[] = ["uber", "rent"];
 export const BUSINESS_ICONS: Record<Exclude<Business, "">, string> = { rent: "🏠", uber: "🚗" };
 
 export function isIncomeCategory(category: Pick<Category, "kind"> | undefined): boolean {
@@ -114,9 +115,24 @@ export function businessOf(
   expense: { business?: string; category_id: string },
   categories: Category[]
 ): Business {
-  const own = (expense.business ?? "") as Business;
-  if (own) return own;
+  const own = expense.business ?? "";
+  if (own === LIFE_OVERRIDE) return "";
+  if (own) return own as Business;
   return resolveCategory(expense.category_id, categories)?.business ?? "";
+}
+
+// Stored on an expense or subscription to say "Life" on a category whose
+// default is a business. Mirrors LIFE_OVERRIDE in functions/src/sheetSchema.ts.
+export const LIFE_OVERRIDE = "life";
+
+/**
+ * What to store for a For choice: "" while it matches the category's default
+ * (so the row keeps following the category), else the choice itself, with Life
+ * written as LIFE_OVERRIDE because "" would mean "the default" again.
+ */
+export function businessToStore(choice: Business, categoryDefault: Business): string {
+  if (choice === categoryDefault) return "";
+  return choice || LIFE_OVERRIDE;
 }
 
 export const NOTE_MAX_LENGTH = 120;

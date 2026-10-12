@@ -17,13 +17,14 @@ import {
   isBusinessValue,
   expenseBusiness,
   BUSINESSES,
+  LIFE_OVERRIDE,
   buildColumnMap,
   buildWriteRow,
   cell,
   columnLetter,
   rowToSubscription,
 } from "./sheetSchema";
-import { TIME_ZONE, runSubscriptionScheduler, readSchedulerStatus, ensureTab } from "./scheduler";
+import { TIME_ZONE, runSubscriptionScheduler, readSchedulerStatus, ensureTab, ensureColumns } from "./scheduler";
 import { authorize } from "./auth";
 
 const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
@@ -105,40 +106,6 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 function endsBeforeStart(start: string, end: string): boolean {
   if (!ISO_DATE.test(start) || !ISO_DATE.test(end)) return false;
   return end < start;
-}
-
-// Creates a missing optional header on demand (`start_date` / `end_date` /
-// `notes` on Subscriptions, `fixed` on Categories), following
-// ensureTab: the captain never has to touch the sheet by hand, and a
-// production-sheet precondition is exactly the thing that blocks a deploy.
-//
-// New headers land past the widest OCCUPIED row, not past row 1's last header.
-// Sheets trims trailing blanks, so a column holding data under a blank header
-// cell is invisible in row 1's length — placing by that length would claim the
-// column and destroy its cells. Production already has this shape: CATEGORIES
-// carries `note` data under a blank H1 (see sheetSchema.ts).
-async function ensureColumns(
-  sheets: ReturnType<typeof google.sheets>,
-  spreadsheetId: string,
-  tabName: string,
-  map: ColumnMap,
-  rows: Row[],
-  fields: string[]
-): Promise<ColumnMap> {
-  const missing = fields.filter((f) => map.index[f] === undefined);
-  if (missing.length === 0) return map;
-
-  const first = rows.reduce((widest, r) => Math.max(widest, r.length), map.width);
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${tabName}!${columnLetter(first)}1:${columnLetter(first + missing.length - 1)}1`,
-    valueInputOption: "RAW",
-    requestBody: { values: [missing] },
-  });
-
-  const index = { ...map.index };
-  missing.forEach((f, i) => { index[f] = first + i; });
-  return { tab: map.tab, index, width: first + missing.length };
 }
 
 /**
@@ -237,7 +204,7 @@ function rowToCategory(row: Row, map: ColumnMap): Record<string, unknown> {
 // Validates a submitted `business` value, returning the error or null.
 function businessError(value: unknown): string | null {
   if (value === undefined) return null;
-  return isBusinessValue(value) ? null : `business "${String(value)}" must be blank or one of: ${BUSINESSES.join(", ")}.`;
+  return isBusinessValue(value) ? null : `business "${String(value)}" must be blank or one of: ${[LIFE_OVERRIDE, ...BUSINESSES].join(", ")}.`;
 }
 
 // The Income tab, or null when it has not been created yet — a GET before the
@@ -515,6 +482,9 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         // rejected request must leave the sheet byte-identical.
         const catError = await categoryIdError(sheets, spreadsheetId, body.category_id);
         if (catError) { res.status(400).json({ error: catError }); return; }
+        const bizError = businessError(body.business);
+        if (bizError) { res.status(400).json({ error: bizError }); return; }
+        const business = String(body.business ?? "");
 
         const id = `sub-${Date.now()}`;
 
@@ -522,7 +492,8 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         // data sitting under a blank header cell, which row 1 alone cannot show.
         const { rows: subRows, map: readMap } = await readTab(sheets, spreadsheetId, SUBSCRIPTIONS_SPEC);
         const map = await ensureColumns(
-          sheets, spreadsheetId, SUBSCRIPTIONS_TAB, readMap, subRows, ["start_date", "end_date", "notes"]
+          sheets, spreadsheetId, SUBSCRIPTIONS_TAB, readMap, subRows,
+          ["start_date", "end_date", "notes", ...(business ? ["business"] : [])]
         );
 
         const paidById = String(body.paid_by ?? "");
@@ -544,6 +515,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           start_date: String(body.start_date ?? ""),
           end_date: "",
           notes: String(body.notes ?? ""),
+          ...(business && { business }),
         });
 
         await insertRowAtTop(sheets, spreadsheetId, SUBSCRIPTIONS_TAB, row);
@@ -576,10 +548,15 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         // frequency and paid_by are not patchable; leaving them out of `updates`
         // carries their existing cells forward untouched. The same rule is what
         // keeps an unrelated edit from blanking a date.
+        const bizError = businessError(body.business);
+        if (bizError) { res.status(400).json({ error: bizError }); return; }
+
         const updates: Record<string, string> = {};
-        for (const field of ["name", "amount", "category_id", "due_day", "due_month", "is_active", "start_date", "end_date", "notes"]) {
+        for (const field of ["name", "amount", "category_id", "due_day", "due_month", "is_active", "start_date", "end_date", "notes", "business"]) {
           if (body[field] !== undefined) updates[field] = String(body[field]);
         }
+        // A blank tag on a tab without the column has nothing to say.
+        if (updates.business === "" && map.index.business === undefined) delete updates.business;
 
         // Rejected independently of the modal, because the modal is not the only
         // caller. A start date arriving in the same PATCH wins over the stored one.

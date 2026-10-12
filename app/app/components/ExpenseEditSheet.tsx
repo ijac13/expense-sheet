@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Business, BUSINESSES, BUSINESS_ICONS, Category, businessOf, categoriesOfKind, categoryIcon, resolveCategory } from "../lib/categories";
+import { Business, Category, businessOf, businessToStore, categoriesOfKind, categoryIcon, resolveCategory } from "../lib/categories";
 import { Expense } from "../lib/expenses";
 import { USERS } from "../lib/users";
 import { updateExpense, deleteExpense } from "../lib/expenseService";
@@ -16,6 +16,7 @@ import { updateIncome, deleteIncome } from "../lib/incomes";
  */
 export type HistoryEntry = Expense & { kind?: "income" };
 import CategoryPicker from "./CategoryPicker";
+import ForPicker, { useForLabel } from "./ForPicker";
 import DatePickerModal from "./DatePickerModal";
 
 interface EditForm {
@@ -72,7 +73,7 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
   // The edit picker offers only categories of the row's own kind.
   const pickerCategories = categoriesOfKind(categories, isIncome ? "income" : "expense");
   const business = isIncome ? "" : businessOf(expense, allCategories);
-  const forLabel = (b: Business) => (b ? `${BUSINESS_ICONS[b]} ${t(`earnings.business_${b}`)}` : `❤️ ${t("home.for_life")}`);
+  const forLabel = useForLabel();
 
   function startEdit() {
     setEditForm({
@@ -98,6 +99,10 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
     if (!editForm) return;
     const amount = parseFloat(editForm.amount);
     if (isNaN(amount) || amount <= 0) { setActionError("Enter a valid amount."); return; }
+    const storedBusiness = businessToStore(
+      editForm.business,
+      resolveCategory(editForm.categoryId, allCategories)?.business ?? ""
+    );
     setSaving(true);
     setActionError("");
     try {
@@ -119,7 +124,7 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
           category_id: editForm.categoryId,
           // Only a changed tag is written: an untouched row keeps following its
           // category's default, and the column is never created for nothing.
-          ...(editForm.business !== business && { business: editForm.business }),
+          ...(storedBusiness !== (expense.business ?? "") && { business: storedBusiness }),
         });
         onSaved(updated);
       }
@@ -302,21 +307,11 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
               {!isIncome && (
                 <div>
                   <div className="text-xs uppercase tracking-wider text-base-content/40 mb-1">{t("home.for")}</div>
-                  <div data-testid="edit-for" className="flex gap-1.5 flex-wrap">
-                    {(["", ...BUSINESSES] as Business[]).map((b) => (
-                      <button
-                        key={b || "life"}
-                        type="button"
-                        aria-pressed={editForm.business === b}
-                        onClick={() => setEditForm(f => f ? { ...f, business: b } : f)}
-                        className={`px-3 py-1.5 rounded-full border text-sm font-medium ${
-                          editForm.business === b ? "bg-primary border-primary text-primary-content" : "bg-base-100 border-base-300"
-                        }`}
-                      >
-                        {forLabel(b)}
-                      </button>
-                    ))}
-                  </div>
+                  <ForPicker
+                    testId="edit-for"
+                    value={editForm.business}
+                    onChange={(b) => setEditForm(f => f ? { ...f, business: b } : f)}
+                  />
                 </div>
               )}
 

@@ -42,7 +42,7 @@ const COST_GROUP_COLORS: Record<CostGroup, string> = {
   rent: "#6b7fa8",
   uber: "#3d4a5c",
 };
-const BUSINESS_GROUPS: CostGroup[] = ["rent", "uber"];
+const BUSINESS_GROUPS: CostGroup[] = ["uber", "rent"]; // the For order: Uber, then Rent
 
 /** The total a card shows: Life, plus Business costs when they are included. */
 function shownTotal(lifeTotal: number, groups: AnnualCostGroups, includeBusiness: boolean): number {

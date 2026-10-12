@@ -17,6 +17,9 @@ export interface Subscription {
   start_date: string;
   end_date: string;
   notes: string;
+  // "" = follow the category's default; "life" / "rent" / "uber" otherwise.
+  // Copied onto every expense the daily logger creates from this subscription.
+  business?: string;
 }
 
 export const MOCK_SUBSCRIPTIONS: Subscription[] = [

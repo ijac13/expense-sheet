@@ -62,8 +62,9 @@ const BEFORE = {
   // Entity 053 added start_date / end_date to every subscription; entity 059
   // added notes. SUBS_HEADER still carries only the nine legacy columns, so the
   // `""` on all three rows is the deliberate AC-3 shape: a tab carrying none of
-  // those three headers reads 200, not 500.
-  "/api/subscriptions": '[{"id":"sub-1","name":"Netflix","amount":390,"category_id":"cat_002","frequency":"monthly","due_day":15,"paid_by":"ijac","is_active":true,"start_date":"","end_date":"","notes":""},{"id":"sub-2","name":"Insurance","amount":12000,"category_id":"cat_005","frequency":"annual","due_day":3,"due_month":6,"paid_by":"wei","is_active":true,"start_date":"","end_date":"","notes":""},{"id":"sub-3","name":"Old","amount":100,"category_id":"cat_002","frequency":"monthly","due_day":1,"paid_by":"","is_active":true,"start_date":"","end_date":"","notes":""}]',
+  // those three headers reads 200, not 500. Income & earnings added `business`,
+  // read the same way.
+  "/api/subscriptions": '[{"id":"sub-1","name":"Netflix","amount":390,"category_id":"cat_002","frequency":"monthly","due_day":15,"paid_by":"ijac","is_active":true,"start_date":"","end_date":"","notes":"","business":""},{"id":"sub-2","name":"Insurance","amount":12000,"category_id":"cat_005","frequency":"annual","due_day":3,"due_month":6,"paid_by":"wei","is_active":true,"start_date":"","end_date":"","notes":"","business":""},{"id":"sub-3","name":"Old","amount":100,"category_id":"cat_002","frequency":"monthly","due_day":1,"paid_by":"","is_active":true,"start_date":"","end_date":"","notes":"","business":""}]',
 };
 
 for (const [path, expected] of Object.entries(BEFORE)) {

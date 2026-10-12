@@ -4,10 +4,11 @@ import { ChevronLeft, ChevronRight, PenLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
 import DatePickerModal from "./components/DatePickerModal";
-import { Business, BUSINESSES, BUSINESS_ICONS, Category, CategoryKind, DEFAULT_CATEGORIES, categoriesOfKind, categoryIcon, getCachedCategories, getDefaultCategory, pickCategoryId, resolveCategory, saveCachedCategories, saveLastCategory } from "./lib/categories";
+import { Business, Category, CategoryKind, DEFAULT_CATEGORIES, businessToStore, categoriesOfKind, categoryIcon, getCachedCategories, getDefaultCategory, pickCategoryId, resolveCategory, saveCachedCategories, saveLastCategory } from "./lib/categories";
 import { getCategories } from "./lib/categoryService";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
 import { addIncome } from "./lib/incomes";
+import ForPicker from "./components/ForPicker";
 import { DEFAULT_USER, USERS, type UserId } from "./lib/users";
 import { useAuth } from "./lib/authContext";
 
@@ -137,7 +138,9 @@ export default function HomePage() {
       if (mode === "income") {
         await addIncome({ amount: val, category_id: categoryId, date, received_by: paidByName, created_by: paidByName, notes: note });
       } else {
-        await addExpense({ amount: val, category_id: categoryId, date, paid_by: paidByName, created_by: paidByName, notes: note, business });
+        // Only a choice that differs from the category's default is stored.
+        const stored = businessToStore(business, categories.find((c) => c.id === categoryId)?.business ?? "");
+        await addExpense({ amount: val, category_id: categoryId, date, paid_by: paidByName, created_by: paidByName, notes: note, business: stored });
       }
       const updated = await getTodayExpenses();
       setExpenses(updated);
@@ -259,19 +262,7 @@ export default function HomePage() {
         {mode === "expense" && (
           <div data-testid="for-row" className="flex items-center gap-1.5 mb-2 px-1 text-xs">
             <span className="text-base-content/60 mr-0.5">{t("home.for")}</span>
-            {(["", ...BUSINESSES] as Business[]).map((b) => (
-              <button
-                key={b || "life"}
-                type="button"
-                aria-pressed={business === b}
-                onClick={() => setBusiness(b)}
-                className={`px-2.5 py-1 rounded-full border font-medium transition-colors ${
-                  business === b ? "bg-primary border-primary text-primary-content" : "bg-base-100 border-base-300"
-                }`}
-              >
-                {b ? `${BUSINESS_ICONS[b]} ${t(`earnings.business_${b}`)}` : `❤️ ${t("home.for_life")}`}
-              </button>
-            ))}
+            <ForPicker value={business} onChange={setBusiness} compact />
           </div>
         )}
 

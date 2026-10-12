@@ -170,14 +170,37 @@ test("Home starts in Expense mode with only expense categories and Life selected
   assert.match(pressed.textContent, /home\.for_life/);
 });
 
-test("picking Rent paid fills in Rent, and the expense is posted tagged rent", async () => {
+test("picking Rent paid fills in Rent, and the expense follows its category's default", async () => {
   const { container, expWrites } = await mountHome();
   await click(byText(container, "Rent paid"));
+  const forRow = container.querySelector('[data-testid="for-row"]');
+  const pressed = [...forRow.querySelectorAll("button")].find((b) => b.getAttribute("aria-pressed") === "true");
+  assert.match(pressed.textContent, /earnings\.business_rent/);
   await click(key(container, "3"));
   await click(byText(container, "home.save"));
   assert.equal(expWrites.length, 1);
   assert.equal(expWrites[0].body.category_id, "cat_026");
-  assert.equal(expWrites[0].body.business, "rent");
+  assert.equal(expWrites[0].body.business, "", "matches the default, so nothing extra is stored");
+});
+
+test("choosing Life on Tenant stores an explicit life override", async () => {
+  const { container, expWrites } = await mountHome();
+  await click(byText(container, "Tenant"));
+  const forRow = container.querySelector('[data-testid="for-row"]');
+  await click([...forRow.querySelectorAll("button")].find((b) => b.textContent.includes("home.for_life")));
+  await click(key(container, "5"));
+  await click(byText(container, "home.save"));
+  assert.equal(expWrites[0].body.business, "life");
+
+  const { businessOf } = lib("categories");
+  assert.equal(businessOf({ category_id: "cat_023", business: "life" }, CATEGORIES), "", "counts as Life");
+  assert.equal(businessOf({ category_id: "cat_023", business: "" }, CATEGORIES), "rent", "blank follows the default");
+});
+
+test("the For row offers Life, Uber, Rent in that order", async () => {
+  const { container } = await mountHome();
+  const labels = [...container.querySelectorAll('[data-testid="for-row"] button')].map((b) => b.textContent);
+  assert.deepEqual(labels.map((l) => l.replace(/^\S+ /, "")), ["home.for_life", "earnings.business_uber", "earnings.business_rent"]);
 });
 
 test("tapping Uber on fuel posts the fuel tagged uber", async () => {
@@ -280,4 +303,38 @@ test("Reports puts the Income & earnings row right under the total, showing only
   // Money in 5,000 + Rent earnings 8,000 = 13,000, less Life spending 1,000.
   assert.equal(link.querySelector('[data-testid="earnings-left-over"]').textContent, "+NT$12,000");
   assert.ok(!/earnings\.money_in/.test(link.textContent), "no breakdown on the row itself");
+});
+
+// ---------------------------------------------------------------------------
+// Subscriptions: a For choice, carried to the expenses the logger creates
+// ---------------------------------------------------------------------------
+
+test("a subscription on Fuel can be set to Uber, and income categories show no For choice", async () => {
+  const g = installGlobals({ categories: CATEGORIES, subscriptions: [] });
+  const container = await mount(loadPage("subscriptions/page.js"));
+  await click([...container.querySelectorAll("button")].find((b) => b.className.includes("btn-primary")));
+  const modal = container.querySelector(".modal-open");
+
+  const setValue = (el, value, event = "input") => React.act(async () => {
+    const proto = el.tagName === "SELECT" ? global.window.HTMLSelectElement.prototype : global.window.HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value").set.call(el, value);
+    el.dispatchEvent(new global.window.Event(event, { bubbles: true }));
+  });
+  const categorySelect = [...modal.querySelectorAll("select")].find((s) => [...s.options].some((o) => o.value === "cat_015"));
+
+  await setValue(categorySelect, "cat_030", "change");
+  assert.ok(!modal.querySelector('[data-testid="add-sub-for"]'), "Salary is income: no For");
+
+  await setValue(categorySelect, "cat_015", "change");
+  const forPicker = modal.querySelector('[data-testid="add-sub-for"]');
+  assert.ok(forPicker);
+  await click([...forPicker.querySelectorAll("button")].find((b) => b.textContent.includes("earnings.business_uber")));
+
+  await setValue(modal.querySelector('input[placeholder="e.g. Netflix"]'), "Car wash plan");
+  await setValue(modal.querySelector('input[type="number"]'), "750");
+  await click([...modal.querySelectorAll("button")].find((b) => b.textContent.trim() === "subscriptions.add"));
+
+  assert.equal(g.subWrites.length, 1);
+  assert.equal(g.subWrites[0].body.category_id, "cat_015");
+  assert.equal(g.subWrites[0].body.business, "uber");
 });
