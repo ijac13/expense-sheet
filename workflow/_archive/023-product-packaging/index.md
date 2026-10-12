@@ -5,9 +5,9 @@ status: verify
 source: captain feedback
 started: 2026-09-15T08:28:38Z
 completed:
-verdict:
+verdict: REJECTED
 score: 0.6
-worktree: .worktrees/spacedock-ensign-023-product-packaging
+worktree:
 issue:
 pr:
 gates:
@@ -59,7 +59,10 @@ gates:
                 id: briefing:023:verify:attempt-1:revision-1
                 digest: sha256:3299cf6b3384b87bcb0ad2b86bbb5c09761d7b996d743d32529c9ebf6dbe1e13
                 room-ref: ./review/verify/briefing-1
+archived: 2026-10-12T08:19:52Z
 ---
+
+**Archived 2026-10-12 by captain:** no longer wanted. The build work stays on local branch `spacedock-ensign/023-product-packaging` (not merged).
 
 After launch for ijac's household, package the app and sheet setup so other users can self-serve their own instance — their own Google Sheet, their own Firebase project, their own deployed app.
 
