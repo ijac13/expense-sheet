@@ -247,3 +247,10 @@ test("every new label is defined in English and Chinese", () => {
     assert.ok(get(ZH, k), `zh ${k}`);
   }
 });
+
+test("an old backend answering /api/income with expenses shows no income at all", async () => {
+  // The old API falls through to GET all expenses for any path it does not know.
+  installGlobals({ categories: CATEGORIES, expenses: EXPENSES, incomes: EXPENSES });
+  const { getSharedIncomes } = lib("incomes");
+  assert.deepEqual(await getSharedIncomes(), []);
+});
