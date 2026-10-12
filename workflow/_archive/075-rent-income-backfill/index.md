@@ -1,16 +1,17 @@
 ---
 id: 075
 title: Backfill rent income (and rent paid) from 2025-01
-status: ideation
+status: done
 source: captain, 2026-10-12 — "add rent income ... see my subscription about rent and recent receive from 2025 Jan. Add the historical records back"
 started:
-completed:
-verdict:
+completed: 2026-10-12T08:36:54Z
+verdict: PASSED
 score: 0.8
 worktree:
 issue:
 pr:
 mod-block:
+archived: 2026-10-12T08:36:54Z
 ---
 
 The Rent earnings view starts empty: no rent received has ever been logged (production has no Income tab yet), so Rent shows only costs and reads as a loss. The captain has entered each lease as a subscription with real start/end dates back to 2025-01; those dates are the source for filling the history.
@@ -55,3 +56,5 @@ Open questions for ideation:
 {Written at the `spec` stage.}
 
 ### Feedback Cycles
+
+- 2026-10-12: applied to staging and production — 87 Rent received income rows + 88 rent-paid expense rows (business rent), verified present once; rerun writes nothing. 4號3樓 rent-paid subscription tagged Rent; spare 4號1樓 subscription deleted. Captain checked Earnings: "075 is good." Script kept local (holds lease amounts; public remote).
