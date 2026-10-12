@@ -25,6 +25,7 @@ import {
 import { getMonthlySummary, getAnnualSummary, getEarningsSummary } from "../lib/reportService";
 import Link from "next/link";
 import { EarningsSummary } from "../lib/reportTypes";
+import { shortAmount } from "../lib/shortAmount";
 import DrillDown from "./DrillDown";
 import MonthPickerModal from "../components/MonthPickerModal";
 import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
@@ -36,11 +37,12 @@ import { useTranslation } from "react-i18next";
 // ---------------------------------------------------------------------------
 const LIFE_GROUPS: CostGroup[] = ["fixed", "big_extra", "living"];
 const COST_GROUP_COLORS: Record<CostGroup, string> = {
-  fixed: "#1e6d4a",
-  big_extra: "#f9c440",
-  living: "#d97757",
-  rent: "#6b7fa8",
-  uber: "#3d4a5c",
+  // Captain's palette (078); mid tones so each reads on light and dark themes.
+  fixed: "#9ca3af",     // gray
+  big_extra: "#f9c440", // yellow
+  living: "#3b82f6",    // blue
+  uber: "#ef4444",      // red
+  rent: "#22c55e",      // green
 };
 const BUSINESS_GROUPS: CostGroup[] = ["uber", "rent"]; // the For order: Uber, then Rent
 
@@ -72,11 +74,14 @@ function DonutChart({
   totalLabel,
   colors,
   testId,
+  size = 240,
 }: {
   categories: Pick<CategoryBreakdown, "category_id" | "total">[];
   totalLabel: string;
   colors: string[];
   testId?: string;
+  /** Rendered width and height in px; the drawing scales to fit. */
+  size?: number;
 }) {
   const total = categories.reduce((s, c) => s + c.total, 0);
   if (total === 0) return null;
@@ -84,7 +89,7 @@ function DonutChart({
   let offset = 0;
   return (
     <div className="flex justify-center" data-testid={testId}>
-      <svg width={240} height={240} viewBox="0 0 240 240">
+      <svg width={size} height={size} viewBox="0 0 240 240">
         {/* Track */}
         <circle
           cx={120} cy={120} r={88}
@@ -255,12 +260,25 @@ function CostGroupsCard({
           ))}
         </div>
       </div>
-      <DonutChart
-        testId="group-donut"
-        categories={segments}
-        colors={segments.map((s) => COST_GROUP_COLORS[s.category_id])}
-        totalLabel={t("reports.total")}
-      />
+      {/* The donut at full size, each slice's share and short amount listed under it (078). */}
+      <div>
+        <DonutChart
+          testId="group-donut"
+          categories={segments}
+          colors={segments.map((s) => COST_GROUP_COLORS[s.category_id])}
+          totalLabel={t("reports.total")}
+        />
+        <ul data-testid="slice-list" className="mt-3 mx-auto max-w-xs space-y-1.5">
+          {segments.map((s) => (
+            <li key={s.category_id} data-testid={`slice-label-${s.category_id}`} className="flex items-center gap-2 text-sm">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COST_GROUP_COLORS[s.category_id] }} />
+              <span className="truncate flex-1 min-w-0">{t(`reports.group_${s.category_id}`)}</span>
+              <span className="font-semibold tabular-nums">{groupShare(s.category_id)}%</span>
+              <span className="font-mono text-xs text-base-content/60 w-12 text-right">{shortAmount(s.total)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
       {comparison && (
         <div data-testid="total-compare" className="flex justify-between items-center px-2 text-sm">
           <span className="text-base-content/70">{t("reports.total")}</span>

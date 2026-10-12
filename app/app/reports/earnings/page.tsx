@@ -7,6 +7,17 @@ import { useTranslation } from "react-i18next";
 import { getEarningsSummary } from "../../lib/reportService";
 import { BusinessCard, EarningsSummary, IncomeCard } from "../../lib/reportTypes";
 import { BUSINESS_ICONS } from "../../lib/categories";
+import DrillDown from "../DrillDown";
+
+// What a tapped line opens: the same list Reports shows for a category, narrowed
+// to the card's business for a cost, or that category's income rows.
+interface Drill {
+  categoryId: string;
+  name: string;
+  icon: string;
+  kind: "expense" | "income";
+  group?: "rent" | "uber";
+}
 
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -59,7 +70,9 @@ function TrendBars({ trend }: { trend: BusinessCard["trend"] }) {
   );
 }
 
-function BusinessCardView({ card, lang }: { card: BusinessCard; lang: string }) {
+const lineButton = "w-full flex justify-between text-sm text-left rounded hover:bg-base-300 active:bg-base-300 -mx-1 px-1";
+
+function BusinessCardView({ card, lang, onOpen }: { card: BusinessCard; lang: string; onOpen: (d: Drill) => void }) {
   const { t } = useTranslation();
   const name = (zh: string, en: string) => (lang === "zh" && zh ? zh : en);
   return (
@@ -68,10 +81,16 @@ function BusinessCardView({ card, lang }: { card: BusinessCard; lang: string }) 
         {BUSINESS_ICONS[card.business]} {t(`earnings.business_${card.business}`)}
       </div>
       {card.income.map((l) => (
-        <div key={l.category_id} className="flex justify-between text-sm">
+        <button
+          type="button"
+          key={l.category_id}
+          data-testid={`line-${card.business}-${l.category_id}`}
+          className={lineButton}
+          onClick={() => onOpen({ categoryId: l.category_id, name: name(l.category_name_zh, l.category_name), icon: l.icon, kind: "income" })}
+        >
           <span>{name(l.category_name_zh, l.category_name)}</span>
           <span className="font-mono text-success">+{l.total.toLocaleString()}</span>
-        </div>
+        </button>
       ))}
       {card.costs.length === 0 ? (
         <div className="flex justify-between text-sm">
@@ -80,10 +99,16 @@ function BusinessCardView({ card, lang }: { card: BusinessCard; lang: string }) 
         </div>
       ) : (
         card.costs.map((c) => (
-          <div key={c.category_id} className="flex justify-between text-sm">
+          <button
+            type="button"
+            key={c.category_id}
+            data-testid={`line-${card.business}-${c.category_id}`}
+            className={lineButton}
+            onClick={() => onOpen({ categoryId: c.category_id, name: name(c.category_name_zh, c.category_name), icon: c.icon, kind: "expense", group: card.business })}
+          >
             <span>{c.icon} {name(c.category_name_zh, c.category_name)}</span>
             <span className="font-mono text-error">−{c.total.toLocaleString()}</span>
-          </div>
+          </button>
         ))
       )}
       <div className="flex justify-between items-baseline border-t border-base-300 pt-2 font-semibold">
@@ -97,12 +122,18 @@ function BusinessCardView({ card, lang }: { card: BusinessCard; lang: string }) 
   );
 }
 
-function IncomeCardView({ card, lang }: { card: IncomeCard; lang: string }) {
+function IncomeCardView({ card, lang, onOpen }: { card: IncomeCard; lang: string; onOpen: (d: Drill) => void }) {
+  const name = lang === "zh" && card.category_name_zh ? card.category_name_zh : card.category_name;
   return (
-    <div data-testid={`card-income-${card.category_id}`} className="bg-base-200 rounded-2xl p-4 flex justify-between items-baseline">
-      <span className="font-semibold">{card.icon} {lang === "zh" && card.category_name_zh ? card.category_name_zh : card.category_name}</span>
+    <button
+      type="button"
+      data-testid={`card-income-${card.category_id}`}
+      className="w-full text-left bg-base-200 hover:bg-base-300 rounded-2xl p-4 flex justify-between items-baseline"
+      onClick={() => onOpen({ categoryId: card.category_id, name, icon: card.icon, kind: "income" })}
+    >
+      <span className="font-semibold">{card.icon} {name}</span>
       <span className="font-mono font-semibold text-success">+NT${card.total.toLocaleString()}</span>
-    </div>
+    </button>
   );
 }
 
@@ -112,6 +143,9 @@ export default function EarningsPage() {
   const [period, setPeriod] = useState<{ year: number; month: number | null } | null>(null);
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
   const [failed, setFailed] = useState(false);
+  const [drill, setDrill] = useState<Drill | null>(null);
+  // Bumped when the drill-down writes, so the cards refetch on the way back.
+  const [dataVersion, setDataVersion] = useState(0);
 
   useEffect(() => setPeriod(periodFromUrl()), []);
 
@@ -122,7 +156,7 @@ export default function EarningsPage() {
     getEarningsSummary(period.year, period.month)
       .then(setSummary)
       .catch(() => setFailed(true));
-  }, [period]);
+  }, [period, dataVersion]);
 
   function step(dir: 1 | -1) {
     setPeriod((p) => {
@@ -134,6 +168,24 @@ export default function EarningsPage() {
   }
 
   const label = period ? (period.month === null ? String(period.year) : `${MONTH_SHORT[period.month - 1]} ${period.year}`) : "";
+
+  if (drill && period) {
+    return (
+      <DrillDown
+        year={period.year}
+        month={period.month}
+        categoryId={drill.categoryId}
+        categoryName={drill.group ? `${drill.name} · ${t(`earnings.business_${drill.group}`)}` : drill.name}
+        icon={drill.icon}
+        periodLabel={label}
+        payer="all"
+        group={drill.group}
+        kind={drill.kind}
+        onBack={() => setDrill(null)}
+        onDataChanged={() => setDataVersion((v) => v + 1)}
+      />
+    );
+  }
 
   return (
     <main className="flex flex-col min-h-screen bg-base-100 max-w-md mx-auto pb-24">
@@ -187,8 +239,8 @@ export default function EarningsPage() {
             )}
             {summary.cards.map((card) =>
               card.type === "business"
-                ? <BusinessCardView key={card.business} card={card} lang={lang} />
-                : <IncomeCardView key={card.category_id} card={card} lang={lang} />
+                ? <BusinessCardView key={card.business} card={card} lang={lang} onOpen={setDrill} />
+                : <IncomeCardView key={card.category_id} card={card} lang={lang} onOpen={setDrill} />
             )}
           </>
         )}

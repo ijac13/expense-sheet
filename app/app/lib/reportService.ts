@@ -369,6 +369,24 @@ export async function getExpensesByCategory(
     .map((e) => toReportExpense(e, categories));
 }
 
+/**
+ * The income rows behind one income category for a month (or a whole year when
+ * month is null), newest first, in the drill-down's row shape. Household-wide,
+ * like the Earnings page: the payer filter does not apply to income.
+ */
+export async function getIncomesByCategory(
+  year: number,
+  month: number | null,
+  categoryId: string
+): Promise<ReportExpense[]> {
+  const [incomes, categories] = await Promise.all([getSharedIncomes(), fetchCategoryList()]);
+  const prefix = month === null ? String(year) : makeDate(year, month, 1).slice(0, 7);
+  return incomes
+    .filter((i) => i.category_id === categoryId && i.date.startsWith(prefix))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((i) => toReportExpense({ ...i, paid_by: i.received_by } as Expense, categories));
+}
+
 // ---------------------------------------------------------------------------
 // getEarningsSummary — Income & earnings for one month (or a whole year when
 // month is null). Household-wide: the payer filter does not apply to income.

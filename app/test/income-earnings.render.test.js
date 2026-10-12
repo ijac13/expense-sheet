@@ -365,3 +365,91 @@ test("History's Uber and Rent filters show that business's income and costs, tot
   await click(chips.find((b) => b.textContent.includes("business_uber")));
   assert.equal(container.querySelector('[data-testid="month-total"]').textContent, "+NT$2,000");
 });
+
+// ---------------------------------------------------------------------------
+// Income & earnings: tapping a line opens the list behind it (077)
+// ---------------------------------------------------------------------------
+
+async function mountEarnings() {
+  const g = installGlobals({ categories: CATEGORIES, expenses: EXPENSES, incomes: INCOMES });
+  global.window.history.replaceState(null, "", "/reports/earnings?y=2026&m=10");
+  const container = await mount(loadPage("reports/earnings/page.js"));
+  return { ...g, container };
+}
+const rowAmounts = (c) =>
+  [...c.querySelectorAll("button.card")].map((b) => b.querySelector(".font-mono").textContent);
+
+test("tapping a business cost opens that category's expenses for that business only", async () => {
+  const { container } = await mountEarnings();
+  await click(container.querySelector('[data-testid="line-uber-cat_015"]'));
+  assert.equal(rowAmounts(container).length, 1, "Uber fuel only, not the Life fuel");
+  assert.equal(rowAmounts(container)[0], "NT$2,400");
+  assert.equal(container.querySelector('[data-testid="drill-total"]').textContent, "NT$2,400");
+  assert.match(container.textContent, /Fuel · earnings\.business_uber/);
+  assert.match(container.textContent, /Oct 2026/);
+
+  await click(byText(container, "reports.back"));
+  assert.ok(container.querySelector('[data-testid="card-uber"]'), "Back returns to the cards");
+});
+
+test("tapping an income line opens its income rows for the period", async () => {
+  const { container } = await mountEarnings();
+  await click(container.querySelector('[data-testid="line-rent-cat_032"]'));
+  assert.deepEqual(rowAmounts(container), ["+NT$38,000"], "October only, not August's 37,700");
+
+  await click(byText(container, "reports.back"));
+  await click(container.querySelector('[data-testid="card-income-cat_030"]'));
+  assert.deepEqual(rowAmounts(container), ["+NT$85,000"]);
+  assert.equal(container.querySelector('[data-testid="drill-total"]').textContent, "+NT$85,000");
+});
+
+test("an income row opened from Earnings edits as income", async () => {
+  const { container } = await mountEarnings();
+  await click(container.querySelector('[data-testid="card-income-cat_030"]'));
+  await click(container.querySelector("button.card"));
+  assert.match(global.document.body.textContent, /history\.received_by/, "the edit sheet treats it as income");
+});
+
+// ---------------------------------------------------------------------------
+// Reports: every donut slice shows its % and short amount (078)
+// ---------------------------------------------------------------------------
+
+test("shortAmount: as-is under 1,000, then K and M with one decimal", () => {
+  const { shortAmount } = lib("shortAmount");
+  assert.equal(shortAmount(850), "850");
+  assert.equal(shortAmount(17500), "17.5K");
+  assert.equal(shortAmount(12000), "12K");
+  assert.equal(shortAmount(999950), "1M");
+  assert.equal(shortAmount(1234567), "1.2M");
+});
+
+test("under the donut, every slice lists the legend's % and a short amount, business slices included", async () => {
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  installGlobals({
+    categories: CATEGORIES,
+    expenses: [
+      row("d1", "cat_001", 17500, today),
+      row("d2", "cat_026", 30000, today),
+      row("d3", "cat_015", 2400, today, { business: "uber" }),
+    ],
+    incomes: [],
+  });
+  const container = await mount(loadPage("reports/page.js"));
+  await React.act(async () => {});
+  await React.act(async () => {});
+  const label = (g) => container.querySelector(`[data-testid="slice-label-${g}"]`)?.textContent;
+
+  assert.equal(label("living"), "reports.group_living100%17.5K", "Life only: one slice");
+  assert.equal(label("rent"), undefined);
+
+  const toggle = container.querySelector('[data-testid="scope-toggle"]');
+  await click([...toggle.querySelectorAll("button")].find((b) => b.textContent === "reports.include_business"));
+  assert.equal(label("living"), "reports.group_living35%17.5K");
+  assert.equal(label("rent"), "reports.group_rent60%30K");
+  assert.equal(label("uber"), "reports.group_uber5%2.4K", "a thin slice still gets its row");
+  const list = container.querySelector('[data-testid="slice-list"]');
+  assert.equal(list.children.length, 3, "one row per slice, under the donut");
+  assert.equal(list.previousElementSibling.getAttribute("data-testid"), "group-donut", "the list follows the donut");
+  assert.equal(list.previousElementSibling.querySelector("svg").getAttribute("width"), "240", "the donut keeps its full size");
+});
