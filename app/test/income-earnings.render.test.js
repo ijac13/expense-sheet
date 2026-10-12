@@ -409,3 +409,43 @@ test("an income row opened from Earnings edits as income", async () => {
   await click(container.querySelector("button.card"));
   assert.match(global.document.body.textContent, /history\.received_by/, "the edit sheet treats it as income");
 });
+
+// ---------------------------------------------------------------------------
+// Reports: every donut slice shows its % and short amount (078)
+// ---------------------------------------------------------------------------
+
+test("shortAmount: as-is under 1,000, then K and M with one decimal", () => {
+  const { shortAmount } = lib("shortAmount");
+  assert.equal(shortAmount(850), "850");
+  assert.equal(shortAmount(17500), "17.5K");
+  assert.equal(shortAmount(12000), "12K");
+  assert.equal(shortAmount(999950), "1M");
+  assert.equal(shortAmount(1234567), "1.2M");
+});
+
+test("each donut slice is labelled with the legend's % and a short amount, business slices included", async () => {
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  installGlobals({
+    categories: CATEGORIES,
+    expenses: [
+      row("d1", "cat_001", 17500, today),
+      row("d2", "cat_026", 30000, today),
+      row("d3", "cat_015", 2400, today, { business: "uber" }),
+    ],
+    incomes: [],
+  });
+  const container = await mount(loadPage("reports/page.js"));
+  await React.act(async () => {});
+  await React.act(async () => {});
+  const label = (g) => container.querySelector(`[data-testid="slice-label-${g}"]`)?.textContent;
+
+  assert.equal(label("living"), "100%17.5K", "Life only: one slice");
+  assert.equal(label("rent"), undefined);
+
+  const toggle = container.querySelector('[data-testid="scope-toggle"]');
+  await click([...toggle.querySelectorAll("button")].find((b) => b.textContent === "reports.include_business"));
+  assert.equal(label("living"), "35%17.5K");
+  assert.equal(label("rent"), "60%30K");
+  assert.equal(label("uber"), "5%2.4K", "a thin slice still gets its label");
+});

@@ -25,6 +25,7 @@ import {
 import { getMonthlySummary, getAnnualSummary, getEarningsSummary } from "../lib/reportService";
 import Link from "next/link";
 import { EarningsSummary } from "../lib/reportTypes";
+import { shortAmount } from "../lib/shortAmount";
 import DrillDown from "./DrillDown";
 import MonthPickerModal from "../components/MonthPickerModal";
 import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
@@ -67,27 +68,38 @@ function segmentProps(percent: number, offset: number, total: number) {
   return { strokeDasharray: `${dash} ${circumference - dash}`, strokeDashoffset: dashOffset };
 }
 
+// Labels sit just outside the ring, at each slice's middle; the canvas grows a
+// margin for them so a label never clips at phone width (078).
+const LABEL_MARGIN = 44;
+
 function DonutChart({
   categories,
   totalLabel,
   colors,
   testId,
+  labels,
 }: {
   categories: Pick<CategoryBreakdown, "category_id" | "total">[];
   totalLabel: string;
   colors: string[];
   testId?: string;
+  /** Per slice, in the same order as `categories`: its share (%) and amount. */
+  labels?: { pct: number; amount: number }[];
 }) {
   const total = categories.reduce((s, c) => s + c.total, 0);
   if (total === 0) return null;
 
+  const m = labels ? LABEL_MARGIN : 0;
+  const size = 240 + 2 * m;
+  const c = 120 + m;
   let offset = 0;
+  let labelOffset = 0;
   return (
     <div className="flex justify-center" data-testid={testId}>
-      <svg width={240} height={240} viewBox="0 0 240 240">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ maxWidth: "100%", height: "auto" }}>
         {/* Track */}
         <circle
-          cx={120} cy={120} r={88}
+          cx={c} cy={c} r={88}
           fill="none"
           stroke="var(--color-base-200)"
           strokeWidth={22}
@@ -98,18 +110,42 @@ function DonutChart({
           return (
             <circle
               key={cat.category_id}
-              cx={120} cy={120} r={88}
+              cx={c} cy={c} r={88}
               fill="none"
               stroke={colors[i % colors.length]}
               strokeWidth={22}
               strokeDasharray={props.strokeDasharray}
               strokeDashoffset={props.strokeDashoffset}
-              style={{ transform: "rotate(-90deg)", transformOrigin: "120px 120px" }}
+              style={{ transform: "rotate(-90deg)", transformOrigin: `${c}px ${c}px` }}
             />
           );
         })}
-        <text x={120} y={114} textAnchor="middle" fontSize={13} fill="currentColor" opacity={0.5}>{totalLabel}</text>
-        <text x={120} y={134} textAnchor="middle" fontSize={18} fontWeight={600} fill="currentColor">
+        {labels && categories.map((cat, i) => {
+          // Slices start at 12 o'clock and run clockwise.
+          const mid = (labelOffset + cat.total / 2) / total;
+          labelOffset += cat.total;
+          const angle = mid * 2 * Math.PI - Math.PI / 2;
+          const r = 88 + 11 + 20;
+          const x = c + r * Math.cos(angle);
+          const y = c + r * Math.sin(angle);
+          const anchor = Math.abs(Math.cos(angle)) < 0.3 ? "middle" : Math.cos(angle) > 0 ? "start" : "end";
+          const nudge = Math.abs(Math.cos(angle)) < 0.3 ? 0 : Math.cos(angle) > 0 ? -8 : 8;
+          return (
+            <text
+              key={`label-${cat.category_id}`}
+              data-testid={`slice-label-${cat.category_id}`}
+              x={x + nudge}
+              y={y - 2}
+              textAnchor={anchor}
+              fill="currentColor"
+            >
+              <tspan x={x + nudge} fontSize={13} fontWeight={600}>{`${labels[i].pct}%`}</tspan>
+              <tspan x={x + nudge} dy={14} fontSize={11} opacity={0.6}>{shortAmount(labels[i].amount)}</tspan>
+            </text>
+          );
+        })}
+        <text x={c} y={c - 6} textAnchor="middle" fontSize={13} fill="currentColor" opacity={0.5}>{totalLabel}</text>
+        <text x={c} y={c + 14} textAnchor="middle" fontSize={18} fontWeight={600} fill="currentColor">
           {`NT$${(total / 1000).toFixed(0)}k`}
         </text>
       </svg>
@@ -260,6 +296,7 @@ function CostGroupsCard({
         categories={segments}
         colors={segments.map((s) => COST_GROUP_COLORS[s.category_id])}
         totalLabel={t("reports.total")}
+        labels={segments.map((s) => ({ pct: groupShare(s.category_id), amount: s.total }))}
       />
       {comparison && (
         <div data-testid="total-compare" className="flex justify-between items-center px-2 text-sm">
