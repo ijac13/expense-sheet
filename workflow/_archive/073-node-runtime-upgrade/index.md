@@ -1,16 +1,17 @@
 ---
 id: 073
 title: Backend Node.js runtime upgrade (before 2026-10-30)
-status: verify
+status: done
 source: captain, 2026-10-12 — production deploy warned Node.js 20 is decommissioned on 2026-10-30
 started: 2026-10-12T09:49:18Z
-completed:
-verdict:
+completed: 2026-10-12T10:39:34Z
+verdict: PASSED
 score: 0.9
 worktree:
 issue:
 pr: #49
 mod-block:
+archived: 2026-10-12T10:39:34Z
 ---
 
 Google decommissions the Node.js 20 runtime on 2026-10-30; after that date no backend (`api`, `subscriptionScheduler`) deploy succeeds, so every future fix is blocked until the runtime moves.
@@ -44,3 +45,4 @@ Open questions for the captain (in the plan): Node 24 vs 22; whether to fold in 
 
 - 2026-10-12: captain answers — Q1 Node 24, Q2 yes (firebase-functions v7 too). Built on branch node-runtime-upgrade (b61b05a): engines 24, firebase-functions ^7.4.0, @types/node ^24, test script `node --test test/*.test.js` (Node 22+ rejects a bare directory). 377/377 pass on Node 20 and 24. Deployed to staging: api and subscriptionScheduler report nodejs24; api answers 401 unsigned. Pending: captain staging check, overnight 01:00 SchedulerLog run, then production (captain runs the functions deploy).
 - 2026-10-12: captain chose to ship before the overnight check. PR #49 merged (c386666); captain ran the production functions deploy: api and subscriptionScheduler report nodejs24, api answers 401 unsigned. Remaining: confirm the 2026-10-13 01:00 SchedulerLog run on production, then close.
+- 2026-10-12: captain closed 073 ("close 073") before the overnight SchedulerLog check.
