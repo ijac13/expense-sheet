@@ -13,6 +13,10 @@ export interface Income {
 
 const API_BASE = "/api/income";
 
+function isIncomeRow(row: unknown): row is Income {
+  return typeof row === "object" && row !== null && "received_by" in row && !("paid_by" in row);
+}
+
 // The session's one GET /api/income, shared by Home, History and the Earnings
 // page — the same pattern as expensesCache.ts. A failed fetch is not cached.
 let cache: Promise<Income[]> | null = null;
@@ -24,6 +28,10 @@ export function getSharedIncomes(): Promise<Income[]> {
         if (!res.ok) throw new Error(`Failed to fetch income: ${res.status} ${res.statusText}`);
         return res.json() as Promise<Income[]>;
       })
+      // Only rows that are really income. A backend older than this page answers
+      // /api/income with the expense list, which would otherwise show every
+      // expense a second time as income.
+      .then((rows) => (Array.isArray(rows) ? rows.filter(isIncomeRow) : []))
       .catch((err) => {
         cache = null;
         throw err;
