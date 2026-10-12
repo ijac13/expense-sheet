@@ -26,6 +26,7 @@ import { getMonthlySummary, getAnnualSummary, getEarningsSummary } from "../lib/
 import Link from "next/link";
 import { EarningsSummary } from "../lib/reportTypes";
 import { shortAmount } from "../lib/shortAmount";
+import { layoutLabels } from "../lib/donutLabels";
 import DrillDown from "./DrillDown";
 import MonthPickerModal from "../components/MonthPickerModal";
 import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
@@ -68,9 +69,11 @@ function segmentProps(percent: number, offset: number, total: number) {
   return { strokeDasharray: `${dash} ${circumference - dash}`, strokeDashoffset: dashOffset };
 }
 
-// Labels sit just outside the ring, at each slice's middle; the canvas grows a
-// margin for them so a label never clips at phone width (078).
-const LABEL_MARGIN = 44;
+// Labels sit in a column either side of the ring, joined to their slice by a
+// leader line and spread so they never overlap; the canvas grows margins for
+// them and scales to fit phone width (078).
+const LABEL_MX = 56;
+const LABEL_MY = 24;
 
 function DonutChart({
   categories,
@@ -89,17 +92,28 @@ function DonutChart({
   const total = categories.reduce((s, c) => s + c.total, 0);
   if (total === 0) return null;
 
-  const m = labels ? LABEL_MARGIN : 0;
-  const size = 240 + 2 * m;
-  const c = 120 + m;
+  const mx = labels ? LABEL_MX : 0;
+  const my = labels ? LABEL_MY : 0;
+  const width = 240 + 2 * mx;
+  const height = 240 + 2 * my;
+  const cx = 120 + mx;
+  const cy = 120 + my;
   let offset = 0;
-  let labelOffset = 0;
+  let running = 0;
+  const fractions = categories.map((cat) => {
+    const mid = (running + cat.total / 2) / total;
+    running += cat.total;
+    return mid;
+  });
+  const spots = labels
+    ? layoutLabels(fractions, { cx, cy, ringOuter: 99, column: 126, gap: 30, minY: 16, maxY: height - 18 })
+    : [];
   return (
     <div className="flex justify-center" data-testid={testId}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ maxWidth: "100%", height: "auto" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ maxWidth: "100%", height: "auto" }}>
         {/* Track */}
         <circle
-          cx={c} cy={c} r={88}
+          cx={cx} cy={cy} r={88}
           fill="none"
           stroke="var(--color-base-200)"
           strokeWidth={22}
@@ -110,42 +124,40 @@ function DonutChart({
           return (
             <circle
               key={cat.category_id}
-              cx={c} cy={c} r={88}
+              cx={cx} cy={cy} r={88}
               fill="none"
               stroke={colors[i % colors.length]}
               strokeWidth={22}
               strokeDasharray={props.strokeDasharray}
               strokeDashoffset={props.strokeDashoffset}
-              style={{ transform: "rotate(-90deg)", transformOrigin: `${c}px ${c}px` }}
+              style={{ transform: "rotate(-90deg)", transformOrigin: `${cx}px ${cy}px` }}
             />
           );
         })}
-        {labels && categories.map((cat, i) => {
-          // Slices start at 12 o'clock and run clockwise.
-          const mid = (labelOffset + cat.total / 2) / total;
-          labelOffset += cat.total;
-          const angle = mid * 2 * Math.PI - Math.PI / 2;
-          const r = 88 + 11 + 20;
-          const x = c + r * Math.cos(angle);
-          const y = c + r * Math.sin(angle);
-          const anchor = Math.abs(Math.cos(angle)) < 0.3 ? "middle" : Math.cos(angle) > 0 ? "start" : "end";
-          const nudge = Math.abs(Math.cos(angle)) < 0.3 ? 0 : Math.cos(angle) > 0 ? -8 : 8;
-          return (
+        {labels && spots.map((spot, i) => (
+          <g key={`label-${categories[i].category_id}`}>
+            <polyline
+              points={spot.line.map(([x, y]) => `${x},${y}`).join(" ")}
+              fill="none"
+              stroke={colors[i % colors.length]}
+              strokeWidth={1.5}
+            />
             <text
-              key={`label-${cat.category_id}`}
-              data-testid={`slice-label-${cat.category_id}`}
-              x={x + nudge}
-              y={y - 2}
-              textAnchor={anchor}
+              data-testid={`slice-label-${categories[i].category_id}`}
+              data-y={spot.y}
+              data-side={spot.side}
+              x={spot.textX}
+              y={spot.y - 2}
+              textAnchor={spot.side === 1 ? "start" : "end"}
               fill="currentColor"
             >
-              <tspan x={x + nudge} fontSize={13} fontWeight={600}>{`${labels[i].pct}%`}</tspan>
-              <tspan x={x + nudge} dy={14} fontSize={11} opacity={0.6}>{shortAmount(labels[i].amount)}</tspan>
+              <tspan x={spot.textX} fontSize={13} fontWeight={600}>{`${labels[i].pct}%`}</tspan>
+              <tspan x={spot.textX} dy={13} fontSize={11} opacity={0.6}>{shortAmount(labels[i].amount)}</tspan>
             </text>
-          );
-        })}
-        <text x={c} y={c - 6} textAnchor="middle" fontSize={13} fill="currentColor" opacity={0.5}>{totalLabel}</text>
-        <text x={c} y={c + 14} textAnchor="middle" fontSize={18} fontWeight={600} fill="currentColor">
+          </g>
+        ))}
+        <text x={cx} y={cy - 6} textAnchor="middle" fontSize={13} fill="currentColor" opacity={0.5}>{totalLabel}</text>
+        <text x={cx} y={cy + 14} textAnchor="middle" fontSize={18} fontWeight={600} fill="currentColor">
           {`NT$${(total / 1000).toFixed(0)}k`}
         </text>
       </svg>
