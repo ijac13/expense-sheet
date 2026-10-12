@@ -423,7 +423,7 @@ test("shortAmount: as-is under 1,000, then K and M with one decimal", () => {
   assert.equal(shortAmount(1234567), "1.2M");
 });
 
-test("beside the donut, every slice lists the legend's % and a short amount, business slices included", async () => {
+test("under the donut, every slice lists the legend's % and a short amount, business slices included", async () => {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   installGlobals({
@@ -449,6 +449,7 @@ test("beside the donut, every slice lists the legend's % and a short amount, bus
   assert.equal(label("rent"), "reports.group_rent60%30K");
   assert.equal(label("uber"), "reports.group_uber5%2.4K", "a thin slice still gets its row");
   const list = container.querySelector('[data-testid="slice-list"]');
-  assert.equal(list.children.length, 3, "one row per slice, beside the donut");
-  assert.equal(list.previousElementSibling.querySelector('[data-testid="group-donut"] svg').getAttribute("width"), "150");
+  assert.equal(list.children.length, 3, "one row per slice, under the donut");
+  assert.equal(list.previousElementSibling.getAttribute("data-testid"), "group-donut", "the list follows the donut");
+  assert.equal(list.previousElementSibling.querySelector("svg").getAttribute("width"), "240", "the donut keeps its full size");
 });

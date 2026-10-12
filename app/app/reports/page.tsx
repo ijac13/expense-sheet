@@ -37,11 +37,12 @@ import { useTranslation } from "react-i18next";
 // ---------------------------------------------------------------------------
 const LIFE_GROUPS: CostGroup[] = ["fixed", "big_extra", "living"];
 const COST_GROUP_COLORS: Record<CostGroup, string> = {
-  fixed: "#1e6d4a",
-  big_extra: "#f9c440",
-  living: "#d97757",
-  rent: "#6b7fa8",
-  uber: "#3d4a5c",
+  // Captain's palette (078); mid tones so each reads on light and dark themes.
+  fixed: "#9ca3af",     // gray
+  big_extra: "#f9c440", // yellow
+  living: "#3b82f6",    // blue
+  uber: "#ef4444",      // red
+  rent: "#22c55e",      // green
 };
 const BUSINESS_GROUPS: CostGroup[] = ["uber", "rent"]; // the For order: Uber, then Rent
 
@@ -259,18 +260,15 @@ function CostGroupsCard({
           ))}
         </div>
       </div>
-      {/* Donut on the left, each slice's share and short amount on the right (078). */}
-      <div className="flex items-center gap-3">
-        <div className="shrink-0">
-          <DonutChart
-            testId="group-donut"
-            categories={segments}
-            colors={segments.map((s) => COST_GROUP_COLORS[s.category_id])}
-            totalLabel={t("reports.total")}
-            size={150}
-          />
-        </div>
-        <ul data-testid="slice-list" className="flex-1 min-w-0 space-y-1.5">
+      {/* The donut at full size, each slice's share and short amount listed under it (078). */}
+      <div>
+        <DonutChart
+          testId="group-donut"
+          categories={segments}
+          colors={segments.map((s) => COST_GROUP_COLORS[s.category_id])}
+          totalLabel={t("reports.total")}
+        />
+        <ul data-testid="slice-list" className="mt-3 mx-auto max-w-xs space-y-1.5">
           {segments.map((s) => (
             <li key={s.category_id} data-testid={`slice-label-${s.category_id}`} className="flex items-center gap-2 text-sm">
               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COST_GROUP_COLORS[s.category_id] }} />
