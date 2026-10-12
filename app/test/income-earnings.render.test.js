@@ -423,7 +423,7 @@ test("shortAmount: as-is under 1,000, then K and M with one decimal", () => {
   assert.equal(shortAmount(1234567), "1.2M");
 });
 
-test("each donut slice is labelled with the legend's % and a short amount, business slices included", async () => {
+test("beside the donut, every slice lists the legend's % and a short amount, business slices included", async () => {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   installGlobals({
@@ -440,58 +440,15 @@ test("each donut slice is labelled with the legend's % and a short amount, busin
   await React.act(async () => {});
   const label = (g) => container.querySelector(`[data-testid="slice-label-${g}"]`)?.textContent;
 
-  assert.equal(label("living"), "100%17.5K", "Life only: one slice");
+  assert.equal(label("living"), "reports.group_living100%17.5K", "Life only: one slice");
   assert.equal(label("rent"), undefined);
 
   const toggle = container.querySelector('[data-testid="scope-toggle"]');
   await click([...toggle.querySelectorAll("button")].find((b) => b.textContent === "reports.include_business"));
-  assert.equal(label("living"), "35%17.5K");
-  assert.equal(label("rent"), "60%30K");
-  assert.equal(label("uber"), "5%2.4K", "a thin slice still gets its label");
-});
-
-test("donut labels: thin neighbouring slices are spread apart, never overlapping, and stay on the canvas", () => {
-  const { layoutLabels } = lib("donutLabels");
-  const g = { cx: 176, cy: 144, ringOuter: 99, column: 126, gap: 30, minY: 16, maxY: 270 };
-  // Five slices, four of them crowded near 12 o'clock on the right.
-  const spots = layoutLabels([0.01, 0.03, 0.05, 0.07, 0.55], g);
-  for (const side of [1, -1]) {
-    const ys = spots.filter((s) => s.side === side).map((s) => s.y).sort((a, b) => a - b);
-    for (let k = 1; k < ys.length; k++) assert.ok(ys[k] - ys[k - 1] >= g.gap - 1e-9, `side ${side}: ${ys}`);
-  }
-  for (const s of spots) {
-    assert.ok(s.y >= g.minY && s.y <= g.maxY, `y ${s.y} on canvas`);
-    assert.equal(s.line.length, 3, "slice edge → elbow → label");
-    assert.equal(s.line[2][1], s.y, "the line ends level with its label");
-  }
-  assert.equal(spots[4].side, -1, "a slice past 6 o'clock labels on the left");
-});
-
-test("on Reports every slice gets a leader line, and the labels on a side never overlap", async () => {
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  installGlobals({
-    categories: CATEGORIES,
-    expenses: [
-      row("o1", "cat_001", 90000, today),
-      row("o2", "cat_026", 3000, today),
-      row("o3", "cat_015", 2000, today, { business: "uber" }),
-    ],
-    incomes: [],
-  });
-  const container = await mount(loadPage("reports/page.js"));
-  await React.act(async () => {});
-  await React.act(async () => {});
-  const toggle = container.querySelector('[data-testid="scope-toggle"]');
-  await click([...toggle.querySelectorAll("button")].find((b) => b.textContent === "reports.include_business"));
-  const donut = container.querySelector('[data-testid="group-donut"]');
-  const labels = [...donut.querySelectorAll('[data-testid^="slice-label-"]')];
-  assert.equal(labels.length, 3);
-  assert.equal(donut.querySelectorAll("polyline").length, 3);
-  const bySide = {};
-  for (const l of labels) (bySide[l.getAttribute("data-side")] ??= []).push(Number(l.getAttribute("data-y")));
-  for (const ys of Object.values(bySide)) {
-    ys.sort((a, b) => a - b);
-    for (let k = 1; k < ys.length; k++) assert.ok(ys[k] - ys[k - 1] >= 30, String(ys));
-  }
+  assert.equal(label("living"), "reports.group_living35%17.5K");
+  assert.equal(label("rent"), "reports.group_rent60%30K");
+  assert.equal(label("uber"), "reports.group_uber5%2.4K", "a thin slice still gets its row");
+  const list = container.querySelector('[data-testid="slice-list"]');
+  assert.equal(list.children.length, 3, "one row per slice, beside the donut");
+  assert.equal(list.previousElementSibling.querySelector('[data-testid="group-donut"] svg').getAttribute("width"), "150");
 });

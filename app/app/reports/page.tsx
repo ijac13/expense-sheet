@@ -26,7 +26,6 @@ import { getMonthlySummary, getAnnualSummary, getEarningsSummary } from "../lib/
 import Link from "next/link";
 import { EarningsSummary } from "../lib/reportTypes";
 import { shortAmount } from "../lib/shortAmount";
-import { layoutLabels } from "../lib/donutLabels";
 import DrillDown from "./DrillDown";
 import MonthPickerModal from "../components/MonthPickerModal";
 import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
@@ -69,51 +68,30 @@ function segmentProps(percent: number, offset: number, total: number) {
   return { strokeDasharray: `${dash} ${circumference - dash}`, strokeDashoffset: dashOffset };
 }
 
-// Labels sit in a column either side of the ring, joined to their slice by a
-// leader line and spread so they never overlap; the canvas grows margins for
-// them and scales to fit phone width (078).
-const LABEL_MX = 56;
-const LABEL_MY = 24;
-
 function DonutChart({
   categories,
   totalLabel,
   colors,
   testId,
-  labels,
+  size = 240,
 }: {
   categories: Pick<CategoryBreakdown, "category_id" | "total">[];
   totalLabel: string;
   colors: string[];
   testId?: string;
-  /** Per slice, in the same order as `categories`: its share (%) and amount. */
-  labels?: { pct: number; amount: number }[];
+  /** Rendered width and height in px; the drawing scales to fit. */
+  size?: number;
 }) {
   const total = categories.reduce((s, c) => s + c.total, 0);
   if (total === 0) return null;
 
-  const mx = labels ? LABEL_MX : 0;
-  const my = labels ? LABEL_MY : 0;
-  const width = 240 + 2 * mx;
-  const height = 240 + 2 * my;
-  const cx = 120 + mx;
-  const cy = 120 + my;
   let offset = 0;
-  let running = 0;
-  const fractions = categories.map((cat) => {
-    const mid = (running + cat.total / 2) / total;
-    running += cat.total;
-    return mid;
-  });
-  const spots = labels
-    ? layoutLabels(fractions, { cx, cy, ringOuter: 99, column: 126, gap: 30, minY: 16, maxY: height - 18 })
-    : [];
   return (
     <div className="flex justify-center" data-testid={testId}>
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ maxWidth: "100%", height: "auto" }}>
+      <svg width={size} height={size} viewBox="0 0 240 240">
         {/* Track */}
         <circle
-          cx={cx} cy={cy} r={88}
+          cx={120} cy={120} r={88}
           fill="none"
           stroke="var(--color-base-200)"
           strokeWidth={22}
@@ -124,40 +102,18 @@ function DonutChart({
           return (
             <circle
               key={cat.category_id}
-              cx={cx} cy={cy} r={88}
+              cx={120} cy={120} r={88}
               fill="none"
               stroke={colors[i % colors.length]}
               strokeWidth={22}
               strokeDasharray={props.strokeDasharray}
               strokeDashoffset={props.strokeDashoffset}
-              style={{ transform: "rotate(-90deg)", transformOrigin: `${cx}px ${cy}px` }}
+              style={{ transform: "rotate(-90deg)", transformOrigin: "120px 120px" }}
             />
           );
         })}
-        {labels && spots.map((spot, i) => (
-          <g key={`label-${categories[i].category_id}`}>
-            <polyline
-              points={spot.line.map(([x, y]) => `${x},${y}`).join(" ")}
-              fill="none"
-              stroke={colors[i % colors.length]}
-              strokeWidth={1.5}
-            />
-            <text
-              data-testid={`slice-label-${categories[i].category_id}`}
-              data-y={spot.y}
-              data-side={spot.side}
-              x={spot.textX}
-              y={spot.y - 2}
-              textAnchor={spot.side === 1 ? "start" : "end"}
-              fill="currentColor"
-            >
-              <tspan x={spot.textX} fontSize={13} fontWeight={600}>{`${labels[i].pct}%`}</tspan>
-              <tspan x={spot.textX} dy={13} fontSize={11} opacity={0.6}>{shortAmount(labels[i].amount)}</tspan>
-            </text>
-          </g>
-        ))}
-        <text x={cx} y={cy - 6} textAnchor="middle" fontSize={13} fill="currentColor" opacity={0.5}>{totalLabel}</text>
-        <text x={cx} y={cy + 14} textAnchor="middle" fontSize={18} fontWeight={600} fill="currentColor">
+        <text x={120} y={114} textAnchor="middle" fontSize={13} fill="currentColor" opacity={0.5}>{totalLabel}</text>
+        <text x={120} y={134} textAnchor="middle" fontSize={18} fontWeight={600} fill="currentColor">
           {`NT$${(total / 1000).toFixed(0)}k`}
         </text>
       </svg>
@@ -303,13 +259,28 @@ function CostGroupsCard({
           ))}
         </div>
       </div>
-      <DonutChart
-        testId="group-donut"
-        categories={segments}
-        colors={segments.map((s) => COST_GROUP_COLORS[s.category_id])}
-        totalLabel={t("reports.total")}
-        labels={segments.map((s) => ({ pct: groupShare(s.category_id), amount: s.total }))}
-      />
+      {/* Donut on the left, each slice's share and short amount on the right (078). */}
+      <div className="flex items-center gap-3">
+        <div className="shrink-0">
+          <DonutChart
+            testId="group-donut"
+            categories={segments}
+            colors={segments.map((s) => COST_GROUP_COLORS[s.category_id])}
+            totalLabel={t("reports.total")}
+            size={150}
+          />
+        </div>
+        <ul data-testid="slice-list" className="flex-1 min-w-0 space-y-1.5">
+          {segments.map((s) => (
+            <li key={s.category_id} data-testid={`slice-label-${s.category_id}`} className="flex items-center gap-2 text-sm">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COST_GROUP_COLORS[s.category_id] }} />
+              <span className="truncate flex-1 min-w-0">{t(`reports.group_${s.category_id}`)}</span>
+              <span className="font-semibold tabular-nums">{groupShare(s.category_id)}%</span>
+              <span className="font-mono text-xs text-base-content/60 w-12 text-right">{shortAmount(s.total)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
       {comparison && (
         <div data-testid="total-compare" className="flex justify-between items-center px-2 text-sm">
           <span className="text-base-content/70">{t("reports.total")}</span>
