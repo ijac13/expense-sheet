@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { X, SlidersHorizontal, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getAllExpenses } from "../lib/historyService";
-import { BUSINESS_ICONS, DEFAULT_CATEGORIES, Category, businessOf, categoryIcon, resolveCategory, getCachedCategoriesFull, saveCachedCategoriesFull } from "../lib/categories";
+import { Business, BUSINESSES, BUSINESS_ICONS, DEFAULT_CATEGORIES, Category, businessOf, categoryIcon, resolveCategory, getCachedCategoriesFull, saveCachedCategoriesFull } from "../lib/categories";
 import { getCategories } from "../lib/categoryService";
 import { getSharedIncomes, Income } from "../lib/incomes";
 import { USERS } from "../lib/users";
@@ -16,11 +16,13 @@ import DatePickerModal from "../components/DatePickerModal";
 
 interface DayGroup {
   date: string;
-  total: number; // spending only: income rows show but are not summed
+  total: number; // spending for All / Expenses; the net for Income, Uber, Rent
   expenses: HistoryEntry[];
 }
 
-type KindFilter = "all" | "expense" | "income";
+// Uber and Rent show one business's whole story: its income and its tagged costs.
+type KindFilter = "all" | "expense" | "income" | Exclude<Business, "">;
+const KIND_FILTERS: KindFilter[] = ["all", "expense", "income", ...BUSINESSES];
 
 function incomeEntry(i: Income): HistoryEntry {
   return { ...i, paid_by: i.received_by, kind: "income" };
@@ -28,6 +30,25 @@ function incomeEntry(i: Income): HistoryEntry {
 
 function spendingOf(entries: HistoryEntry[]): number {
   return entries.reduce((s, e) => s + (e.kind === "income" ? 0 : e.amount), 0);
+}
+
+/** Money in less money out: what a business (or plain income) netted. */
+function netOf(entries: HistoryEntry[]): number {
+  return entries.reduce((s, e) => s + (e.kind === "income" ? e.amount : -e.amount), 0);
+}
+
+/** The business an entry belongs to: an income's category, or an expense's tag/default. */
+function entryBusiness(e: HistoryEntry, categories: Category[]): Business {
+  if (e.kind === "income") return resolveCategory(e.category_id, categories)?.business ?? "";
+  return businessOf(e, categories);
+}
+
+/** All and Expenses total what was spent; Income, Uber and Rent total the net. */
+const showsNet = (kind: KindFilter) => kind !== "all" && kind !== "expense";
+
+function formatTotal(n: number, net: boolean): string {
+  if (!net) return `NT$${n.toLocaleString()}`;
+  return `${n < 0 ? "−" : "+"}NT$${Math.abs(n).toLocaleString()}`;
 }
 
 type DatePreset = "all" | "this-month" | "last-month" | "last-3m" | "custom";
@@ -110,7 +131,7 @@ function countActiveFilters(filters: Filters): number {
   return n;
 }
 
-function groupByDate(expenses: HistoryEntry[]): DayGroup[] {
+function groupByDate(expenses: HistoryEntry[], totalOf: (entries: HistoryEntry[]) => number): DayGroup[] {
   const map = new Map<string, HistoryEntry[]>();
   for (const exp of expenses) {
     const list = map.get(exp.date) ?? [];
@@ -126,7 +147,7 @@ function groupByDate(expenses: HistoryEntry[]): DayGroup[] {
       );
       return {
         date,
-        total: spendingOf(exps),
+        total: totalOf(exps),
         expenses: exps,
       };
     });
@@ -387,10 +408,14 @@ export default function HistoryPage() {
 
   const filtered = useMemo(
     () => applyFilters(expenses, filters, search, categories)
-      .filter((e) => kind === "all" || (kind === "income") === (e.kind === "income")),
-    [expenses, filters, search, categories, kind]
+      .filter((e) => {
+        if (kind === "all") return true;
+        if (kind === "expense" || kind === "income") return (kind === "income") === (e.kind === "income");
+        return entryBusiness(e, allCategories) === kind;
+      }),
+    [expenses, filters, search, categories, kind, allCategories]
   );
-  const groups = useMemo(() => groupByDate(filtered), [filtered]);
+  const groups = useMemo(() => groupByDate(filtered, showsNet(kind) ? netOf : spendingOf), [filtered, kind]);
 
   const monthGroups = useMemo(() => {
     const months = new Map<string, DayGroup[]>();
@@ -483,18 +508,18 @@ export default function HistoryPage() {
           )}
 
           {/* All / Expenses / Income */}
-          <div data-testid="kind-filter" className="flex gap-2 px-4 pb-3">
-            {(["all", "expense", "income"] as KindFilter[]).map((k) => (
+          <div data-testid="kind-filter" className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none">
+            {KIND_FILTERS.map((k) => (
               <button
                 key={k}
                 type="button"
                 aria-pressed={kind === k}
                 onClick={() => setKind(k)}
-                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap shrink-0 ${
                   kind === k ? "bg-primary text-primary-content" : "bg-base-200 text-base-content/70"
                 }`}
               >
-                {t(`history.kind_${k}`)}
+                {k === "uber" || k === "rent" ? `${BUSINESS_ICONS[k]} ${t(`earnings.business_${k}`)}` : t(`history.kind_${k}`)}
               </button>
             ))}
           </div>
@@ -540,7 +565,7 @@ export default function HistoryPage() {
         {/* List */}
         <div className="py-2">
           {monthGroups.map(([monthKey, dayGroups]) => {
-            const monthTotal = dayGroups.reduce((s, g) => s + g.total, 0); // spending only
+            const monthTotal = dayGroups.reduce((s, g) => s + g.total, 0);
             const entryCount = dayGroups.reduce((s, g) => s + g.expenses.length, 0);
             return (
               <div key={monthKey} className="mb-4">
@@ -548,7 +573,7 @@ export default function HistoryPage() {
                   <span className="text-sm font-semibold text-base-content/80">{formatMonthLabel(monthKey, lang)}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-base-content/40">{entryCount} {t("history.entries")}</span>
-                    <span className="text-sm font-semibold">NT${monthTotal.toLocaleString()}</span>
+                    <span data-testid="month-total" className="text-sm font-semibold">{formatTotal(monthTotal, showsNet(kind))}</span>
                   </div>
                 </div>
 
@@ -559,7 +584,7 @@ export default function HistoryPage() {
                         {formatDateHeader(group.date, todayStr, yesterdayStr, t("home.today"), t("home.yesterday"), lang)}
                       </span>
                       <span className="text-sm font-semibold text-base-content">
-                        NT${group.total.toLocaleString()}
+                        {formatTotal(group.total, showsNet(kind))}
                       </span>
                     </div>
 
