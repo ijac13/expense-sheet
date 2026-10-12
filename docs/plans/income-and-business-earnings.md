@@ -39,6 +39,7 @@
   - **Uber card:** Uber income − Uber-tagged expenses (fuel, car wash…) = **Uber earnings**
   - **Rent card:** Rent received − Rent-tagged expenses (rent paid, tenant costs) = **Rent earnings**, plus the last 6 months as small bars. Green means it made money, red means it lost money.
 - **History** shows income rows with a green "+", and each expense row shows its tag (Rent / Uber). You can edit the tag later from the edit sheet.
+- **Subscriptions** accept income categories: a Salary subscription is logged to the Income tab each month (added during the build, at your request).
 - **Settings › Categories:** each category gets a "Fills in" picker (Life / Rent / Uber). That's how Rent paid and Tenant default to Rent.
 
 ## Mockup
@@ -47,7 +48,6 @@
 
 ## Not in this round
 
-- Recurring income (for example, salary auto-logged each month). Rent paid can already use Subscriptions, since it's an expense.
 - Re-tagging past fuel as Uber. Old expenses stay Life unless you edit them one by one.
 
 ## How it's built (for reference)
