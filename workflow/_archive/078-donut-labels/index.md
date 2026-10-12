@@ -1,9 +1,13 @@
 ---
 title: "Reports: % and short amount on each slice of the cost-group donut"
-status: ideation
 source: 'captain, 2026-10-12 — "on the report, the expense pie chart, can you add numbers of each — fixed, big extras, living costs, Uber, Rent" / "show % and short numbers, e.g. 57%, 17.5K"'
 score: 0.5
 id: 078
+status: done
+completed: 2026-10-12T11:05:07Z
+verdict: PASSED
+pr: '#51'
+archived: 2026-10-12T11:05:07Z
 ---
 
 The cost-group donut on Reports shows only coloured slices and the total in the middle; the captain has to read the list below to know what each slice is worth.
@@ -35,3 +39,5 @@ Open questions for ideation:
 ### Feedback Cycles
 
 - 2026-10-12: built on branch donut-labels (65bcbbc, on top of 077's earnings-drilldown so staging shows both). App tests 290/290. Deployed to staging; served index.html matches build, chunk carries slice-label.
+
+- 2026-10-12: captain checked on staging and said ship. PR #51 merged (0bc0e86); production website deployed — served index.html matches the build; slice-list, drill-total and the new colours are in the live chunks.

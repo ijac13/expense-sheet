@@ -1,9 +1,13 @@
 ---
 title: "Income & earnings: tap a cost to see its expenses"
-status: ideation
 source: captain, 2026-10-12 — "in the Report > 收入與盈餘, when I click the category, direct me to the expense detail like Report. e.g. when I click 修車 under Uber expense, direct me to see the 修車 under Uber detail."
 score: 0.6
 id: 077
+status: done
+completed: 2026-10-12T11:05:07Z
+verdict: PASSED
+pr: '#51'
+archived: 2026-10-12T11:05:07Z
 ---
 
 On Reports, tapping a category opens its list of expenses for the period. On Reports › 收入與盈餘 the Uber and Rent cards list their cost categories (e.g. 修車 under Uber) but tapping one does nothing, so the captain can't see which expenses make up a business cost.
@@ -32,3 +36,5 @@ Open questions for ideation:
 {Written at the `spec` stage.}
 
 ### Feedback Cycles
+
+- 2026-10-12: captain checked on staging and said ship. PR #51 merged (0bc0e86); production website deployed — served index.html matches the build; slice-list, drill-total and the new colours are in the live chunks.
