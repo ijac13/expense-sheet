@@ -1,16 +1,17 @@
 ---
 id: 074
 title: "History: Uber and Rent filters"
-status: ideation
+status: done
 source: captain, 2026-10-12 — "in the History, we have All, Expense, Income, add Uber and Rent, so I can see the details of Uber and Rent"
 started:
-completed:
-verdict:
+completed: 2026-10-12T10:43:42Z
+verdict: PASSED
 score: 0.6
 worktree:
 issue:
-pr:
+pr: #50
 mod-block:
+archived: 2026-10-12T10:43:42Z
 ---
 
 History filters by All · Expenses · Income only, so the captain cannot see one business's whole story — its income and its tagged costs — in one list.
@@ -40,3 +41,5 @@ Already built ahead of the workflow on branch `history-business-filter` (commit 
 {Written at the `spec` stage.}
 
 ### Feedback Cycles
+
+- 2026-10-12: captain checked on staging ("074 is good"). PR #50 merged (6a50fe6); production website deployed, served index.html matches build, history chunk carries month-total.

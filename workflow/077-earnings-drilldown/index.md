@@ -25,7 +25,7 @@ On Reports, tapping a category opens its list of expenses for the period. On Rep
 
 Open questions for ideation:
 
-1. Should the income lines (Rent received, Uber, Salary, Random) also open a list of their income rows, or only the costs?
+1. Should the income lines also open a list of their income rows? — **captain: yes** (2026-10-12). Income lines open a list of that category's income rows for the period (business-filtered on the Uber/Rent cards).
 
 ## Acceptance criteria
 
