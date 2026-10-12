@@ -231,3 +231,54 @@ test("apply-income-categories: adds headers, tags Tenant, appends five categorie
   await run(["--target", "staging", "--apply"], opts);
   assert.equal(JSON.stringify(f.grids), before, "a second apply writes nothing");
 });
+
+// ---------------------------------------------------------------------------
+// Subscriptions carry a For tag onto the expenses they log
+// ---------------------------------------------------------------------------
+
+test("a subscription tagged uber stores the tag, and its logged expense carries it", async () => {
+  const f = fixture();
+  const api = loadApi(f.sheets);
+  const created = await call(api, "POST", "/api/subscriptions", {
+    name: "Car wash plan", amount: 750, category_id: "cat_015", frequency: "monthly", due_day: 12,
+    paid_by: "ijac", start_date: "2026-10-01", notes: "", business: "uber",
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.business, "uber");
+
+  await runSubscriptionScheduler(f.sheets, "sheet-under-test", Date.parse("2026-10-12T01:00:00+08:00"));
+  const header = f.grids.Expenses[0];
+  const logged = f.grids.Expenses.find((r) => String(r[0]).startsWith(`exp-auto-${created.body.id}`));
+  assert.ok(logged, "the expense was logged");
+  assert.equal(logged[header.indexOf("business")], "uber");
+});
+
+test("an untagged subscription creates no business column on either tab", async () => {
+  const f = fixture();
+  const api = loadApi(f.sheets);
+  const created = await call(api, "POST", "/api/subscriptions", {
+    name: "Netflix", amount: 390, category_id: "cat_001", frequency: "monthly", due_day: 12, paid_by: "ijac", start_date: "2026-10-01",
+  });
+  assert.equal(created.body.business, "");
+  await runSubscriptionScheduler(f.sheets, "sheet-under-test", Date.parse("2026-10-12T01:00:00+08:00"));
+  assert.ok(!f.grids.Subscriptions[0].includes("business"));
+  assert.ok(!f.grids.Expenses[0].includes("business"));
+});
+
+test("PATCH can change a subscription's tag, and rejects an unknown one", async () => {
+  const f = fixture({ Subscriptions: { header: SUBS_HEADER, rows: [["sub-x", "Gas", "900", "cat_015", "monthly", "3", "", "ijac", "true"]] } });
+  const api = loadApi(f.sheets);
+  assert.equal((await call(api, "PATCH", "/api/subscriptions", { id: "sub-x", business: "taxi" })).status, 400);
+  const ok = await call(api, "PATCH", "/api/subscriptions", { id: "sub-x", business: "uber" });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.business, "uber");
+});
+
+test("an explicit life tag on a Rent-default category counts as Life", async () => {
+  const defaults = new Map([["cat_023", "rent"]]);
+  assert.equal(expenseBusiness({ category_id: "cat_023", business: "life" }, defaults), "");
+  const f = fixture();
+  const { status, body } = await call(loadApi(f.sheets), "PATCH", "/api", { id: "exp-1", business: "life" });
+  assert.equal(status, 200);
+  assert.equal(body.business, "life");
+});

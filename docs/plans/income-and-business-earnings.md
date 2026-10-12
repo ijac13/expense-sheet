@@ -9,6 +9,7 @@
 - **Earnings page order:** Salary, Uber, Rent, Random, one card each.
 - Business-costs control is a two-option choice: **Life only** | **Include business costs**.
 - Expense / Income toggle sits just above the category icons.
+- For order everywhere: ❤️ Life · 🚗 Uber · 🏠 Rent. Choosing Life on a Rent-default category (Tenant) is stored as an explicit `life`, so it counts as Life.
 - **No Rent tab in the sheet.** Rent and Uber are tags on Expenses rows; income goes in one new Income tab.
 - **Mixed costs (option B):** each expense is tagged **For: ❤️ Life / Rent / Uber** when you log it. A tank of fuel for driving gets Uber, a tank for daily use stays Life.
 
@@ -39,6 +40,7 @@
   - **Uber card:** Uber income − Uber-tagged expenses (fuel, car wash…) = **Uber earnings**
   - **Rent card:** Rent received − Rent-tagged expenses (rent paid, tenant costs) = **Rent earnings**, plus the last 6 months as small bars. Green means it made money, red means it lost money.
 - **History** shows income rows with a green "+", and each expense row shows its tag (Rent / Uber). You can edit the tag later from the edit sheet.
+- **Subscriptions** have the same For choice (Life · Uber · Rent); each expense they log carries it.
 - **Subscriptions** accept income categories: a Salary subscription is logged to the Income tab each month (added during the build, at your request).
 - **Settings › Categories:** each category gets a "Fills in" picker (Life / Rent / Uber). That's how Rent paid and Tenant default to Rent.
 

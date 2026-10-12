@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Subscription, getNextDueDate, todayLocalIso, endsBeforeStart } from "../lib/subscriptions";
 import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription, getSchedulerStatus, SchedulerStatus } from "../lib/subscriptionService";
-import { Category, CategoryKind, DEFAULT_CATEGORIES, categoriesOfKind, categoryIcon, isIncomeCategory, resolveCategory } from "../lib/categories";
+import { Business, BUSINESS_ICONS, Category, CategoryKind, DEFAULT_CATEGORIES, businessOf, businessToStore, categoriesOfKind, categoryIcon, isIncomeCategory, resolveCategory } from "../lib/categories";
+import ForPicker from "../components/ForPicker";
 import { getCategories } from "../lib/categoryService";
 import { USERS, DEFAULT_USER } from "../lib/users";
 import { useAuth } from "../lib/authContext";
@@ -39,6 +40,7 @@ interface AddFormState {
   due_month: string;
   start_date: string;
   notes: string;
+  business: Business;
 }
 
 interface EditFormState {
@@ -48,6 +50,7 @@ interface EditFormState {
   due_day: string;
   due_month: string;
   notes: string;
+  business: Business;
 }
 
 // A hard cap rather than a truncating ellipsis, following entity 043: a note is
@@ -68,6 +71,7 @@ const defaultAddForm: AddFormState = {
   due_month: "1",
   start_date: "",
   notes: "",
+  business: "",
 };
 
 export default function SubscriptionsPage() {
@@ -138,6 +142,7 @@ export default function SubscriptionsPage() {
     due_day: "1",
     due_month: "1",
     notes: "",
+    business: "",
   });
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
@@ -171,6 +176,10 @@ export default function SubscriptionsPage() {
   const active = matching.filter((s) => s.is_active).sort((a, b) => b.id.localeCompare(a.id));
   const cancelled = matching.filter((s) => !s.is_active).sort((a, b) => b.id.localeCompare(a.id));
 
+  // The For tag a category fills in, and whether it is income (which has no For).
+  const categoryDefault = (id: string): Business => resolveCategory(id, categories)?.business ?? "";
+  const isIncomeId = (id: string) => isIncomeCategory(resolveCategory(id, categories));
+
   function openAdd() {
     // The options are live categories now, so the initial value has to be a live
     // id — a legacy slug default would show one category and submit another.
@@ -180,6 +189,7 @@ export default function SubscriptionsPage() {
       ...defaultAddForm,
       category_id: activeCategories[0]?.id ?? "",
       start_date: todayLocalIso(),
+      business: categoryDefault(activeCategories[0]?.id ?? ""),
     });
     setStartPickerOpen(false);
     setModalMode("add");
@@ -198,6 +208,7 @@ export default function SubscriptionsPage() {
       // /api/subscriptions carries no notes key. Without this, opening Edit in
       // that window throws on .trim() and takes the whole page down.
       notes: sub.notes ?? "",
+      business: businessOf({ business: sub.business, category_id: sub.category_id }, categories),
     });
     setModalMode("edit");
   }
@@ -230,6 +241,8 @@ export default function SubscriptionsPage() {
         // Trimmed, so a note of only spaces is stored as unset rather than as a
         // note line that occupies card space showing nothing.
         notes: addForm.notes.trim(),
+        // Only a choice that differs from the category's default is stored.
+        business: isIncomeId(addForm.category_id) ? "" : businessToStore(addForm.business, categoryDefault(addForm.category_id)),
       });
       setSubscriptions((prev) => [...prev, newSub]);
       closeModal();
@@ -255,6 +268,7 @@ export default function SubscriptionsPage() {
       due_day,
       due_month,
       notes: editForm.notes.trim(),
+      business: isIncomeId(editForm.category_id) ? "" : businessToStore(editForm.business, categoryDefault(editForm.category_id)),
     };
     setEditSubmitting(true);
     try {
@@ -262,7 +276,7 @@ export default function SubscriptionsPage() {
       setSubscriptions((prev) =>
         prev.map((s) =>
           s.id === editingId
-            ? { ...s, name: updates.name ?? s.name, amount: updates.amount, category_id: updates.category_id ?? s.category_id, due_day: updates.due_day ?? s.due_day, due_month: due_month ?? s.due_month, notes: updates.notes }
+            ? { ...s, name: updates.name ?? s.name, amount: updates.amount, category_id: updates.category_id ?? s.category_id, due_day: updates.due_day ?? s.due_day, due_month: due_month ?? s.due_month, notes: updates.notes, business: updates.business }
             : s
         )
       );
@@ -421,6 +435,7 @@ export default function SubscriptionsPage() {
             {active.map((sub) => {
               const cat = getCategoryDisplay(sub.category_id, categories);
               const isIncome = isIncomeCategory(resolveCategory(sub.category_id, categories));
+              const biz = isIncome ? "" : businessOf({ business: sub.business, category_id: sub.category_id }, categories);
               const nextDue = getNextDueDate(sub);
               return (
                 <div key={sub.id} className="card bg-base-200 shadow-sm">
@@ -442,6 +457,9 @@ export default function SubscriptionsPage() {
                             <span className="mx-1.5 text-base-content/30">·</span>
                             <span>{t("subscriptions.due")} {formatDueDate(nextDue)}</span>
                           </div>
+                          {biz && (
+                            <div data-testid="sub-business" className="text-xs">{BUSINESS_ICONS[biz]} {t(`earnings.business_${biz}`)}</div>
+                          )}
                           <div className="text-xs text-base-content/40">
                             {t(isIncome ? "history.received_by" : "subscriptions.paid_by")} {USERS.find(u => u.id === sub.paid_by)?.name ?? sub.paid_by}
                           </div>
@@ -585,7 +603,7 @@ export default function SubscriptionsPage() {
                 <select
                   className="select select-bordered w-full"
                   value={addForm.category_id}
-                  onChange={(e) => setAddForm((f) => ({ ...f, category_id: e.target.value }))}
+                  onChange={(e) => setAddForm((f) => ({ ...f, category_id: e.target.value, business: categoryDefault(e.target.value) }))}
                 >
                   {/* An income category (Salary) makes this an income subscription:
                       the daily logger files it under Income, not Expenses. */}
@@ -600,6 +618,16 @@ export default function SubscriptionsPage() {
                   ))}
                 </select>
               </div>
+              {!isIncomeId(addForm.category_id) && (
+                <div>
+                  <label className="label label-text text-xs">{t("home.for")}</label>
+                  <ForPicker
+                    testId="add-sub-for"
+                    value={addForm.business}
+                    onChange={(b) => setAddForm((f) => ({ ...f, business: b }))}
+                  />
+                </div>
+              )}
               <div>
                 <label className="label label-text text-xs">{t("subscriptions.frequency")}</label>
                 <div className="join w-full">
@@ -719,7 +747,7 @@ export default function SubscriptionsPage() {
                 <select
                   className="select select-bordered w-full"
                   value={editForm.category_id}
-                  onChange={(e) => setEditForm((f) => ({ ...f, category_id: e.target.value }))}
+                  onChange={(e) => setEditForm((f) => ({ ...f, category_id: e.target.value, business: categoryDefault(e.target.value) }))}
                 >
                   {(["expense", "income"] as CategoryKind[]).map((k) => (
                     <optgroup key={k} label={t(`home.mode_${k}`)}>
@@ -732,6 +760,16 @@ export default function SubscriptionsPage() {
                   ))}
                 </select>
               </div>
+              {!isIncomeId(editForm.category_id) && (
+                <div>
+                  <label className="label label-text text-xs">{t("home.for")}</label>
+                  <ForPicker
+                    testId="edit-sub-for"
+                    value={editForm.business}
+                    onChange={(b) => setEditForm((f) => ({ ...f, business: b }))}
+                  />
+                </div>
+              )}
               {editingFrequency === "annual" && (
                 <div>
                   <label className="label label-text text-xs">{t("subscriptions.due_month_label")}</label>

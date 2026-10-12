@@ -32,11 +32,14 @@ export const INCOME_SPEC: TabSpec = {
   optional: [],
 };
 
-// The businesses an expense or income can belong to. Blank is Life.
+// The businesses an expense or income can belong to. Blank means "use the
+// category's default"; LIFE_OVERRIDE is an explicit Life on a category whose
+// default is a business (a Tenant cost that was really personal).
 export const BUSINESSES = ["rent", "uber"] as const;
+export const LIFE_OVERRIDE = "life";
 
 export function isBusinessValue(value: unknown): boolean {
-  return value === "" || (BUSINESSES as readonly unknown[]).includes(value);
+  return value === "" || value === LIFE_OVERRIDE || (BUSINESSES as readonly unknown[]).includes(value);
 }
 
 /**
@@ -49,6 +52,7 @@ export function expenseBusiness(
   categoryBusiness: Map<string, string>
 ): string {
   const own = String(expense.business ?? "");
+  if (own === LIFE_OVERRIDE) return "";
   if (own) return own;
   return categoryBusiness.get(String(expense.category_id ?? "")) ?? "";
 }
@@ -74,7 +78,9 @@ export const SUBSCRIPTIONS_SPEC: TabSpec = {
   // request, every insights request and the daily scheduler the instant this
   // deploys. The write paths create the headers on demand instead.
   required: ["id", "name", "amount", "category_id", "frequency", "due_day", "due_month", "paid_by", "is_active"],
-  optional: ["start_date", "end_date", "notes"],
+  // `business` (blank / rent / uber) is copied onto every expense the scheduler
+  // logs; created on demand by the first subscription tagged to a business.
+  optional: ["start_date", "end_date", "notes", "business"],
 };
 
 // A type alias rather than an interface so it keeps an implicit index signature
@@ -92,6 +98,7 @@ export type Subscription = {
   start_date: string;
   end_date: string;
   notes: string;
+  business: string;
 };
 
 export class SheetSchemaError extends Error {
@@ -196,6 +203,7 @@ export function rowToSubscription(row: Row, map: ColumnMap): Subscription {
     start_date: String(cell(row, map, "start_date") ?? ""),
     end_date: String(cell(row, map, "end_date") ?? ""),
     notes: String(cell(row, map, "notes") ?? ""),
+    business: String(cell(row, map, "business") ?? ""),
   };
 }
 

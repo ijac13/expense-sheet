@@ -216,6 +216,41 @@ async function insertRowsAtTop(
   });
 }
 
+// Creates a missing optional header on demand (`start_date` / `end_date` /
+// `notes` / `business` on Subscriptions, `fixed` on Categories, `business` on
+// Expenses), following
+// ensureTab: the captain never has to touch the sheet by hand, and a
+// production-sheet precondition is exactly the thing that blocks a deploy.
+//
+// New headers land past the widest OCCUPIED row, not past row 1's last header.
+// Sheets trims trailing blanks, so a column holding data under a blank header
+// cell is invisible in row 1's length — placing by that length would claim the
+// column and destroy its cells. Production already has this shape: CATEGORIES
+// carries `note` data under a blank H1 (see sheetSchema.ts).
+export async function ensureColumns(
+  sheets: Sheets,
+  spreadsheetId: string,
+  tabName: string,
+  map: ColumnMap,
+  rows: Row[],
+  fields: string[]
+): Promise<ColumnMap> {
+  const missing = fields.filter((f) => map.index[f] === undefined);
+  if (missing.length === 0) return map;
+
+  const first = rows.reduce((widest, r) => Math.max(widest, r.length), map.width);
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${tabName}!${columnLetter(first)}1:${columnLetter(first + missing.length - 1)}1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [missing] },
+  });
+
+  const index = { ...map.index };
+  missing.forEach((f, i) => { index[f] = first + i; });
+  return { tab: map.tab, index, width: first + missing.length };
+}
+
 // Writes one row per due subscription to the tab `map` describes, skipping any
 // whose deterministic id is already there so a re-run never double-logs.
 // Returns how many rows it wrote; skips are counted into `counts`.
@@ -294,10 +329,17 @@ export async function runSubscriptionScheduler(
       const dueExpense = due.filter((s) => !incomeIds.has(s.category_id));
 
       if (dueExpense.length > 0) {
-        const map = await readColumnMap(sheets, spreadsheetId, EXPENSES_SPEC);
+        let map = await readColumnMap(sheets, spreadsheetId, EXPENSES_SPEC);
+        // The subscription's For tag rides along onto the expense. Only the first
+        // tagged one pays for the full-tab read that placing a new header needs.
+        if (dueExpense.some((s) => s.business) && map.index.business === undefined) {
+          const { rows } = await readTab(sheets, spreadsheetId, EXPENSES_SPEC);
+          map = await ensureColumns(sheets, spreadsheetId, EXPENSES_SPEC.tab, map, rows, ["business"]);
+        }
         counts.created_count += await logDue(sheets, spreadsheetId, map, dueExpense, counts, (sub) => ({
           id: autoExpenseId(sub.id, today.iso),
           paid_by: sub.paid_by,
+          ...(sub.business && { business: sub.business }),
         }), today.iso, run_at);
       }
       if (dueIncome.length > 0) {
