@@ -1,7 +1,7 @@
 ---
 title: "Reports: % and short amount on each slice of the cost-group donut"
 status: ideation
-source: captain, 2026-10-12 — "on the report, the expense pie chart, can you add numbers of each: fixed, big extras, living costs, Uber, Rent" / "show % and short numbers, e.g. 57%, 17.5K"
+source: 'captain, 2026-10-12 — "on the report, the expense pie chart, can you add numbers of each — fixed, big extras, living costs, Uber, Rent" / "show % and short numbers, e.g. 57%, 17.5K"'
 score: 0.5
 id: 078
 ---
