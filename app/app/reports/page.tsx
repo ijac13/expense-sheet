@@ -240,7 +240,9 @@ function CostGroupsCard({
   }
 
   return (
-    <div data-testid="cost-groups" className="bg-base-200 rounded-2xl p-4 space-y-4">
+    // Two cards: the donut with its slice list, then the details per group (079).
+    <div data-testid="cost-groups" className="space-y-4">
+    <div data-testid="cost-group-chart" className="bg-base-200 rounded-2xl p-4 space-y-4">
       <div className="flex flex-wrap justify-between items-center gap-2">
         <div className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">
           {t("reports.cost_groups")}
@@ -289,6 +291,8 @@ function CostGroupsCard({
           </span>
         </div>
       )}
+    </div>
+    <div data-testid="cost-group-details" className="bg-base-200 rounded-2xl p-4 space-y-4">
       {COST_GROUPS.map((group) => (
         <div key={group}>
           <div className="flex justify-between items-baseline px-2">
@@ -331,6 +335,7 @@ function CostGroupsCard({
           )}
         </div>
       ))}
+    </div>
     </div>
   );
 }
