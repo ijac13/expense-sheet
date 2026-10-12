@@ -63,18 +63,20 @@ const INCOMES = [
 // Reports: business costs leave Life
 // ---------------------------------------------------------------------------
 
-test("the monthly total is Life only; Rent and Uber costs sit in the Business group", async () => {
+test("the monthly total is Life only; Rent and Uber costs sit in their own groups", async () => {
   installGlobals({ categories: CATEGORIES, expenses: EXPENSES, incomes: INCOMES });
   const { getMonthlySummary } = lib("reportService");
   const s = await getMonthlySummary(2026, 10, "all", new Date(2026, 9, 31));
 
   assert.equal(s.total, 31850 + 900, "eating out and daily fuel only");
-  assert.equal(s.groups.business.total, 30000 + 2450 + 2400, "rent paid, tenant and Uber fuel");
+  assert.equal(s.groups.rent.total, 30000 + 2450, "rent paid and tenant");
+  assert.equal(s.groups.uber.total, 2400, "Uber fuel");
   assert.equal(s.groups.fixed.total + s.groups.big_extra.total + s.groups.living.total, s.total);
   assert.deepEqual(
-    s.groups.business.categories.map((c) => c.category_id).sort(),
-    ["cat_015", "cat_023", "cat_026"]
+    s.groups.rent.categories.map((c) => c.category_id).sort(),
+    ["cat_023", "cat_026"]
   );
+  assert.deepEqual(s.groups.uber.categories.map((c) => c.category_id), ["cat_015"]);
   assert.ok(!s.groups.living.categories.some((c) => c.category_id === "cat_023"), "Tenant is never Living");
   assert.equal(s.payers.reduce((n, p) => n + p.total, 0), s.total, "By payer counts Life only");
 });
@@ -83,7 +85,7 @@ test("an untagged fuel stays Life while a tagged one goes to Uber", async () => 
   installGlobals({ categories: CATEGORIES, expenses: EXPENSES, incomes: INCOMES });
   const { getExpensesByCategory } = lib("reportService");
   const life = await getExpensesByCategory(2026, 10, "cat_015", "all", "living");
-  const biz = await getExpensesByCategory(2026, 10, "cat_015", "all", "business");
+  const biz = await getExpensesByCategory(2026, 10, "cat_015", "all", "uber");
   assert.deepEqual(life.map((e) => e.id), ["e5"]);
   assert.deepEqual(biz.map((e) => e.id), ["e4"]);
 });
@@ -94,7 +96,8 @@ test("the annual trend and total are Life only too", async () => {
   const a = await getAnnualSummary(2026, "all", new Date(2026, 11, 31));
   assert.equal(a.total, 32750);
   assert.equal(a.monthly_trend[7].total, 0, "August held only Rent costs");
-  assert.equal(a.groups.business.total, 30000 + 2450 + 2400 + 30000 + 8900);
+  assert.equal(a.groups.rent.total, 30000 + 2450 + 30000 + 8900);
+  assert.equal(a.groups.uber.total, 2400);
 });
 
 // ---------------------------------------------------------------------------
@@ -232,7 +235,7 @@ test("every new label is defined in English and Chinese", () => {
   const keys = [
     "home.mode_expense", "home.mode_income", "home.for", "home.for_life", "home.save_income",
     "history.received_by", "history.kind_all", "history.kind_expense", "history.kind_income",
-    "reports.life_only", "reports.include_business", "reports.group_business",
+    "reports.life_only", "reports.include_business", "reports.group_rent", "reports.group_uber",
     "earnings.title", "earnings.money_in", "earnings.spending", "earnings.left_over", "earnings.money_in_hint",
     "earnings.business_rent", "earnings.business_uber", "earnings.earnings_rent", "earnings.earnings_uber",
     "earnings.costs", "earnings.load_failed", "earnings.empty",

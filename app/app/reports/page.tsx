@@ -39,12 +39,14 @@ const COST_GROUP_COLORS: Record<CostGroup, string> = {
   fixed: "#1e6d4a",
   big_extra: "#f9c440",
   living: "#d97757",
-  business: "#6b7fa8",
+  rent: "#6b7fa8",
+  uber: "#3d4a5c",
 };
+const BUSINESS_GROUPS: CostGroup[] = ["rent", "uber"];
 
 /** The total a card shows: Life, plus Business costs when they are included. */
 function shownTotal(lifeTotal: number, groups: AnnualCostGroups, includeBusiness: boolean): number {
-  return lifeTotal + (includeBusiness ? groups.business.total : 0);
+  return lifeTotal + (includeBusiness ? groups.rent.total + groups.uber.total : 0);
 }
 
 const THIS_YEAR_COLOR = "#1e6d4a";
@@ -185,12 +187,12 @@ function CostGroupsCard({
   const comparison = comparisons.find((c) => c.key === selected) ?? null;
   const comparing = comparison !== null;
   const name = (zh: string, en: string) => (lang === "zh" && zh ? zh : en);
-  const COST_GROUPS = includeBusiness ? [...LIFE_GROUPS, "business" as const] : LIFE_GROUPS;
+  const COST_GROUPS = includeBusiness ? [...LIFE_GROUPS, ...BUSINESS_GROUPS] : LIFE_GROUPS;
   const groupShare = (g: CostGroup) => (periodTotal > 0 ? Math.round((groups[g].total / periodTotal) * 100) : 0);
   // An empty group has no segment; colors stay paired with their group.
   const segments = COST_GROUPS.filter((g) => groups[g].total > 0).map((g) => ({ category_id: g, total: groups[g].total }));
 
-  function categoryRows(group: "fixed" | "living" | "business") {
+  function categoryRows(group: Exclude<CostGroup, "big_extra">) {
     const current = groups[group].categories;
     const previous = comparison?.groups[group].categories ?? [];
     const prevTotal = new Map(previous.map((c) => [c.category_id, c.total]));
@@ -946,7 +948,7 @@ export default function ReportsPage() {
               />
             )}
 
-            {monthly && monthly.total === 0 && monthly.groups.business.total === 0 ? (
+            {monthly && monthly.total === 0 && shownTotal(0, monthly.groups, true) === 0 ? (
               <div className="text-center py-16 text-base-content/40">
                 <div className="font-medium">{t("reports.no_data_period")}</div>
                 <div className="text-sm mt-1">{t("reports.try_different_month")}</div>
@@ -1076,7 +1078,7 @@ export default function ReportsPage() {
                 {mounted && <TrendCard data={annual.monthly_trend} year={annualYear} />}
 
                 {/* Cost groups — Fixed / Big extras / Living costs (071) */}
-                {(annual.expense_count > 0 || annual.groups.business.total > 0) && (
+                {(annual.expense_count > 0 || shownTotal(0, annual.groups, true) > 0) && (
                   <CostGroupsCard
                     groups={annual.groups}
                     comparisons={[{

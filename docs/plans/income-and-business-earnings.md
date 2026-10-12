@@ -30,7 +30,7 @@
   - Fuel, Car repair, Tolls and the rest stay as they are. Tag them Uber when they're for driving.
 - **Reports**
   - The total and the cost groups count only Life expenses (Fixed + Big extras + Living costs).
-  - **Life only** | **Include business costs** on the Total spending card. The second option adds a 4th group, Business, and shows the full total.
+  - **Life only** | **Include business costs** on the Total spending card. The second option adds two groups, Rent (房租) and Uber, and shows the full total.
   - A new row, **"Income & earnings ›"**, opens the second-level page.
   - AI insights look at Life spending only.
 - **Income & earnings page** (second level, opened from Reports), for the same month or year you're viewing:

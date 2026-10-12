@@ -124,7 +124,8 @@ const BIG_EXTRA_KEYWORDS = ["#大筆", "＃大筆"];
 // A business tag wins over everything: Rent and Uber costs are never Life.
 // Then a fixed category wins over the keyword. An unresolvable category is living.
 function costGroupOf(e: Expense, categories: Category[]): CostGroup {
-  if (businessOf(e, categories)) return "business";
+  const business = businessOf(e, categories);
+  if (business) return business;
   if (isFixedCategory(resolveCategory(e.category_id, categories))) return "fixed";
   if (BIG_EXTRA_KEYWORDS.some((k) => (e.notes ?? "").includes(k))) return "big_extra";
   return "living";
@@ -144,18 +145,22 @@ function buildCostGroups(expenses: Expense[], categories: Category[]): AnnualCos
   const fixed = of("fixed");
   const bigExtra = of("big_extra");
   const living = of("living");
-  const business = of("business");
-  // Life groups are shares of Life; Business is a share of everything, the
-  // total it is shown against when business costs are included.
+  const rent = of("rent");
+  const uber = of("uber");
+  // Life groups are shares of Life; Rent and Uber are shares of everything, the
+  // total they are shown against when business costs are included.
   const lifeTotal = sum(fixed) + sum(bigExtra) + sum(living);
+  const allTotal = lifeTotal + sum(rent) + sum(uber);
   const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
   const share = (list: Expense[]) => ({ total: sum(list), percentage: pct(sum(list), lifeTotal) });
+  const businessGroup = (list: Expense[]) => ({
+    total: sum(list),
+    percentage: pct(sum(list), allTotal),
+    categories: buildCategoryBreakdown(list, categories),
+  });
   return {
-    business: {
-      total: sum(business),
-      percentage: pct(sum(business), lifeTotal + sum(business)),
-      categories: buildCategoryBreakdown(business, categories),
-    },
+    rent: businessGroup(rent),
+    uber: businessGroup(uber),
     fixed: { ...share(fixed), categories: buildCategoryBreakdown(fixed, categories) },
     big_extra: {
       ...share(bigExtra),

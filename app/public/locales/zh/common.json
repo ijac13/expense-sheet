@@ -84,7 +84,8 @@
     "range_month": "{{year}} 年 {{m}} 月",
     "life_only": "只看生活",
     "include_business": "含事業支出",
-    "group_business": "事業（房租＋Uber）"
+    "group_rent": "房租",
+    "group_uber": "Uber"
   },
   "earnings": {
     "title": "收入與盈餘",

@@ -31,7 +31,7 @@ export interface MonthlySummary {
   year: number;
   month: number;
   label: string; // e.g. "April 2026"
-  total: number; // Life only; groups.business.total is the rest
+  total: number; // Life only; groups.rent and groups.uber hold the rest
   categories: CategoryBreakdown[];
   groups: AnnualCostGroups;
   payers: PayerBreakdown[];
@@ -48,10 +48,10 @@ export interface MonthlyTrend {
 
 // The captain's planning-sheet split of a year: Fixed (categories switched on as
 // fixed), Big extras (other expenses noted #大筆), Living costs (the rest) —
-// together, Life. Business holds Rent and Uber costs, which stay out of every
-// total unless "Include business costs" is chosen.
-export type CostGroup = "fixed" | "big_extra" | "living" | "business";
-export type LifeGroup = Exclude<CostGroup, "business">;
+// together, Life. Rent and Uber each hold their business's costs, which stay out
+// of every total unless "Include business costs" is chosen.
+export type CostGroup = "fixed" | "big_extra" | "living" | "rent" | "uber";
+export type BusinessGroup = Extract<CostGroup, "rent" | "uber">;
 
 export interface CostGroupTotal {
   total: number;
@@ -62,8 +62,9 @@ export interface AnnualCostGroups {
   fixed: CostGroupTotal & { categories: CategoryBreakdown[] };
   big_extra: CostGroupTotal & { expenses: ReportExpense[] };
   living: CostGroupTotal & { categories: CategoryBreakdown[] };
-  // Percentage here is of Life + Business, the total it is shown against.
-  business: CostGroupTotal & { categories: CategoryBreakdown[] };
+  // Percentages here are of Life + Rent + Uber, the total they are shown against.
+  rent: CostGroupTotal & { categories: CategoryBreakdown[] };
+  uber: CostGroupTotal & { categories: CategoryBreakdown[] };
 }
 
 // The year before, cut to the same stretch of days: Jan 1 to today's date while

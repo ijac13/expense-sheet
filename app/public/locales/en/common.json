@@ -84,7 +84,8 @@
     "range_month": "{{mon}} {{year}}",
     "life_only": "Life only",
     "include_business": "Include business costs",
-    "group_business": "Business (Rent + Uber)"
+    "group_rent": "Rent",
+    "group_uber": "Uber"
   },
   "earnings": {
     "title": "Income & earnings",
