@@ -1,13 +1,13 @@
 ---
 id: 073
 title: Backend Node.js runtime upgrade (before 2026-10-30)
-status: ideation
+status: verify
 source: captain, 2026-10-12 — production deploy warned Node.js 20 is decommissioned on 2026-10-30
-started:
+started: 2026-10-12T09:49:18Z
 completed:
 verdict:
 score: 0.9
-worktree:
+worktree: .worktrees/073-node24
 issue:
 pr:
 mod-block:
@@ -41,3 +41,5 @@ Open questions for the captain (in the plan): Node 24 vs 22; whether to fold in 
 {Written at the `spec` stage.}
 
 ### Feedback Cycles
+
+- 2026-10-12: captain answers — Q1 Node 24, Q2 yes (firebase-functions v7 too). Built on branch node-runtime-upgrade (b61b05a): engines 24, firebase-functions ^7.4.0, @types/node ^24, test script `node --test test/*.test.js` (Node 22+ rejects a bare directory). 377/377 pass on Node 20 and 24. Deployed to staging: api and subscriptionScheduler report nodejs24; api answers 401 unsigned. Pending: captain staging check, overnight 01:00 SchedulerLog run, then production (captain runs the functions deploy).
