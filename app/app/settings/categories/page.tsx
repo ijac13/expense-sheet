@@ -346,7 +346,7 @@ export default function CategoryManagementPage() {
                   value={form.business}
                   onChange={(e) => setForm((f) => ({ ...f, business: e.target.value as Business, error: "" }))}
                 >
-                  <option value="">❤️ {t("home.for_life")}</option>
+                  <option value="">💙 {t("home.for_life")}</option>
                   {BUSINESSES.map((b) => (
                     <option key={b} value={b}>{BUSINESS_ICONS[b]} {t(`earnings.business_${b}`)}</option>
                   ))}
