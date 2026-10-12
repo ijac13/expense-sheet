@@ -338,3 +338,30 @@ test("a subscription on Fuel can be set to Uber, and income categories show no F
   assert.equal(g.subWrites[0].body.category_id, "cat_015");
   assert.equal(g.subWrites[0].body.business, "uber");
 });
+
+test("History's Uber and Rent filters show that business's income and costs, totalled as the net", async () => {
+  installGlobals({
+    categories: CATEGORIES,
+    expenses: [
+      row("k1", "cat_023", 850, "2026-10-10"),                        // Tenant: Rent
+      row("k2", "cat_015", 1200, "2026-10-10", { business: "uber" }), // Uber fuel
+      row("k3", "cat_001", 300, "2026-10-10"),                        // Life
+    ],
+    incomes: [inc("k4", "cat_032", 38000, "2026-10-10"), inc("k5", "cat_031", 3200, "2026-10-10")],
+  });
+  const container = await mount(loadPage("history/page.js"));
+  await React.act(async () => {});
+  const chips = [...container.querySelectorAll('[data-testid="kind-filter"] button')];
+  assert.deepEqual(chips.map((b) => b.textContent.replace(/^\S+ /, "")), [
+    "history.kind_all", "history.kind_expense", "history.kind_income", "earnings.business_uber", "earnings.business_rent",
+  ]);
+
+  await click(chips.find((b) => b.textContent.includes("business_rent")));
+  assert.match(container.textContent, /\+NT\$38,000/);
+  assert.match(container.textContent, /NT\$850/);
+  assert.doesNotMatch(container.textContent, /NT\$1,200|NT\$300/, "no Uber or Life rows");
+  assert.equal(container.querySelector('[data-testid="month-total"]').textContent, "+NT$37,150");
+
+  await click(chips.find((b) => b.textContent.includes("business_uber")));
+  assert.equal(container.querySelector('[data-testid="month-total"]').textContent, "+NT$2,000");
+});
