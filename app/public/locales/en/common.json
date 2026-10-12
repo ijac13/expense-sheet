@@ -1,6 +1,6 @@
 {
   "tabs": { "home": "Home", "history": "History", "reports": "Reports", "subscriptions": "Subscriptions", "settings": "Settings" },
-  "home": { "title": "Add Expense", "amount_label": "Amount (TWD)", "logged_today": "logged today", "notes_placeholder": "Notes (optional)", "log_another": "Log another", "save": "Save", "paid_by": "Paid by", "today": "Today", "yesterday": "Yesterday", "tomorrow": "Tomorrow" },
+  "home": { "title": "Add Expense", "amount_label": "Amount (TWD)", "logged_today": "logged today", "notes_placeholder": "Notes (optional)", "log_another": "Log another", "save": "Save", "paid_by": "Paid by", "today": "Today", "yesterday": "Yesterday", "tomorrow": "Tomorrow", "mode_expense": "Expense", "mode_income": "Income", "for": "For", "for_life": "Life", "save_income": "Save income" },
   "history": {
     "title": "History",
     "no_expenses": "No expenses yet",
@@ -26,7 +26,11 @@
     "delete_subscription_note": "This was created by a subscription. Future entries won't be affected.",
     "edit_title": "Edit Expense",
     "save_changes": "Save Changes",
-    "subscription_edit_warning": "This expense was created by a subscription. Editing it here won't affect future entries."
+    "subscription_edit_warning": "This expense was created by a subscription. Editing it here won't affect future entries.",
+    "received_by": "Received by",
+    "kind_all": "All",
+    "kind_expense": "Expenses",
+    "kind_income": "Income"
   },
   "reports": {
     "title": "Reports",
@@ -77,7 +81,24 @@
     "compare_vs": "vs {{range}}",
     "range_days": "{{mon}} 1–{{d}}",
     "range_days_year": "{{mon}} 1–{{d}}, {{year}}",
-    "range_month": "{{mon}} {{year}}"
+    "range_month": "{{mon}} {{year}}",
+    "life_only": "Life only",
+    "include_business": "Include business costs",
+    "group_business": "Business (Rent + Uber)"
+  },
+  "earnings": {
+    "title": "Income & earnings",
+    "money_in": "Money in",
+    "spending": "Spending",
+    "left_over": "Left over",
+    "money_in_hint": "Money in = Salary + Uber earnings + Rent earnings + Random. Spending is Life only.",
+    "business_rent": "Rent",
+    "business_uber": "Uber",
+    "earnings_rent": "Rent earnings",
+    "earnings_uber": "Uber earnings",
+    "costs": "Costs",
+    "load_failed": "Could not load income. Check your connection and reopen this page.",
+    "empty": "No income categories yet. Add them in Settings › Categories."
   },
   "subscriptions": {
     "title": "Subscriptions",
@@ -113,7 +134,7 @@
   },
   "settings": { "title": "Settings", "signed_in_as": "Signed in as", "sign_out": "Sign out", "font_size": "Font Size", "small": "Small", "medium": "Medium", "large": "Large", "language": "Language", "category_management": "Category Management", "user_management": "User Management", "open_sheet": "Open Google Sheet" },
   "users": { "title": "User Management", "description": "Add or remove users by editing the Users tab in Google Sheets.", "loading": "Loading users…", "no_email": "No email set", "empty": "No users found in the Users tab." },
-  "cat_mgmt": { "title": "Category Management", "add": "+ Add Category", "form_add": "New Category", "form_edit": "Edit Category", "icon_label": "Emoji Icon", "name_en": "Name EN", "name_zh": "Name 繁中", "error_en_required": "English name is required", "error_zh_required": "Chinese name is required", "error_duplicate": "Name already exists", "archive": "Archive", "restore": "Restore", "active": "Active", "archived": "Archived", "gov_category_label": "Gov Category", "gov_category_required": "Government category is required", "gov_category_unset": "未設定", "gov_category_placeholder": "Select government category", "note_label": "Note", "save_success": "Category updated", "fixed_label": "Fixed cost", "fixed_hint": "Counts under Fixed in Report > Annual", "fixed_badge": "Fixed" },
+  "cat_mgmt": { "title": "Category Management", "add": "+ Add Category", "form_add": "New Category", "form_edit": "Edit Category", "icon_label": "Emoji Icon", "name_en": "Name EN", "name_zh": "Name 繁中", "error_en_required": "English name is required", "error_zh_required": "Chinese name is required", "error_duplicate": "Name already exists", "archive": "Archive", "restore": "Restore", "active": "Active", "archived": "Archived", "gov_category_label": "Gov Category", "gov_category_required": "Government category is required", "gov_category_unset": "未設定", "gov_category_placeholder": "Select government category", "note_label": "Note", "save_success": "Category updated", "fixed_label": "Fixed cost", "fixed_hint": "Counts under Fixed in Report > Annual", "fixed_badge": "Fixed", "kind_label": "Kind", "business_label": "Fills in", "business_hint": "New expenses in this category start tagged to this business." },
   "gov_category": { "food_beverage_tobacco": "食品飲料及菸草", "clothing_footwear": "衣著鞋襪類", "housing_utilities": "住宅服務水電瓦斯及其他燃料", "furnishings_household": "家具設備及家務服務", "health": "醫療保健", "transport_communication": "交通及資通訊", "recreation_culture_education": "休閒、運動、文化及教育", "restaurants_accommodation": "餐廳及住宿", "insurance_financial": "保險及金融服務", "miscellaneous": "其他" },
   "categories": { "eating-out": "Eating Out", "daily-necessities": "Daily Necessities", "groceries": "Groceries", "medical": "Medical", "travel": "Travel", "transportation": "Transportation", "digital": "Digital", "babies": "Babies", "clothing": "Clothing", "sports": "Sports", "gifts": "Gifts", "tuition": "Tuition", "tolls": "Tolls", "equipment": "Equipment", "fuel": "Fuel", "entertainment": "Entertainment", "rent": "Rent", "shopping": "Shopping", "car-repair": "Car Repair", "donate": "Donate", "mortgage": "Mortgage", "other": "Other" },
   "errors": { "load_failed": "Failed to load", "retry": "Retry", "no_longer_exists": "This expense no longer exists." },

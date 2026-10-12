@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReportExpense, PayerFilter, CostGroup } from "../lib/reportTypes";
 import { getExpensesByCategory } from "../lib/reportService";
-import { DEFAULT_CATEGORIES, Category } from "../lib/categories";
+import { DEFAULT_CATEGORIES, Category, categoriesOfKind } from "../lib/categories";
 import { getCategories } from "../lib/categoryService";
 import { USERS } from "../lib/users";
 import ExpenseEditSheet from "../components/ExpenseEditSheet";
@@ -42,7 +42,7 @@ export default function DrillDown({
   const [selected, setSelected] = useState<ReportExpense | null>(null);
 
   const categories = useMemo(
-    () => allCategories.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order),
+    () => categoriesOfKind(allCategories, "expense").filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order),
     [allCategories]
   );
 

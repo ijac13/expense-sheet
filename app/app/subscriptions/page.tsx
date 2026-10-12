@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Subscription, getNextDueDate, todayLocalIso, endsBeforeStart } from "../lib/subscriptions";
 import { getSubscriptions, addSubscription, updateSubscription, cancelSubscription, getSchedulerStatus, SchedulerStatus } from "../lib/subscriptionService";
-import { Category, DEFAULT_CATEGORIES, categoryIcon, resolveCategory } from "../lib/categories";
+import { Category, CategoryKind, DEFAULT_CATEGORIES, categoriesOfKind, categoryIcon, isIncomeCategory, resolveCategory } from "../lib/categories";
 import { getCategories } from "../lib/categoryService";
 import { USERS, DEFAULT_USER } from "../lib/users";
 import { useAuth } from "../lib/authContext";
@@ -343,12 +343,13 @@ export default function SubscriptionsPage() {
   // field cannot silently rewrite the category, and label it with the live
   // category's icon and name so the modal shows what Category Management shows.
   const editCategoryOptions = useMemo(() => {
-    const options = activeCategories.map((c) => ({ value: c.id, label: `${categoryIcon(c)} ${c.name_en}` }));
+    const options = activeCategories.map((c) => ({ value: c.id, label: `${categoryIcon(c)} ${c.name_en}`, kind: (isIncomeCategory(c) ? "income" : "expense") as CategoryKind }));
     if (editForm.category_id && !options.some((o) => o.value === editForm.category_id)) {
       const stored = resolveCategory(editForm.category_id, categories);
       options.unshift({
         value: editForm.category_id,
         label: `${categoryIcon(stored)} ${stored?.name_en ?? editForm.category_id}`,
+        kind: isIncomeCategory(stored) ? "income" : "expense",
       });
     }
     return options;
@@ -419,6 +420,7 @@ export default function SubscriptionsPage() {
           <div className="space-y-2">
             {active.map((sub) => {
               const cat = getCategoryDisplay(sub.category_id, categories);
+              const isIncome = isIncomeCategory(resolveCategory(sub.category_id, categories));
               const nextDue = getNextDueDate(sub);
               return (
                 <div key={sub.id} className="card bg-base-200 shadow-sm">
@@ -431,7 +433,7 @@ export default function SubscriptionsPage() {
                         </div>
                         <div className="text-sm text-base-content/60 mt-1 space-y-0.5">
                           <div>
-                            <span className="font-medium text-base-content">NT${sub.amount.toLocaleString()}</span>
+                            <span className={`font-medium ${isIncome ? "text-success" : "text-base-content"}`}>{isIncome ? "+" : ""}NT${sub.amount.toLocaleString()}</span>
                             <span className="mx-1.5 text-base-content/30">·</span>
                             <span>{sub.frequency === "monthly" ? t("subscriptions.monthly") : t("subscriptions.annual")}</span>
                           </div>
@@ -441,7 +443,7 @@ export default function SubscriptionsPage() {
                             <span>{t("subscriptions.due")} {formatDueDate(nextDue)}</span>
                           </div>
                           <div className="text-xs text-base-content/40">
-                            {t("subscriptions.paid_by")} {USERS.find(u => u.id === sub.paid_by)?.name ?? sub.paid_by}
+                            {t(isIncome ? "history.received_by" : "subscriptions.paid_by")} {USERS.find(u => u.id === sub.paid_by)?.name ?? sub.paid_by}
                           </div>
                           {/* Every subscription active before this feature has an
                               empty start_date, so absent must stay absent rather
@@ -585,10 +587,16 @@ export default function SubscriptionsPage() {
                   value={addForm.category_id}
                   onChange={(e) => setAddForm((f) => ({ ...f, category_id: e.target.value }))}
                 >
-                  {activeCategories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {categoryIcon(c)} {c.name_en}
-                    </option>
+                  {/* An income category (Salary) makes this an income subscription:
+                      the daily logger files it under Income, not Expenses. */}
+                  {(["expense", "income"] as CategoryKind[]).map((k) => (
+                    <optgroup key={k} label={t(`home.mode_${k}`)}>
+                      {categoriesOfKind(activeCategories, k).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {categoryIcon(c)} {c.name_en}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -713,10 +721,14 @@ export default function SubscriptionsPage() {
                   value={editForm.category_id}
                   onChange={(e) => setEditForm((f) => ({ ...f, category_id: e.target.value }))}
                 >
-                  {editCategoryOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
+                  {(["expense", "income"] as CategoryKind[]).map((k) => (
+                    <optgroup key={k} label={t(`home.mode_${k}`)}>
+                      {editCategoryOptions.filter((o) => o.kind === k).map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>

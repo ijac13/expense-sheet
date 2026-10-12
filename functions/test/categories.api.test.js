@@ -348,6 +348,8 @@ test("AC-9: a row shorter than the header reads as empty defaults, not shifted v
     gov_category: null,
     note: "",
     fixed: null,
+    kind: "expense",
+    business: "",
   });
 });
 

@@ -4,9 +4,10 @@ import { ChevronLeft, ChevronRight, PenLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
 import DatePickerModal from "./components/DatePickerModal";
-import { Category, DEFAULT_CATEGORIES, categoryIcon, getCachedCategories, getDefaultCategory, pickCategoryId, resolveCategory, saveCachedCategories, saveLastCategory } from "./lib/categories";
+import { Business, BUSINESSES, BUSINESS_ICONS, Category, CategoryKind, DEFAULT_CATEGORIES, categoriesOfKind, categoryIcon, getCachedCategories, getDefaultCategory, pickCategoryId, resolveCategory, saveCachedCategories, saveLastCategory } from "./lib/categories";
 import { getCategories } from "./lib/categoryService";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
+import { addIncome } from "./lib/incomes";
 import { DEFAULT_USER, USERS, type UserId } from "./lib/users";
 import { useAuth } from "./lib/authContext";
 
@@ -35,7 +36,13 @@ export default function HomePage() {
   // write, and conflating the two is the bug this entity exists to remove.
   // A device that has fetched successfully before draws its last-known live list
   // instead, so first paint doesn't visibly swap out from under the captain.
-  const [categories, setCategories] = useState<Category[]>(() => getCachedCategories() ?? DEFAULT_CATEGORIES);
+  const [allCategories, setCategories] = useState<Category[]>(() => getCachedCategories() ?? DEFAULT_CATEGORIES);
+  // Expense or income: the same calculator logs both, each with its own categories.
+  const [mode, setMode] = useState<CategoryKind>("expense");
+  const categories = categoriesOfKind(allCategories, mode);
+  // Who an expense is for. Starts at Life; a category with a default (Rent paid,
+  // Tenant) fills it in, and the captain can change it before saving.
+  const [business, setBusiness] = useState<Business>("");
   const [categoriesReady, setCategoriesReady] = useState(false);
   const [categoriesFailed, setCategoriesFailed] = useState(false);
   const [amount, setAmount] = useState("");
@@ -77,7 +84,12 @@ export default function HomePage() {
         // The seed from localStorage was never reconciled here, which is how a
         // stale slug survived all the way into the POST body on the fastest path
         // through the app: type an amount, confirm, touch nothing else.
-        setCategoryId((current) => pickCategoryId(current, active));
+        const expenseCats = categoriesOfKind(active, "expense");
+        setCategoryId((current) => {
+          const picked = pickCategoryId(current, expenseCats);
+          setBusiness(expenseCats.find((c) => c.id === picked)?.business ?? "");
+          return picked;
+        });
         setCategoriesReady(true);
       })
       .catch(() => setCategoriesFailed(true));
@@ -85,12 +97,22 @@ export default function HomePage() {
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
 
+  function switchMode(next: CategoryKind) {
+    if (next === mode) return;
+    setMode(next);
+    const list = categoriesOfKind(allCategories, next);
+    const picked = pickCategoryId(next === "expense" ? getDefaultCategory() : "", list);
+    setCategoryId(picked);
+    setBusiness(next === "expense" ? list.find((c) => c.id === picked)?.business ?? "" : "");
+  }
+
   function handleSelectCategory(id: string) {
     setCategoryId(id);
+    if (mode === "expense") setBusiness(categories.find((c) => c.id === id)?.business ?? "");
     // Only a live id is worth remembering. Before the list resolves the tiles are
     // DEFAULT_CATEGORIES placeholders, and persisting one of those would replace
     // the captain's real last-used category with a slug.
-    if (categoriesReady) saveLastCategory(id);
+    if (categoriesReady && mode === "expense") saveLastCategory(id);
   }
 
   function handleKey(key: string) {
@@ -112,7 +134,11 @@ export default function HomePage() {
     setSubmitError(null);
     try {
       const paidByName = USERS.find(u => u.id === paidBy)?.name ?? paidBy;
-      await addExpense({ amount: val, category_id: categoryId, date, paid_by: paidByName, created_by: paidByName, notes: note });
+      if (mode === "income") {
+        await addIncome({ amount: val, category_id: categoryId, date, received_by: paidByName, created_by: paidByName, notes: note });
+      } else {
+        await addExpense({ amount: val, category_id: categoryId, date, paid_by: paidByName, created_by: paidByName, notes: note, business });
+      }
       const updated = await getTodayExpenses();
       setExpenses(updated);
       setAmount("");
@@ -120,7 +146,7 @@ export default function HomePage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save expense";
+      const msg = err instanceof Error ? err.message : `Failed to save ${mode}`;
       setSubmitError(msg);
       alert(msg);
     } finally {
@@ -181,8 +207,23 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Category picker — scrollable */}
+      {/* Expense / Income, then the categories of that kind — scrollable */}
       <div className="flex-1 min-h-0 overflow-y-auto">
+        <div data-testid="entry-mode" className="grid grid-cols-2 gap-1 bg-base-200 rounded-xl p-1 mx-2 mt-2">
+          {(["expense", "income"] as CategoryKind[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={mode === k}
+              onClick={() => switchMode(k)}
+              className={`py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                mode === k ? "bg-primary text-primary-content" : "text-base-content/70"
+              }`}
+            >
+              {t(`home.mode_${k}`)}
+            </button>
+          ))}
+        </div>
         <CategoryPicker
           categories={categories}
           selectedId={categoryId}
@@ -211,6 +252,26 @@ export default function HomePage() {
                 {t("common.retry")}
               </button>
             )}
+          </div>
+        )}
+
+        {/* Who this expense is for: Life, or a business with its own earnings */}
+        {mode === "expense" && (
+          <div data-testid="for-row" className="flex items-center gap-1.5 mb-2 px-1 text-xs">
+            <span className="text-base-content/60 mr-0.5">{t("home.for")}</span>
+            {(["", ...BUSINESSES] as Business[]).map((b) => (
+              <button
+                key={b || "life"}
+                type="button"
+                aria-pressed={business === b}
+                onClick={() => setBusiness(b)}
+                className={`px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                  business === b ? "bg-primary border-primary text-primary-content" : "bg-base-100 border-base-300"
+                }`}
+              >
+                {b ? `${BUSINESS_ICONS[b]} ${t(`earnings.business_${b}`)}` : `❤️ ${t("home.for_life")}`}
+              </button>
+            ))}
           </div>
         )}
 
@@ -267,7 +328,7 @@ export default function HomePage() {
             className={`col-span-2 h-9 rounded-xl font-semibold text-sm active:opacity-80 disabled:opacity-50 transition-colors
               ${saved ? "bg-success text-success-content" : "bg-primary text-primary-content"}`}
           >
-            {saved ? `✓ ${t("home.save")}` : submitting ? "…" : t("home.save")}
+            {saved ? `✓ ${t("home.save")}` : submitting ? "…" : t(mode === "income" ? "home.save_income" : "home.save")}
           </button>
         </div>
       </div>

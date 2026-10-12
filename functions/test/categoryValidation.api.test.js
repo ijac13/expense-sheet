@@ -224,8 +224,12 @@ test("AC-13: no DEFAULT_CATEGORIES slug literal exists anywhere under functions/
   ];
   // Comments are stripped first: a slug NAMED in prose explains the rule, while a
   // slug the code can compare against is the second source of truth AC-13 bans.
+  // The BUSINESSES tag list ("rent", "uber") is skipped too: a business tag on
+  // an expense is not a category id, and nothing compares a category against it.
   const stripComments = (s) =>
-    s.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+    s.replace(/\/\*[\s\S]*?\*\//g, "").split("\n")
+      .filter((l) => !l.trim().startsWith("//") && !l.includes("export const BUSINESSES ="))
+      .join("\n");
 
   const scanned = [];
   for (const file of fs.readdirSync(dir)) {

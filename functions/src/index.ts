@@ -13,13 +13,17 @@ import {
   EXPENSES_SPEC,
   CATEGORIES_SPEC,
   SUBSCRIPTIONS_SPEC,
+  INCOME_SPEC,
+  isBusinessValue,
+  expenseBusiness,
+  BUSINESSES,
   buildColumnMap,
   buildWriteRow,
   cell,
   columnLetter,
   rowToSubscription,
 } from "./sheetSchema";
-import { TIME_ZONE, runSubscriptionScheduler, readSchedulerStatus } from "./scheduler";
+import { TIME_ZONE, runSubscriptionScheduler, readSchedulerStatus, ensureTab } from "./scheduler";
 import { authorize } from "./auth";
 
 const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
@@ -31,6 +35,7 @@ const EXPENSES_TAB = EXPENSES_SPEC.tab;
 const USERS_TAB = "Users";
 const SUBSCRIPTIONS_TAB = SUBSCRIPTIONS_SPEC.tab;
 const CATEGORIES_TAB = CATEGORIES_SPEC.tab;
+const INCOME_TAB = INCOME_SPEC.tab;
 
 // Read wide enough that a column dragged to the right is still in view. A range
 // that stops at the last known field reintroduces the bug where `gov_category`
@@ -104,7 +109,7 @@ function endsBeforeStart(start: string, end: string): boolean {
 
 // Creates a missing optional header on demand (`start_date` / `end_date` /
 // `notes` on Subscriptions, `fixed` on Categories), following
-// ensureSchedulerLog: the captain never has to touch the sheet by hand, and a
+// ensureTab: the captain never has to touch the sheet by hand, and a
 // production-sheet precondition is exactly the thing that blocks a deploy.
 //
 // New headers land past the widest OCCUPIED row, not past row 1's last header.
@@ -178,6 +183,20 @@ function rowToExpense(row: Row, map: ColumnMap): Record<string, unknown> {
     created_by: cell(row, map, "created_by") ?? "",
     notes: cell(row, map, "notes") ?? "",
     created_at: cell(row, map, "created_at") ?? "",
+    business: cell(row, map, "business") ?? "",
+  };
+}
+
+function rowToIncome(row: Row, map: ColumnMap): Record<string, unknown> {
+  return {
+    id: cell(row, map, "id") ?? "",
+    date: cell(row, map, "date") ?? "",
+    amount: Number(cell(row, map, "amount") ?? 0),
+    category_id: cell(row, map, "category_id") ?? "",
+    received_by: cell(row, map, "received_by") ?? "",
+    created_by: cell(row, map, "created_by") ?? "",
+    notes: cell(row, map, "notes") ?? "",
+    created_at: cell(row, map, "created_at") ?? "",
   };
 }
 
@@ -209,8 +228,30 @@ function rowToCategory(row: Row, map: ColumnMap): Record<string, unknown> {
     // null = never set (blank cell or no column yet): the app then applies the
     // default by name, so the three states must stay distinct.
     fixed: fixedCell(cell(row, map, "fixed")),
+    // Blank = expense, so every category that existed before income keeps working.
+    kind: cell(row, map, "kind") === "income" ? "income" : "expense",
+    business: cell(row, map, "business") ?? "",
   };
 }
+
+// Validates a submitted `business` value, returning the error or null.
+function businessError(value: unknown): string | null {
+  if (value === undefined) return null;
+  return isBusinessValue(value) ? null : `business "${String(value)}" must be blank or one of: ${BUSINESSES.join(", ")}.`;
+}
+
+// The Income tab, or null when it has not been created yet — a GET before the
+// first income write is an empty list, not an error.
+async function readIncomeTab(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string
+): Promise<{ rows: Row[]; map: ColumnMap } | null> {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" });
+  const exists = (meta.data.sheets ?? []).some((t) => t.properties?.title === INCOME_TAB);
+  if (!exists) return null;
+  return readTab(sheets, spreadsheetId, INCOME_SPEC);
+}
+
 
 function fixedCell(value: Cell): boolean | null {
   if (value === "true") return true;
@@ -383,11 +424,16 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         if (body.gov_category !== undefined) updates.gov_category = String(body.gov_category);
         if (body.note !== undefined) updates.note = String(body.note);
         if (body.fixed !== undefined) updates.fixed = String(body.fixed === true || body.fixed === "true");
+        const bizError = businessError(body.business);
+        if (bizError) { res.status(400).json({ error: bizError }); return; }
+        if (body.kind !== undefined) updates.kind = body.kind === "income" ? "income" : "expense";
+        if (body.business !== undefined) updates.business = String(body.business);
 
-        // `fixed` is created on demand, unlike gov_category/note: no live sheet
-        // has it, and the Settings switch must work without a manual sheet edit.
-        const writeMap = updates.fixed !== undefined
-          ? await ensureColumns(sheets, spreadsheetId, CATEGORIES_TAB, map, rows, ["fixed"])
+        // `fixed`, `kind` and `business` are created on demand, unlike
+        // gov_category/note: the Settings form must work without a manual sheet edit.
+        const onDemand = ["fixed", "kind", "business"].filter((f) => updates[f] !== undefined);
+        const writeMap = onDemand.length > 0
+          ? await ensureColumns(sheets, spreadsheetId, CATEGORIES_TAB, map, rows, onDemand)
           : map;
         const row = buildWriteRow([], writeMap, updates);
 
@@ -425,8 +471,13 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
           if (body[field] !== undefined) updates[field] = String(body[field]);
         }
         if (body.fixed !== undefined) updates.fixed = String(body.fixed === true || body.fixed === "true");
-        const writeMap = updates.fixed !== undefined
-          ? await ensureColumns(sheets, spreadsheetId, CATEGORIES_TAB, map, rows, ["fixed"])
+        const bizError = businessError(body.business);
+        if (bizError) { res.status(400).json({ error: bizError }); return; }
+        if (body.kind !== undefined) updates.kind = body.kind === "income" ? "income" : "expense";
+        if (body.business !== undefined) updates.business = String(body.business);
+        const onDemand = ["fixed", "kind", "business"].filter((f) => updates[f] !== undefined);
+        const writeMap = onDemand.length > 0
+          ? await ensureColumns(sheets, spreadsheetId, CATEGORIES_TAB, map, rows, onDemand)
           : map;
         const updated = buildWriteRow(rows[rowIndex], writeMap, updates);
 
@@ -565,6 +616,93 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
     }
 
     // -----------------------------------------------------------------------
+    // /api/income — GET / POST / PATCH / DELETE (money coming in)
+    // -----------------------------------------------------------------------
+    if (path.includes("income")) {
+      if (req.method === "GET") {
+        const tab = await readIncomeTab(sheets, spreadsheetId);
+        res.status(200).json(tab ? tab.rows.slice(1).map((r) => rowToIncome(r, tab.map)) : []);
+        return;
+      }
+
+      if (req.method === "POST") {
+        const body = req.body as Record<string, unknown>;
+        // Before ensureTab, so a rejected request leaves the sheet untouched.
+        const catError = await categoryIdError(sheets, spreadsheetId, body.category_id);
+        if (catError) { res.status(400).json({ error: catError }); return; }
+
+        const map = await ensureTab(sheets, spreadsheetId, INCOME_SPEC);
+        const receivedById = String(body.received_by ?? "");
+        const createdById = String(body.created_by ?? "");
+        const nameMap = await resolveUserDisplayNames(sheets, spreadsheetId, [receivedById, createdById]);
+
+        const row = buildWriteRow([], map, {
+          id: `inc-${Date.now()}`,
+          date: String(body.date ?? new Date().toISOString().split("T")[0]),
+          amount: String(body.amount ?? 0),
+          category_id: String(body.category_id ?? ""),
+          received_by: nameMap.get(receivedById) ?? receivedById,
+          created_by: nameMap.get(createdById) ?? createdById,
+          notes: String(body.notes ?? ""),
+          created_at: new Date().toISOString(),
+        });
+        await insertRowAtTop(sheets, spreadsheetId, INCOME_TAB, row);
+        res.status(201).json(rowToIncome(row, map));
+        return;
+      }
+
+      if (req.method === "PATCH" || req.method === "DELETE") {
+        const body = req.body as Record<string, unknown>;
+        const targetId = String(body.id ?? "");
+        if (!targetId) { res.status(400).json({ error: "id is required" }); return; }
+
+        if (req.method === "PATCH" && body.category_id !== undefined) {
+          const catError = await categoryIdError(sheets, spreadsheetId, body.category_id);
+          if (catError) { res.status(400).json({ error: catError }); return; }
+        }
+
+        const tab = await readIncomeTab(sheets, spreadsheetId);
+        const rowIndex = tab ? tab.rows.findIndex((r, i) => i > 0 && cell(r, tab.map, "id") === targetId) : -1;
+        if (!tab || rowIndex === -1) { res.status(404).json({ error: "Income not found" }); return; }
+
+        if (req.method === "DELETE") {
+          const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" });
+          const sheetId = meta.data.sheets?.find((t) => t.properties?.title === INCOME_TAB)?.properties?.sheetId ?? 0;
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: { requests: [{ deleteDimension: {
+              range: { sheetId, dimension: "ROWS", startIndex: rowIndex, endIndex: rowIndex + 1 },
+            }}] },
+          });
+          res.status(200).json({ deleted: true });
+          return;
+        }
+
+        // created_by and created_at are not patchable, as on expenses.
+        const updates: Record<string, string> = {};
+        for (const field of ["date", "amount", "category_id", "notes"]) {
+          if (body[field] !== undefined) updates[field] = String(body[field]);
+        }
+        if (body.received_by !== undefined) {
+          const nameMap = await resolveUserDisplayNames(sheets, spreadsheetId, [String(body.received_by)]);
+          updates.received_by = nameMap.get(String(body.received_by)) ?? String(body.received_by);
+        }
+        const updated = buildWriteRow(tab.rows[rowIndex], tab.map, updates);
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `${INCOME_TAB}!A${rowIndex + 1}:${columnLetter(updated.length - 1)}${rowIndex + 1}`,
+          valueInputOption: "RAW",
+          requestBody: { values: [updated] },
+        });
+        res.status(200).json(rowToIncome(updated, tab.map));
+        return;
+      }
+
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    // -----------------------------------------------------------------------
     // /api/insights — POST (generates AI spending analysis)
     // -----------------------------------------------------------------------
     if (path.includes("insights")) {
@@ -585,11 +723,12 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         : { type: "annual", year: period.year };
 
       // Fetch all expenses and subscriptions
-      let expTab, subTab;
+      let expTab, subTab, catTab;
       try {
-        [expTab, subTab] = await Promise.all([
+        [expTab, subTab, catTab] = await Promise.all([
           readTab(sheets, spreadsheetId, EXPENSES_SPEC),
           readTab(sheets, spreadsheetId, SUBSCRIPTIONS_SPEC),
+          readTab(sheets, spreadsheetId, CATEGORIES_SPEC),
         ]);
       } catch (fetchErr) {
         // A schema problem is a 500 naming the tab and field, not a generic
@@ -600,9 +739,15 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         return;
       }
 
-      const allExpenses = expTab.rows.slice(1).map((r) => rowToExpense(r, expTab.map));
+      // The analysis is of Life spending: Rent and Uber costs belong to their
+      // business, the same split Reports shows. Income subscriptions are not spending.
+      const categories = catTab.rows.slice(1).map((r) => rowToCategory(r, catTab.map));
+      const categoryBusiness = new Map(categories.map((c) => [String(c.id), String(c.business)]));
+      const incomeIds = new Set(categories.filter((c) => c.kind === "income").map((c) => String(c.id)));
+      const allExpenses = expTab.rows.slice(1).map((r) => rowToExpense(r, expTab.map))
+        .filter((e) => !expenseBusiness(e, categoryBusiness));
       const subscriptions = subTab.rows.slice(1).map((r) => rowToSubscription(r, subTab.map))
-        .filter((s) => s.is_active);
+        .filter((s) => s.is_active && !incomeIds.has(s.category_id) && !categoryBusiness.get(s.category_id));
 
       const built = buildInsightsPrompt({
         expenses: allExpenses,
@@ -725,8 +870,11 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
 
       // created_by and created_at are not patchable; omitting them from
       // `updates` carries their existing cells forward untouched.
+      const bizError = businessError(body.business);
+      if (bizError) { res.status(400).json({ error: bizError }); return; }
+
       const updates: Record<string, string> = {};
-      for (const field of ["date", "amount", "category_id", "notes"]) {
+      for (const field of ["date", "amount", "category_id", "notes", "business"]) {
         if (body[field] !== undefined) updates[field] = String(body[field]);
       }
       if (body.paid_by !== undefined) {
@@ -734,7 +882,13 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         updates.paid_by = nameMap.get(String(body.paid_by)) ?? String(body.paid_by);
       }
 
-      const updated = buildWriteRow(rows[rowIndex], map, updates);
+      // The first tag ever written creates the column; a blank tag on a sheet
+      // without one has nothing to say, so it is dropped rather than creating it.
+      if (updates.business === "" && map.index.business === undefined) delete updates.business;
+      const writeMap = updates.business !== undefined
+        ? await ensureColumns(sheets, spreadsheetId, EXPENSES_TAB, map, rows, ["business"])
+        : map;
+      const updated = buildWriteRow(rows[rowIndex], writeMap, updates);
 
       await sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -743,7 +897,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         requestBody: { values: [updated] },
       });
 
-      res.status(200).json(rowToExpense(updated, map));
+      res.status(200).json(rowToExpense(updated, writeMap));
       return;
     }
 
@@ -815,10 +969,20 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
       const catError = await categoryIdError(sheets, spreadsheetId, body.category_id);
       if (catError) { res.status(400).json({ error: catError }); return; }
 
+      const bizError = businessError(body.business);
+      if (bizError) { res.status(400).json({ error: bizError }); return; }
+      const business = String(body.business ?? "");
+
       const id = `exp-${Date.now()}`;
       const created_at = new Date().toISOString();
 
-      const map = await readColumnMap(sheets, spreadsheetId, EXPENSES_SPEC);
+      let map = await readColumnMap(sheets, spreadsheetId, EXPENSES_SPEC);
+      // Only the first tagged expense pays for the full-tab read ensureColumns
+      // needs; every later one finds the column already in row 1.
+      if (business && map.index.business === undefined) {
+        const { rows } = await readTab(sheets, spreadsheetId, EXPENSES_SPEC);
+        map = await ensureColumns(sheets, spreadsheetId, EXPENSES_TAB, map, rows, ["business"]);
+      }
 
       // Resolve user IDs to display names for the sheet
       const paidById = String(body.paid_by ?? "");
@@ -834,6 +998,7 @@ export const api = onRequest({ secrets: [anthropicKey] }, async (req, res) => {
         created_by: nameMap.get(createdById) ?? createdById,
         notes: String(body.notes ?? ""),
         created_at,
+        ...(business && { business }),
       });
 
       await insertRowAtTop(sheets, spreadsheetId, EXPENSES_TAB, row);

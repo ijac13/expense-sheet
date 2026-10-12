@@ -83,6 +83,40 @@ export interface Category {
   // The captain's "Fixed cost" switch. null/absent = never set: isFixedCategory
   // then falls back to the default by name.
   fixed?: boolean | null;
+  // Absent on every category that predates income: absent means expense.
+  kind?: CategoryKind;
+  // The business an expense in this category fills in; "" = Life.
+  business?: Business;
+}
+
+export type CategoryKind = "expense" | "income";
+
+// A small business with its own earnings. "" is Life: household spending.
+export type Business = "" | "rent" | "uber";
+export const BUSINESSES: Exclude<Business, "">[] = ["rent", "uber"];
+export const BUSINESS_ICONS: Record<Exclude<Business, "">, string> = { rent: "🏠", uber: "🚗" };
+
+export function isIncomeCategory(category: Pick<Category, "kind"> | undefined): boolean {
+  return category?.kind === "income";
+}
+
+/** Only the categories of one kind — what an expense or an income picker offers. */
+export function categoriesOfKind<T extends Pick<Category, "kind">>(categories: T[], kind: CategoryKind): T[] {
+  return categories.filter((c) => (c.kind === "income") === (kind === "income"));
+}
+
+/**
+ * The business an expense belongs to: its own tag when set, else its
+ * category's default. Mirrors expenseBusiness in functions/src/sheetSchema.ts,
+ * so Reports and the AI insights leave out the same rows.
+ */
+export function businessOf(
+  expense: { business?: string; category_id: string },
+  categories: Category[]
+): Business {
+  const own = (expense.business ?? "") as Business;
+  if (own) return own;
+  return resolveCategory(expense.category_id, categories)?.business ?? "";
 }
 
 export const NOTE_MAX_LENGTH = 120;
