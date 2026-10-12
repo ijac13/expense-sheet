@@ -453,3 +453,18 @@ test("under the donut, every slice lists the legend's % and a short amount, busi
   assert.equal(list.previousElementSibling.getAttribute("data-testid"), "group-donut", "the list follows the donut");
   assert.equal(list.previousElementSibling.querySelector("svg").getAttribute("width"), "240", "the donut keeps its full size");
 });
+
+test("Reports shows the donut and its slice list in one card, and the group details in a separate card below", async () => {
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  installGlobals({ categories: CATEGORIES, expenses: [row("s1", "cat_001", 17500, today)], incomes: [] });
+  const container = await mount(loadPage("reports/page.js"));
+  await React.act(async () => {});
+  await React.act(async () => {});
+  const chart = container.querySelector('[data-testid="cost-group-chart"]');
+  const details = container.querySelector('[data-testid="cost-group-details"]');
+  assert.ok(chart.querySelector('[data-testid="group-donut"]') && chart.querySelector('[data-testid="slice-list"]'));
+  assert.ok(details.querySelector('[data-testid="group-total-living"]'), "the per-group details live in the second card");
+  assert.ok(!chart.querySelector('[data-testid="group-total-living"]'));
+  assert.equal(chart.nextElementSibling, details, "details follow the chart card");
+});
