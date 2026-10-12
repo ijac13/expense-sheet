@@ -38,13 +38,14 @@ async function openAnnual(container) {
   await React.act(async () => {});
 }
 
-test("AC-1/AC-2: Annual shows year picker, total, monthly trend, cost groups, by payer, insights — in that order", async () => {
+test("AC-1/AC-2: Annual shows year picker, total, earnings row, monthly trend, cost groups, by payer, insights — in that order", async () => {
   installGlobals({ expenses: EXPENSES });
   const page = await mount(loadPage("reports/page.js"));
   await openAnnual(page);
 
   assert.deepEqual(sectionLabels(page), [
     "reports.annual_total",
+    "earnings.left_over", // the Income & earnings row, right under the total
     "reports.monthly_trend",
     "reports.cost_groups",
     "reports.by_payer",
@@ -57,12 +58,13 @@ test("AC-1/AC-2: Annual shows year picker, total, monthly trend, cost groups, by
   assert.ok(precedes(year, total), "year picker comes before the year total");
 });
 
-test("AC-3a: Monthly shows total, cost groups, by payer, comparison, insights — and no monthly trend", async () => {
+test("AC-3a: Monthly shows total, earnings row, cost groups, by payer, comparison, insights — and no monthly trend", async () => {
   installGlobals({ expenses: EXPENSES });
   const page = await mount(loadPage("reports/page.js"));
 
   assert.deepEqual(sectionLabels(page), [
     "reports.total_spending",
+    "earnings.left_over", // the Income & earnings row, right under the total
     "reports.cost_groups",
     "reports.by_payer",
     "reports.comparison",
