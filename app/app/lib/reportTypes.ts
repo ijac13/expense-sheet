@@ -31,7 +31,7 @@ export interface MonthlySummary {
   year: number;
   month: number;
   label: string; // e.g. "April 2026"
-  total: number;
+  total: number; // Life only; groups.rent and groups.uber hold the rest
   categories: CategoryBreakdown[];
   groups: AnnualCostGroups;
   payers: PayerBreakdown[];
@@ -47,8 +47,11 @@ export interface MonthlyTrend {
 }
 
 // The captain's planning-sheet split of a year: Fixed (categories switched on as
-// fixed), Big extras (other expenses noted #大筆), Living costs (the rest).
-export type CostGroup = "fixed" | "big_extra" | "living";
+// fixed), Big extras (other expenses noted #大筆), Living costs (the rest) —
+// together, Life. Rent and Uber each hold their business's costs, which stay out
+// of every total unless "Include business costs" is chosen.
+export type CostGroup = "fixed" | "big_extra" | "living" | "rent" | "uber";
+export type BusinessGroup = Extract<CostGroup, "rent" | "uber">;
 
 export interface CostGroupTotal {
   total: number;
@@ -59,6 +62,9 @@ export interface AnnualCostGroups {
   fixed: CostGroupTotal & { categories: CategoryBreakdown[] };
   big_extra: CostGroupTotal & { expenses: ReportExpense[] };
   living: CostGroupTotal & { categories: CategoryBreakdown[] };
+  // Percentages here are of Life + Rent + Uber, the total they are shown against.
+  rent: CostGroupTotal & { categories: CategoryBreakdown[] };
+  uber: CostGroupTotal & { categories: CategoryBreakdown[] };
 }
 
 // The year before, cut to the same stretch of days: Jan 1 to today's date while
@@ -102,3 +108,37 @@ export interface ReportExpense {
 export type PayerFilter = "all" | UserId;
 export type ChartType = "pie" | "bar";
 export type ReportPeriod = "monthly" | "annual";
+
+// ---------------------------------------------------------------------------
+// Income & earnings
+// ---------------------------------------------------------------------------
+
+export interface IncomeLine {
+  category_id: string;
+  category_name: string;
+  category_name_zh: string;
+  icon: string;
+  total: number;
+}
+
+export interface BusinessCard {
+  type: "business";
+  business: "rent" | "uber";
+  income: IncomeLine[];      // one line per income category of this business
+  income_total: number;
+  costs: CategoryBreakdown[];
+  costs_total: number;
+  earnings: number;          // income_total − costs_total; negative is a loss
+  trend: { label: string; earnings: number }[]; // last 6 months, or the year's 12
+}
+
+export interface IncomeCard extends IncomeLine {
+  type: "income";
+}
+
+export interface EarningsSummary {
+  money_in: number;   // plain income + every business's earnings
+  spending: number;   // Life spending, the same total Reports shows
+  left_over: number;
+  cards: (IncomeCard | BusinessCard)[]; // in the income categories' sort order
+}

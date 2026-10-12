@@ -40,7 +40,7 @@ export async function addCategory(
 
 export async function updateCategory(
   id: string,
-  data: Partial<Pick<Category, "name_en" | "name_zh" | "icon" | "sort_order" | "is_active" | "gov_category" | "note" | "fixed">>
+  data: Partial<Pick<Category, "name_en" | "name_zh" | "icon" | "sort_order" | "is_active" | "gov_category" | "note" | "fixed" | "kind" | "business">>
 ): Promise<Category> {
   const res = await apiFetch(`${API_BASE}/${id}`, {
     method: "PATCH",

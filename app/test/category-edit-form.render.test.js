@@ -83,7 +83,7 @@ async function click(el) {
  */
 function formFields(container) {
   const [icon, nameEn, nameZh] = container.querySelectorAll("input");
-  return { icon, nameEn, nameZh, gov: container.querySelector("select") };
+  return { icon, nameEn, nameZh, gov: container.querySelector('[data-testid="category-gov"]') };
 }
 
 /** React tracks the previous value on the node, so a bare `.value =` is ignored. */

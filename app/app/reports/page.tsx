@@ -22,7 +22,9 @@ import {
   MonthComparison,
   MonthlyTrend,
 } from "../lib/reportTypes";
-import { getMonthlySummary, getAnnualSummary } from "../lib/reportService";
+import { getMonthlySummary, getAnnualSummary, getEarningsSummary } from "../lib/reportService";
+import Link from "next/link";
+import { EarningsSummary } from "../lib/reportTypes";
 import DrillDown from "./DrillDown";
 import MonthPickerModal from "../components/MonthPickerModal";
 import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
@@ -32,12 +34,20 @@ import { useTranslation } from "react-i18next";
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const COST_GROUPS: CostGroup[] = ["fixed", "big_extra", "living"];
+const LIFE_GROUPS: CostGroup[] = ["fixed", "big_extra", "living"];
 const COST_GROUP_COLORS: Record<CostGroup, string> = {
   fixed: "#1e6d4a",
   big_extra: "#f9c440",
   living: "#d97757",
+  rent: "#6b7fa8",
+  uber: "#3d4a5c",
 };
+const BUSINESS_GROUPS: CostGroup[] = ["rent", "uber"];
+
+/** The total a card shows: Life, plus Business costs when they are included. */
+function shownTotal(lifeTotal: number, groups: AnnualCostGroups, includeBusiness: boolean): number {
+  return lifeTotal + (includeBusiness ? groups.rent.total + groups.uber.total : 0);
+}
 
 const THIS_YEAR_COLOR = "#1e6d4a";
 const LAST_YEAR_COLOR = "#c2c7c0";
@@ -160,12 +170,14 @@ function CostGroupsCard({
   groups,
   comparisons,
   periodTotal,
+  includeBusiness,
   lang,
   onDrillDown,
 }: {
   groups: AnnualCostGroups;
   comparisons: CardComparison[];
-  periodTotal: number;
+  periodTotal: number; // already includes Business when includeBusiness is on
+  includeBusiness: boolean;
   lang: string;
   onDrillDown: (cat: CategoryBreakdown, group: CostGroup) => void;
 }) {
@@ -175,10 +187,12 @@ function CostGroupsCard({
   const comparison = comparisons.find((c) => c.key === selected) ?? null;
   const comparing = comparison !== null;
   const name = (zh: string, en: string) => (lang === "zh" && zh ? zh : en);
+  const COST_GROUPS = includeBusiness ? [...LIFE_GROUPS, ...BUSINESS_GROUPS] : LIFE_GROUPS;
+  const groupShare = (g: CostGroup) => (periodTotal > 0 ? Math.round((groups[g].total / periodTotal) * 100) : 0);
   // An empty group has no segment; colors stay paired with their group.
   const segments = COST_GROUPS.filter((g) => groups[g].total > 0).map((g) => ({ category_id: g, total: groups[g].total }));
 
-  function categoryRows(group: "fixed" | "living") {
+  function categoryRows(group: Exclude<CostGroup, "big_extra">) {
     const current = groups[group].categories;
     const previous = comparison?.groups[group].categories ?? [];
     const prevTotal = new Map(previous.map((c) => [c.category_id, c.total]));
@@ -265,7 +279,7 @@ function CostGroupsCard({
               {t(`reports.group_${group}`)}
             </span>
             <span className="flex items-baseline gap-2">
-              <span className="text-xs text-base-content/50">{groups[group].percentage}%</span>
+              <span className="text-xs text-base-content/50">{groupShare(group)}%</span>
               <span data-testid={`group-total-${group}`} className="font-mono font-semibold text-sm">
                 NT${groups[group].total.toLocaleString()}
               </span>
@@ -300,6 +314,59 @@ function CostGroupsCard({
         </div>
       ))}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// What the spending total counts: Life only (the default), or Life plus the
+// Rent and Uber costs that belong to a business.
+// ---------------------------------------------------------------------------
+function ScopeToggle({ includeBusiness, onChange }: { includeBusiness: boolean; onChange: (v: boolean) => void }) {
+  const { t } = useTranslation();
+  return (
+    <div data-testid="scope-toggle" className="grid grid-cols-2 gap-1 bg-base-100 border border-base-300 rounded-xl p-1 mt-3">
+      {[false, true].map((on) => (
+        <button
+          key={String(on)}
+          type="button"
+          aria-pressed={includeBusiness === on}
+          onClick={() => onChange(on)}
+          className={`py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+            includeBusiness === on ? "bg-primary text-primary-content" : "text-base-content/70"
+          }`}
+        >
+          {on ? t("reports.include_business") : t("reports.life_only")}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// The second-level Income & earnings page, summarised in one tappable row.
+function EarningsLink({ summary, year, month }: { summary: EarningsSummary | null; year: number; month: number | null }) {
+  const { t } = useTranslation();
+  const href = `/reports/earnings?y=${year}${month === null ? "" : `&m=${month}`}`;
+  const businesses = (summary?.cards ?? []).filter((c) => c.type === "business");
+  return (
+    <Link href={href} data-testid="earnings-link" className="flex items-center justify-between gap-3 bg-base-200 rounded-2xl p-4">
+      <span className="min-w-0">
+        <span className="block font-semibold">{t("earnings.title")}</span>
+        {summary && (
+          <span className="block text-xs text-base-content/60 mt-1">
+            {t("earnings.money_in")} NT${summary.money_in.toLocaleString()}
+            {businesses.map((b) => b.type === "business" && (
+              <span key={b.business}>
+                {" · "}{t(`earnings.business_${b.business}`)}{" "}
+                <span className={b.earnings < 0 ? "text-error" : "text-success"}>
+                  {b.earnings < 0 ? "−" : "+"}NT${Math.abs(b.earnings).toLocaleString()}
+                </span>
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
+      <ChevronRight size={20} className="text-primary shrink-0" />
+    </Link>
   );
 }
 
@@ -690,6 +757,10 @@ export default function ReportsPage() {
   // Annual navigation
   const [annualYear, setAnnualYear] = useState(now.getFullYear());
 
+  // Life only by default; Rent and Uber costs added back on request.
+  const [includeBusiness, setIncludeBusiness] = useState(false);
+  const [earnings, setEarnings] = useState<EarningsSummary | null>(null);
+
   // Data
   const [monthly, setMonthly] = useState<MonthlySummary | null>(null);
   const [annual, setAnnual] = useState<AnnualSummary | null>(null);
@@ -746,6 +817,14 @@ export default function ReportsPage() {
       .catch(() => setLoading(false));
   }, [period, annualYear, payer, dataVersion]);
 
+  // The Income & earnings row's summary, for whichever period is on screen.
+  useEffect(() => {
+    setEarnings(null);
+    getEarningsSummary(period === "monthly" ? year : annualYear, period === "monthly" ? month : null)
+      .then(setEarnings)
+      .catch(() => setEarnings(null));
+  }, [period, year, month, annualYear, dataVersion]);
+
   const prevMonth = useCallback(() => {
     if (month === 1) { setYear((y) => y - 1); setMonth(12); }
     else setMonth((m) => m - 1);
@@ -755,6 +834,9 @@ export default function ReportsPage() {
     if (month === 12) { setYear((y) => y + 1); setMonth(1); }
     else setMonth((m) => m + 1);
   }, [month]);
+
+  const monthlyShown = monthly ? shownTotal(monthly.total, monthly.groups, includeBusiness) : 0;
+  const annualShown = annual ? shownTotal(annual.total, annual.groups, includeBusiness) : 0;
 
   // Drill-down view
   if (drillDownCategory) {
@@ -866,7 +948,7 @@ export default function ReportsPage() {
               />
             )}
 
-            {monthly && monthly.total === 0 ? (
+            {monthly && monthly.total === 0 && shownTotal(0, monthly.groups, true) === 0 ? (
               <div className="text-center py-16 text-base-content/40">
                 <div className="font-medium">{t("reports.no_data_period")}</div>
                 <div className="text-sm mt-1">{t("reports.try_different_month")}</div>
@@ -877,19 +959,20 @@ export default function ReportsPage() {
                 <div className="bg-base-200 rounded-2xl p-5">
                   <div className="text-xs text-base-content/50 uppercase tracking-wide mb-1">{t("reports.total_spending")}</div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-[40px] font-medium leading-none">
-                      NT${Math.floor(monthly.total).toLocaleString()}
+                    <span data-testid="monthly-total" className="text-[40px] font-medium leading-none">
+                      NT${Math.floor(monthlyShown).toLocaleString()}
                     </span>
                     <span className="text-2xl text-base-content/50">
-                      .{String(Math.round((monthly.total % 1) * 100)).padStart(2, "0")}
+                      .{String(Math.round((monthlyShown % 1) * 100)).padStart(2, "0")}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-1.5">
-                    <DeltaBadge current={monthly.total} previous={monthly.comparison.prev_month.total} />
+                    <DeltaBadge current={monthlyShown} previous={shownTotal(monthly.comparison.prev_month.total, monthly.comparison.prev_month.groups, includeBusiness)} />
                     <span className="text-xs text-base-content/50">
-                      vs {monthRangeLabel(monthly.comparison.prev_month, year, t)} · NT${Math.round(monthly.total / 30).toLocaleString()}{t("reports.day_avg")}
+                      vs {monthRangeLabel(monthly.comparison.prev_month, year, t)} · NT${Math.round(monthlyShown / 30).toLocaleString()}{t("reports.day_avg")}
                     </span>
                   </div>
+                  <ScopeToggle includeBusiness={includeBusiness} onChange={setIncludeBusiness} />
                 </div>
 
                 {/* Cost groups + compare to last month / same month last year */}
@@ -898,15 +981,18 @@ export default function ReportsPage() {
                   comparisons={(["prev_month", "last_year"] as const).map((key) => {
                     const c = monthly.comparison[key];
                     const range = monthRangeLabel(c, year, t);
-                    return { key, button: t("reports.compare_vs", { range }), label: range, total: c.total, groups: c.groups };
+                    return { key, button: t("reports.compare_vs", { range }), label: range, total: shownTotal(c.total, c.groups, includeBusiness), groups: c.groups };
                   })}
-                  periodTotal={monthly.total}
+                  periodTotal={monthlyShown}
+                  includeBusiness={includeBusiness}
                   lang={lang}
                   onDrillDown={(cat, group) => {
                     setDrillDownGroup(group);
                     setDrillDownCategory(cat);
                   }}
                 />
+
+                <EarningsLink summary={earnings} year={year} month={month} />
 
                 {/* By payer */}
                 <div className="bg-base-200 rounded-2xl p-4">
@@ -938,8 +1024,8 @@ export default function ReportsPage() {
                       <div key={`${c.year}-${c.month}`} data-testid="month-compare-line" className="flex justify-between items-center">
                         <span className="text-sm text-base-content/70">vs {monthRangeLabel(c, year, t)}</span>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm">NT${c.total.toLocaleString()}</span>
-                          <DeltaBadge current={monthly.total} previous={c.total} />
+                          <span className="font-mono text-sm">NT${shownTotal(c.total, c.groups, includeBusiness).toLocaleString()}</span>
+                          <DeltaBadge current={monthlyShown} previous={shownTotal(c.total, c.groups, includeBusiness)} />
                         </div>
                       </div>
                     ))}
@@ -976,32 +1062,34 @@ export default function ReportsPage() {
                   <div className="text-xs text-base-content/50 uppercase tracking-wide mb-1">{t("reports.annual_total")}</div>
                   <div className="flex items-baseline gap-1">
                     <span className="text-[40px] font-medium leading-none">
-                      NT${Math.floor(annual.total).toLocaleString()}
+                      NT${Math.floor(annualShown).toLocaleString()}
                     </span>
                     <span className="text-2xl text-base-content/50">
-                      .{String(Math.round((annual.total % 1) * 100)).padStart(2, "0")}
+                      .{String(Math.round((annualShown % 1) * 100)).padStart(2, "0")}
                     </span>
                   </div>
                   <div className="text-xs text-base-content/50 mt-1.5">
-                    {annual.expense_count} {t("reports.transactions")} · NT${Math.round(annual.total / 12).toLocaleString()}{t("reports.month_avg")}
+                    {annual.expense_count} {t("reports.transactions")} · NT${Math.round(annualShown / 12).toLocaleString()}{t("reports.month_avg")}
                   </div>
+                  <ScopeToggle includeBusiness={includeBusiness} onChange={setIncludeBusiness} />
                 </div>
 
                 {/* Monthly trend chart — this year vs last year */}
                 {mounted && <TrendCard data={annual.monthly_trend} year={annualYear} />}
 
                 {/* Cost groups — Fixed / Big extras / Living costs (071) */}
-                {annual.expense_count > 0 && (
+                {(annual.expense_count > 0 || shownTotal(0, annual.groups, true) > 0) && (
                   <CostGroupsCard
                     groups={annual.groups}
                     comparisons={[{
                       key: "last_year",
                       button: compareLabel(annual.comparison, t),
                       label: String(annual.comparison.year),
-                      total: annual.comparison.total,
+                      total: shownTotal(annual.comparison.total, annual.comparison.groups, includeBusiness),
                       groups: annual.comparison.groups,
                     }]}
-                    periodTotal={annual.total}
+                    periodTotal={annualShown}
+                    includeBusiness={includeBusiness}
                     lang={lang}
                     onDrillDown={(cat, group) => {
                       setDrillDownGroup(group);
@@ -1009,6 +1097,8 @@ export default function ReportsPage() {
                     }}
                   />
                 )}
+
+                <EarningsLink summary={earnings} year={annualYear} month={null} />
 
                 {/* By payer */}
                 <div className="bg-base-200 rounded-2xl p-4">

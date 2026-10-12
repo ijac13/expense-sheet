@@ -103,7 +103,7 @@ const SCHEDULER_OK = {
  *   deferExpenses holds GET /api open until releaseExpenses() is called — same
  *   purpose as deferCategories, for the shared expense cache's own fetch.
  */
-function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK, subscriptions: subFixture = SUBSCRIPTIONS, failSubscriptionWrites = false, expenses: expFixture = EXPENSES, deferCategories = false, deferExpenses = false } = {}) {
+function installGlobals({ offline = false, failWrites = false, categories: fixture = CATEGORIES, schedulerStatus = SCHEDULER_OK, subscriptions: subFixture = SUBSCRIPTIONS, failSubscriptionWrites = false, expenses: expFixture = EXPENSES, incomes: incFixture = [], deferCategories = false, deferExpenses = false } = {}) {
   const dom = installDom();
 
   // Mutable so a test can fail the categories fetch, then let a retry succeed
@@ -151,6 +151,10 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
   // to the same href, which would over-count a GET-request-dedup assertion
   // (AC-5/AC-9) if used directly.
   const getRequests = [];
+  // GET /api/income serves this; addIncome/updateIncome/deleteIncome are recorded
+  // in incWrites and applied, the same way expenses are.
+  const incomes = incFixture.map((i) => ({ ...i }));
+  const incWrites = [];
 
   global.fetch = async (url, init = {}) => {
     const href = String(url);
@@ -207,6 +211,24 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
       Object.assign(target, body);
       return { ok: true, status: 200, json: async () => ({ ...target }) };
     }
+    if (href === "/api/income") {
+      if (method === "GET") return { ok: true, status: 200, json: async () => incomes.map((i) => ({ ...i })) };
+      const body = JSON.parse(init.body);
+      incWrites.push({ method, body });
+      if (method === "POST") {
+        const created = { id: `inc-${incWrites.length}`, created_at: "2026-10-12T00:00:00.000Z", ...body };
+        incomes.push(created);
+        return { ok: true, status: 201, json: async () => ({ ...created }) };
+      }
+      if (method === "PATCH") {
+        const target = incomes.find((i) => i.id === body.id);
+        if (target) Object.assign(target, body);
+        return { ok: true, status: 200, json: async () => ({ ...target }) };
+      }
+      const idx = incomes.findIndex((i) => i.id === body.id);
+      if (idx !== -1) incomes.splice(idx, 1);
+      return { ok: true, status: 200, json: async () => ({}) };
+    }
     // getTodayExpenses/getAllExpenses/reportService's fetchAllExpenses all read
     // this same bare "/api" GET, through the shared session cache — gated the
     // same way GET /api/categories is, so a test can observe the pre-resolution
@@ -251,10 +273,11 @@ function installGlobals({ offline = false, failWrites = false, categories: fixtu
   // process, and it would otherwise permanently capture the real (unmocked)
   // apiClient module from its first load.
   require("../../.test-build-ui/lib/expensesCache.js").invalidateExpensesCache();
+  require("../../.test-build-ui/lib/incomes.js").invalidateIncomesCache();
   // Same for Reports' session category list (071), which would otherwise carry
   // one test's fixed switches into the next.
   require("../../.test-build-ui/lib/categoryService.js").invalidateSessionCategories();
-  return { dom, requests, getRequests, writes, categories, setCategoryIcon, scrolls, subscriptions, subWrites, expenses, expWrites, setOffline, releaseCategories, releaseExpenses };
+  return { dom, requests, getRequests, writes, categories, setCategoryIcon, scrolls, subscriptions, subWrites, expenses, expWrites, incomes, incWrites, setOffline, releaseCategories, releaseExpenses };
 }
 
 /**

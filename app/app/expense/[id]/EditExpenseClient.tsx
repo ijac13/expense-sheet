@@ -6,7 +6,7 @@ import { Expense } from "../../lib/expenses";
 import { applyKey, evaluateExpression, KeypadKey } from "../../lib/calculator";
 import CalculatorKeypad from "../../components/CalculatorKeypad";
 import CategoryPicker from "../../components/CategoryPicker";
-import { Category, DEFAULT_CATEGORIES } from "../../lib/categories";
+import { Category, DEFAULT_CATEGORIES, categoriesOfKind } from "../../lib/categories";
 import { getCategories } from "../../lib/categoryService";
 import { USERS } from "../../lib/users";
 import { updateExpense, deleteExpense } from "../../lib/expenseService";
@@ -26,7 +26,7 @@ export default function EditExpenseClient({ expense }: EditExpenseClientProps) {
   useEffect(() => {
     getCategories()
       .then((cats) => {
-        const active = cats.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
+        const active = categoriesOfKind(cats, "expense").filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
         if (active.length > 0) setCategories(active);
       })
       .catch(() => {

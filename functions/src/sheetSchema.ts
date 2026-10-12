@@ -19,8 +19,40 @@ export interface TabSpec {
 export const EXPENSES_SPEC: TabSpec = {
   tab: "Expenses",
   required: ["id", "date", "amount", "category_id", "paid_by", "created_by", "notes", "created_at"],
+  // `business` (blank / rent / uber) is created on demand by the first expense
+  // tagged to a business. Blank means "use the category's default".
+  optional: ["business"],
+};
+
+// Money coming in. Created on demand by the first income write, so neither
+// sheet needs a manual tab before this deploys.
+export const INCOME_SPEC: TabSpec = {
+  tab: "Income",
+  required: ["id", "date", "amount", "category_id", "received_by", "created_by", "notes", "created_at"],
   optional: [],
 };
+
+// The businesses an expense or income can belong to. Blank is Life.
+export const BUSINESSES = ["rent", "uber"] as const;
+
+export function isBusinessValue(value: unknown): boolean {
+  return value === "" || (BUSINESSES as readonly unknown[]).includes(value);
+}
+
+/**
+ * Whether an expense belongs to a business rather than to Life: its own tag
+ * when set, else its category's default. Mirrors businessOf in the app's
+ * categories.ts, so the AI insights and the reports leave out the same rows.
+ */
+export function expenseBusiness(
+  expense: { business?: unknown; category_id?: unknown },
+  categoryBusiness: Map<string, string>
+): string {
+  const own = String(expense.business ?? "");
+  if (own) return own;
+  return categoryBusiness.get(String(expense.category_id ?? "")) ?? "";
+}
+
 
 export const CATEGORIES_SPEC: TabSpec = {
   tab: "Categories",
@@ -29,7 +61,9 @@ export const CATEGORIES_SPEC: TabSpec = {
   // every categories request on both sheets. `fixed` exists on neither sheet
   // until the first save of a category's Fixed switch creates it.
   required: ["id", "name_en", "name_zh", "icon", "sort_order", "is_active"],
-  optional: ["gov_category", "note", "fixed"],
+  // `kind` (expense / income; blank = expense) and `business` (the tag an
+  // expense in this category fills in) are created on demand like `fixed`.
+  optional: ["gov_category", "note", "fixed", "kind", "business"],
 };
 
 export const SUBSCRIPTIONS_SPEC: TabSpec = {

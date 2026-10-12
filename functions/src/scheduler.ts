@@ -15,6 +15,8 @@ import {
   TabSpec,
   EXPENSES_SPEC,
   SUBSCRIPTIONS_SPEC,
+  CATEGORIES_SPEC,
+  INCOME_SPEC,
   buildColumnMap,
   buildWriteRow,
   columnLetter,
@@ -88,6 +90,10 @@ export function autoExpenseId(subscriptionId: string, isoDate: string): string {
   return `exp-auto-${subscriptionId}-${isoDate}`;
 }
 
+export function autoIncomeId(subscriptionId: string, isoDate: string): string {
+  return `inc-auto-${subscriptionId}-${isoDate}`;
+}
+
 export interface SchedulerRunResult {
   run_at: string;
   due_count: number;
@@ -128,32 +134,32 @@ async function tabTitles(sheets: Sheets, spreadsheetId: string): Promise<Set<str
 
 // The tab and its header are created on demand, so the captain never has to
 // touch the sheet by hand — a manual Google-side setup step is the exact failure
-// this feature exists to remove.
-async function ensureSchedulerLog(sheets: Sheets, spreadsheetId: string): Promise<ColumnMap> {
+// this feature exists to remove. Used for SchedulerLog and Income.
+export async function ensureTab(sheets: Sheets, spreadsheetId: string, spec: TabSpec): Promise<ColumnMap> {
   const titles = await tabTitles(sheets, spreadsheetId);
-  if (!titles.has(SCHEDULER_LOG_SPEC.tab)) {
+  if (!titles.has(spec.tab)) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
-      requestBody: { requests: [{ addSheet: { properties: { title: SCHEDULER_LOG_SPEC.tab } } }] },
+      requestBody: { requests: [{ addSheet: { properties: { title: spec.tab } } }] },
     });
   }
 
   const header = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${SCHEDULER_LOG_SPEC.tab}!${HEADER_RANGE}`,
+    range: `${spec.tab}!${HEADER_RANGE}`,
   });
   const rows = (header.data.values ?? []) as Row[];
   const blank = !rows[0] || rows[0].every((c) => String(c ?? "").trim() === "");
-  if (!blank) return buildColumnMap(rows, SCHEDULER_LOG_SPEC);
+  if (!blank) return buildColumnMap(rows, spec);
 
-  const fields = SCHEDULER_LOG_SPEC.required;
+  const fields = spec.required;
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${SCHEDULER_LOG_SPEC.tab}!A1:${columnLetter(fields.length - 1)}1`,
+    range: `${spec.tab}!A1:${columnLetter(fields.length - 1)}1`,
     valueInputOption: "RAW",
     requestBody: { values: [fields] },
   });
-  return buildColumnMap([fields], SCHEDULER_LOG_SPEC);
+  return buildColumnMap([fields], spec);
 }
 
 async function appendSchedulerLog(
@@ -161,7 +167,7 @@ async function appendSchedulerLog(
   spreadsheetId: string,
   entry: SchedulerRunResult & { error: string }
 ): Promise<void> {
-  const map = await ensureSchedulerLog(sheets, spreadsheetId);
+  const map = await ensureTab(sheets, spreadsheetId, SCHEDULER_LOG_SPEC);
   const row = buildWriteRow([], map, {
     run_at: entry.run_at,
     due_count: String(entry.due_count),
@@ -210,6 +216,52 @@ async function insertRowsAtTop(
   });
 }
 
+// Writes one row per due subscription to the tab `map` describes, skipping any
+// whose deterministic id is already there so a re-run never double-logs.
+// Returns how many rows it wrote; skips are counted into `counts`.
+async function logDue(
+  sheets: Sheets,
+  spreadsheetId: string,
+  map: ColumnMap,
+  due: Subscription[],
+  counts: { skipped_count: number },
+  identity: (sub: Subscription) => Record<string, string> & { id: string },
+  isoDate: string,
+  run_at: string
+): Promise<number> {
+  // Header first, then the id column alone: the Expenses tab is ~2,000 rows
+  // and growing, and the only thing this needs from them is which ids exist.
+  const idColumn = columnLetter(map.index.id);
+  const idResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${map.tab}!${idColumn}:${idColumn}`,
+  });
+  const existingIds = new Set(
+    ((idResponse.data.values ?? []) as Row[]).slice(1).map((r) => String(r[0] ?? ""))
+  );
+
+  const rows: string[][] = [];
+  for (const sub of due) {
+    const fields = identity(sub);
+    if (existingIds.has(fields.id)) {
+      counts.skipped_count++;
+      continue;
+    }
+    rows.push(buildWriteRow([], map, {
+      ...fields,
+      date: isoDate,
+      amount: String(sub.amount),
+      category_id: sub.category_id,
+      created_by: sub.paid_by,
+      notes: sub.name,
+      created_at: run_at,
+    }));
+  }
+
+  if (rows.length > 0) await insertRowsAtTop(sheets, spreadsheetId, map.tab, rows);
+  return rows.length;
+}
+
 export async function runSubscriptionScheduler(
   sheets: Sheets,
   spreadsheetId: string,
@@ -228,40 +280,32 @@ export async function runSubscriptionScheduler(
     counts.due_count = due.length;
 
     if (due.length > 0) {
-      // Header first, then the id column alone: the Expenses tab is ~2,000 rows
-      // and growing, and the only thing this needs from them is which ids exist.
-      const expensesMap = await readColumnMap(sheets, spreadsheetId, EXPENSES_SPEC);
-      const idColumn = columnLetter(expensesMap.index.id);
-      const idResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `${EXPENSES_SPEC.tab}!${idColumn}:${idColumn}`,
-      });
-      const existingIds = new Set(
-        ((idResponse.data.values ?? []) as Row[]).slice(1).map((r) => String(r[0] ?? ""))
-      );
-
-      const rows: string[][] = [];
-      for (const sub of due) {
-        const id = autoExpenseId(sub.id, today.iso);
-        if (existingIds.has(id)) {
-          counts.skipped_count++;
-          continue;
+      // A subscription filed under an income category (salary) is logged to the
+      // Income tab; everything else stays an expense, as before.
+      // A sheet with no Categories tab has no income categories to route.
+      const incomeIds = new Set<string>();
+      if ((await tabTitles(sheets, spreadsheetId)).has(CATEGORIES_SPEC.tab)) {
+        const catTab = await readTab(sheets, spreadsheetId, CATEGORIES_SPEC);
+        for (const r of catTab.rows.slice(1)) {
+          if (r[catTab.map.index.kind ?? -1] === "income") incomeIds.add(String(r[catTab.map.index.id] ?? ""));
         }
-        rows.push(buildWriteRow([], expensesMap, {
-          id,
-          date: today.iso,
-          amount: String(sub.amount),
-          category_id: sub.category_id,
-          paid_by: sub.paid_by,
-          created_by: sub.paid_by,
-          notes: sub.name,
-          created_at: run_at,
-        }));
       }
+      const dueIncome = due.filter((s) => incomeIds.has(s.category_id));
+      const dueExpense = due.filter((s) => !incomeIds.has(s.category_id));
 
-      if (rows.length > 0) {
-        await insertRowsAtTop(sheets, spreadsheetId, EXPENSES_SPEC.tab, rows);
-        counts.created_count = rows.length;
+      if (dueExpense.length > 0) {
+        const map = await readColumnMap(sheets, spreadsheetId, EXPENSES_SPEC);
+        counts.created_count += await logDue(sheets, spreadsheetId, map, dueExpense, counts, (sub) => ({
+          id: autoExpenseId(sub.id, today.iso),
+          paid_by: sub.paid_by,
+        }), today.iso, run_at);
+      }
+      if (dueIncome.length > 0) {
+        const map = await ensureTab(sheets, spreadsheetId, INCOME_SPEC);
+        counts.created_count += await logDue(sheets, spreadsheetId, map, dueIncome, counts, (sub) => ({
+          id: autoIncomeId(sub.id, today.iso),
+          received_by: sub.paid_by,
+        }), today.iso, run_at);
       }
     }
   } catch (err) {

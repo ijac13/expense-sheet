@@ -4,10 +4,17 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Category, categoryIcon, resolveCategory } from "../lib/categories";
+import { Business, BUSINESSES, BUSINESS_ICONS, Category, businessOf, categoriesOfKind, categoryIcon, resolveCategory } from "../lib/categories";
 import { Expense } from "../lib/expenses";
 import { USERS } from "../lib/users";
 import { updateExpense, deleteExpense } from "../lib/expenseService";
+import { updateIncome, deleteIncome } from "../lib/incomes";
+
+/**
+ * A History row: an expense, or an income shaped like one (`received_by` read
+ * into `paid_by`) and marked `kind: "income"`, so one list and one sheet serve both.
+ */
+export type HistoryEntry = Expense & { kind?: "income" };
 import CategoryPicker from "./CategoryPicker";
 import DatePickerModal from "./DatePickerModal";
 
@@ -17,16 +24,17 @@ interface EditForm {
   paidBy: string;  // user ID
   notes: string;
   categoryId: string;
+  business: Business;
 }
 
 interface Props {
-  expense: Expense;
+  expense: HistoryEntry;
   /** Active categories — the edit-mode picker's options. */
   categories: Category[];
   /** Full live list, archived included — the resolution source for this expense. */
   allCategories: Category[];
   onClose: () => void;
-  onSaved: (updated: Expense) => void;
+  onSaved: (updated: HistoryEntry) => void;
   onDeleted: (id: string) => void;
 }
 
@@ -60,6 +68,11 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
   const paidByUser = USERS.find(u => u.id === expense.paid_by || u.name === expense.paid_by);
   const createdByUser = USERS.find(u => u.id === expense.created_by || u.name === expense.created_by);
   const isSubscription = !!expense.subscription_id;
+  const isIncome = expense.kind === "income";
+  // The edit picker offers only categories of the row's own kind.
+  const pickerCategories = categoriesOfKind(categories, isIncome ? "income" : "expense");
+  const business = isIncome ? "" : businessOf(expense, allCategories);
+  const forLabel = (b: Business) => (b ? `${BUSINESS_ICONS[b]} ${t(`earnings.business_${b}`)}` : `❤️ ${t("home.for_life")}`);
 
   function startEdit() {
     setEditForm({
@@ -68,6 +81,7 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
       paidBy: resolveUserId(expense.paid_by),
       notes: expense.notes ?? "",
       categoryId: expense.category_id,
+      business,
     });
     setMode("edit");
     setActionError("");
@@ -87,14 +101,28 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
     setSaving(true);
     setActionError("");
     try {
-      const updated = await updateExpense(expense.id, {
-        amount,
-        date: editForm.date,
-        paid_by: editForm.paidBy,
-        notes: editForm.notes,
-        category_id: editForm.categoryId,
-      });
-      onSaved(updated);
+      if (isIncome) {
+        const updated = await updateIncome(expense.id, {
+          amount,
+          date: editForm.date,
+          received_by: editForm.paidBy,
+          notes: editForm.notes,
+          category_id: editForm.categoryId,
+        });
+        onSaved({ ...updated, paid_by: updated.received_by, kind: "income" });
+      } else {
+        const updated = await updateExpense(expense.id, {
+          amount,
+          date: editForm.date,
+          paid_by: editForm.paidBy,
+          notes: editForm.notes,
+          category_id: editForm.categoryId,
+          // Only a changed tag is written: an untouched row keeps following its
+          // category's default, and the column is never created for nothing.
+          ...(editForm.business !== business && { business: editForm.business }),
+        });
+        onSaved(updated);
+      }
       onClose();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to save.");
@@ -106,7 +134,7 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
     setSaving(true);
     setActionError("");
     try {
-      await deleteExpense(expense.id);
+      await (isIncome ? deleteIncome(expense.id) : deleteExpense(expense.id));
       onDeleted(expense.id);
       onClose();
     } catch (err) {
@@ -156,8 +184,8 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
                 </div>
                 <div className="text-sm text-base-content/50">{formatFullDate(expense.date, lang)}</div>
               </div>
-              <div className="ml-auto text-2xl font-semibold tabular-nums">
-                NT${expense.amount.toLocaleString()}
+              <div className={`ml-auto text-2xl font-semibold tabular-nums ${isIncome ? "text-success" : ""}`}>
+                {isIncome ? "+" : ""}NT${expense.amount.toLocaleString()}
               </div>
             </div>
 
@@ -170,9 +198,15 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
               )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-xs uppercase tracking-wider text-base-content/40 mb-1">{t("history.paid_by")}</div>
+                  <div className="text-xs uppercase tracking-wider text-base-content/40 mb-1">{t(isIncome ? "history.received_by" : "history.paid_by")}</div>
                   <div className="text-sm font-medium">{paidByUser?.name ?? expense.paid_by}</div>
                 </div>
+                {!isIncome && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-base-content/40 mb-1">{t("home.for")}</div>
+                    <div data-testid="view-for" className="text-sm font-medium">{forLabel(business)}</div>
+                  </div>
+                )}
                 <div>
                   <div className="text-xs uppercase tracking-wider text-base-content/40 mb-1">{t("history.logged_by")}</div>
                   <div className="text-sm font-medium">{createdByUser?.name ?? expense.created_by}</div>
@@ -241,7 +275,7 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
 
               {/* Paid by */}
               <div>
-                <div className="text-xs uppercase tracking-wider text-base-content/40 mb-1">{t("history.paid_by")}</div>
+                <div className="text-xs uppercase tracking-wider text-base-content/40 mb-1">{t(isIncome ? "history.received_by" : "history.paid_by")}</div>
                 <button
                   type="button"
                   onClick={cyclePayer}
@@ -264,11 +298,33 @@ export default function ExpenseEditSheet({ expense, categories, allCategories, o
                 />
               </div>
 
+              {/* For: Life or a business (expenses only) */}
+              {!isIncome && (
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-base-content/40 mb-1">{t("home.for")}</div>
+                  <div data-testid="edit-for" className="flex gap-1.5 flex-wrap">
+                    {(["", ...BUSINESSES] as Business[]).map((b) => (
+                      <button
+                        key={b || "life"}
+                        type="button"
+                        aria-pressed={editForm.business === b}
+                        onClick={() => setEditForm(f => f ? { ...f, business: b } : f)}
+                        className={`px-3 py-1.5 rounded-full border text-sm font-medium ${
+                          editForm.business === b ? "bg-primary border-primary text-primary-content" : "bg-base-100 border-base-300"
+                        }`}
+                      >
+                        {forLabel(b)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Category */}
               <div>
                 <div className="text-xs uppercase tracking-wider text-base-content/40 mb-2">{t("common.category")}</div>
                 <CategoryPicker
-                  categories={categories}
+                  categories={pickerCategories}
                   selectedId={editForm.categoryId}
                   onSelect={id => setEditForm(f => f ? { ...f, categoryId: id } : f)}
                 />

@@ -13,12 +13,16 @@ import {
   PayerFilter,
   CostGroup,
   AnnualCostGroups,
+  EarningsSummary,
+  IncomeCard,
+  BusinessCard,
 } from "./reportTypes";
 import { Expense } from "./expenses";
-import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory, isFixedCategory } from "./categories";
+import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory, isFixedCategory, businessOf, isIncomeCategory } from "./categories";
 import { getSessionCategories } from "./categoryService";
 import { USERS } from "./users";
 import { getSharedExpenses } from "./expensesCache";
+import { getSharedIncomes, Income } from "./incomes";
 
 // ---------------------------------------------------------------------------
 // Category metadata — resolved live-list-first, DEFAULT_CATEGORIES as fallback
@@ -117,24 +121,46 @@ function buildCategoryBreakdown(expenses: Expense[], categories: Category[]): Ca
 // Either hash: Chinese keyboards often type the full-width ＃.
 const BIG_EXTRA_KEYWORDS = ["#大筆", "＃大筆"];
 
-// A fixed category wins over the keyword. An unresolvable category is living.
+// A business tag wins over everything: Rent and Uber costs are never Life.
+// Then a fixed category wins over the keyword. An unresolvable category is living.
 function costGroupOf(e: Expense, categories: Category[]): CostGroup {
+  const business = businessOf(e, categories);
+  if (business) return business;
   if (isFixedCategory(resolveCategory(e.category_id, categories))) return "fixed";
   if (BIG_EXTRA_KEYWORDS.some((k) => (e.notes ?? "").includes(k))) return "big_extra";
   return "living";
 }
 
+/** The expenses that count as Life spending: everything not tagged to a business. */
+function lifeOnly(expenses: Expense[], categories: Category[]): Expense[] {
+  return expenses.filter((e) => !businessOf(e, categories));
+}
+
+function sum(list: { amount: number }[]): number {
+  return list.reduce((s, e) => s + e.amount, 0);
+}
+
 function buildCostGroups(expenses: Expense[], categories: Category[]): AnnualCostGroups {
-  const yearTotal = expenses.reduce((s, e) => s + e.amount, 0);
   const of = (group: CostGroup) => expenses.filter((e) => costGroupOf(e, categories) === group);
-  const share = (list: Expense[]) => {
-    const total = list.reduce((s, e) => s + e.amount, 0);
-    return { total, percentage: yearTotal > 0 ? Math.round((total / yearTotal) * 100) : 0 };
-  };
   const fixed = of("fixed");
   const bigExtra = of("big_extra");
   const living = of("living");
+  const rent = of("rent");
+  const uber = of("uber");
+  // Life groups are shares of Life; Rent and Uber are shares of everything, the
+  // total they are shown against when business costs are included.
+  const lifeTotal = sum(fixed) + sum(bigExtra) + sum(living);
+  const allTotal = lifeTotal + sum(rent) + sum(uber);
+  const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
+  const share = (list: Expense[]) => ({ total: sum(list), percentage: pct(sum(list), lifeTotal) });
+  const businessGroup = (list: Expense[]) => ({
+    total: sum(list),
+    percentage: pct(sum(list), allTotal),
+    categories: buildCategoryBreakdown(list, categories),
+  });
   return {
+    rent: businessGroup(rent),
+    uber: businessGroup(uber),
     fixed: { ...share(fixed), categories: buildCategoryBreakdown(fixed, categories) },
     big_extra: {
       ...share(bigExtra),
@@ -193,10 +219,11 @@ export async function getMonthlySummary(
   ]);
 
   const ym = makeDate(year, month, 1).slice(0, 7);
-  const monthExpenses = filterByPayer(
+  const monthAll = filterByPayer(
     allExpenses.filter((e) => e.date.startsWith(ym)),
     payer
   );
+  const monthExpenses = lifeOnly(monthAll, categories);
 
   // While the viewed month is running, both comparisons stop at today's day;
   // a shorter month simply runs out first (Mar 1–30 vs Feb 1–28).
@@ -214,7 +241,7 @@ export async function getMonthlySummary(
       year: y,
       month: mo,
       through_day,
-      total: list.reduce((s, e) => s + e.amount, 0),
+      total: sum(lifeOnly(list, categories)),
       groups: buildCostGroups(list, categories),
     };
   };
@@ -230,7 +257,7 @@ export async function getMonthlySummary(
     label: `${MONTH_NAMES[month - 1]} ${year}`,
     total: monthExpenses.reduce((s, e) => s + e.amount, 0),
     categories: buildCategoryBreakdown(monthExpenses, categories),
-    groups: buildCostGroups(monthExpenses, categories),
+    groups: buildCostGroups(monthAll, categories),
     payers: buildPayerBreakdown(monthExpenses),
     comparison: {
       prev_month: month === 1 ? compareWith(year - 1, 12) : compareWith(year, month - 1),
@@ -254,10 +281,11 @@ export async function getAnnualSummary(
   ]);
 
   const yearPrefix = String(year);
-  const yearExpenses = filterByPayer(
+  const yearAll = filterByPayer(
     allExpenses.filter((e) => e.date.startsWith(yearPrefix)),
     payer
   );
+  const yearExpenses = lifeOnly(yearAll, categories);
 
   const MONTH_SHORT = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -266,10 +294,10 @@ export async function getAnnualSummary(
 
   const monthTotal = (y: number, mo: number) => {
     const ym = makeDate(y, mo, 1).slice(0, 7);
-    return filterByPayer(
+    return sum(lifeOnly(filterByPayer(
       allExpenses.filter((e) => e.date.startsWith(ym)),
       payer
-    ).reduce((s, e) => s + e.amount, 0);
+    ), categories));
   };
   const monthly_trend: MonthlyTrend[] = MONTH_SHORT.map((label, i) => ({
     month: i + 1,
@@ -294,13 +322,13 @@ export async function getAnnualSummary(
     year,
     total: yearExpenses.reduce((s, e) => s + e.amount, 0),
     categories: buildCategoryBreakdown(yearExpenses, categories),
-    groups: buildCostGroups(yearExpenses, categories),
+    groups: buildCostGroups(yearAll, categories),
     payers: buildPayerBreakdown(yearExpenses),
     monthly_trend,
     comparison: {
       year: year - 1,
       through,
-      total: prevExpenses.reduce((s, e) => s + e.amount, 0),
+      total: sum(lifeOnly(prevExpenses, categories)),
       groups: buildCostGroups(prevExpenses, categories),
     },
     expense_count: yearExpenses.length,
@@ -339,4 +367,102 @@ export async function getExpensesByCategory(
   return expenses
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((e) => toReportExpense(e, categories));
+}
+
+// ---------------------------------------------------------------------------
+// getEarningsSummary — Income & earnings for one month (or a whole year when
+// month is null). Household-wide: the payer filter does not apply to income.
+// ---------------------------------------------------------------------------
+const TREND_MONTHS = 6;
+
+export function buildEarningsSummary(
+  expenses: Expense[],
+  incomes: Income[],
+  categories: Category[],
+  year: number,
+  month: number | null
+): EarningsSummary {
+  const prefixOf = (y: number, mo: number | null) => (mo === null ? String(y) : makeDate(y, mo, 1).slice(0, 7));
+  const prefix = prefixOf(year, month);
+  const inPeriod = <T extends { date: string }>(list: T[], p: string) => list.filter((x) => x.date.startsWith(p));
+
+  const periodExpenses = inPeriod(expenses, prefix);
+  const periodIncomes = inPeriod(incomes, prefix);
+  const spending = sum(lifeOnly(periodExpenses, categories));
+
+  const incomeBusiness = (i: Income) => resolveCategory(i.category_id, categories)?.business ?? "";
+  const earningsOf = (biz: string, exps: Expense[], incs: Income[]) =>
+    sum(incs.filter((i) => incomeBusiness(i) === biz)) - sum(exps.filter((e) => businessOf(e, categories) === biz));
+
+  const line = (categoryId: string, list: Income[]) => {
+    const meta = getCatMeta(categoryId, categories);
+    return {
+      category_id: categoryId,
+      category_name: meta.name_en,
+      category_name_zh: meta.name_zh,
+      icon: meta.icon,
+      total: sum(list.filter((i) => i.category_id === categoryId)),
+    };
+  };
+
+  // The months a business card charts: the 6 ending at the viewed month, or
+  // every month of the viewed year.
+  const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const trendMonths: { y: number; mo: number }[] = month === null
+    ? MONTH_SHORT.map((_, i) => ({ y: year, mo: i + 1 }))
+    : Array.from({ length: TREND_MONTHS }, (_, i) => {
+        const index = year * 12 + (month - 1) - (TREND_MONTHS - 1 - i);
+        return { y: Math.floor(index / 12), mo: (index % 12) + 1 };
+      });
+
+  // Cards follow the income categories' own order, each business once, at its
+  // first income category. An income category with nothing this period still
+  // shows (as NT$0) while active, so the page keeps the same shape every month.
+  const incomeCats = categories
+    .filter((c) => isIncomeCategory(c))
+    .filter((c) => c.is_active || periodIncomes.some((i) => i.category_id === c.id))
+    .sort((a, b) => a.sort_order - b.sort_order);
+  const businessesSeen = new Set<string>();
+  const cards: (IncomeCard | BusinessCard)[] = [];
+  const addBusiness = (biz: "rent" | "uber") => {
+    if (businessesSeen.has(biz)) return;
+    businessesSeen.add(biz);
+    const bizIncomes = periodIncomes.filter((i) => incomeBusiness(i) === biz);
+    const costs = periodExpenses.filter((e) => businessOf(e, categories) === biz);
+    const incomeIds = incomeCats.filter((c) => c.business === biz).map((c) => c.id);
+    cards.push({
+      type: "business",
+      business: biz,
+      income: incomeIds.map((id) => line(id, bizIncomes)),
+      income_total: sum(bizIncomes),
+      costs: buildCategoryBreakdown(costs, categories),
+      costs_total: sum(costs),
+      earnings: sum(bizIncomes) - sum(costs),
+      trend: trendMonths.map(({ y, mo }) => ({
+        label: MONTH_SHORT[mo - 1],
+        earnings: earningsOf(biz, inPeriod(expenses, prefixOf(y, mo)), inPeriod(incomes, prefixOf(y, mo))),
+      })),
+    });
+  };
+  for (const c of incomeCats) {
+    if (c.business) addBusiness(c.business);
+    else cards.push({ type: "income", ...line(c.id, periodIncomes) });
+  }
+  // A business with costs but no income category yet still gets its card.
+  for (const e of periodExpenses) {
+    const biz = businessOf(e, categories);
+    if (biz) addBusiness(biz);
+  }
+
+  const money_in = cards.reduce((s, c) => s + (c.type === "income" ? c.total : c.earnings), 0);
+  return { money_in, spending, left_over: money_in - spending, cards };
+}
+
+export async function getEarningsSummary(year: number, month: number | null): Promise<EarningsSummary> {
+  const [expenses, incomes, categories] = await Promise.all([
+    fetchAllExpenses(),
+    getSharedIncomes(),
+    fetchCategoryList(),
+  ]);
+  return buildEarningsSummary(expenses, incomes, categories, year, month);
 }

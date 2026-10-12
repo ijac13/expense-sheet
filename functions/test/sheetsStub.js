@@ -146,7 +146,8 @@ function makeSheets(tabs) {
         },
         append: async ({ range, requestBody }) => {
           requests.push(`APPEND ${range}`);
-          gridFor(parseRange(range).tab).push(requestBody.values[0].slice());
+          // Every row in the payload lands, as the real append does.
+          for (const v of requestBody.values) gridFor(parseRange(range).tab).push(v.slice());
           return {};
         },
       },

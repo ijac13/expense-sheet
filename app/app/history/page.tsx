@@ -5,19 +5,29 @@ import { createPortal } from "react-dom";
 import { X, SlidersHorizontal, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getAllExpenses } from "../lib/historyService";
-import { DEFAULT_CATEGORIES, Category, categoryIcon, resolveCategory, getCachedCategoriesFull, saveCachedCategoriesFull } from "../lib/categories";
+import { BUSINESS_ICONS, DEFAULT_CATEGORIES, Category, businessOf, categoryIcon, resolveCategory, getCachedCategoriesFull, saveCachedCategoriesFull } from "../lib/categories";
 import { getCategories } from "../lib/categoryService";
-import { Expense } from "../lib/expenses";
+import { getSharedIncomes, Income } from "../lib/incomes";
 import { USERS } from "../lib/users";
-import ExpenseEditSheet from "../components/ExpenseEditSheet";
+import ExpenseEditSheet, { HistoryEntry } from "../components/ExpenseEditSheet";
 import DatePickerModal from "../components/DatePickerModal";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface DayGroup {
   date: string;
-  total: number;
-  expenses: Expense[];
+  total: number; // spending only: income rows show but are not summed
+  expenses: HistoryEntry[];
+}
+
+type KindFilter = "all" | "expense" | "income";
+
+function incomeEntry(i: Income): HistoryEntry {
+  return { ...i, paid_by: i.received_by, kind: "income" };
+}
+
+function spendingOf(entries: HistoryEntry[]): number {
+  return entries.reduce((s, e) => s + (e.kind === "income" ? 0 : e.amount), 0);
 }
 
 type DatePreset = "all" | "this-month" | "last-month" | "last-3m" | "custom";
@@ -62,7 +72,7 @@ function getPresetRange(preset: DatePreset): { from: string; to: string } | null
   return null;
 }
 
-function applyFilters(expenses: Expense[], filters: Filters, search: string, categories: Category[]): Expense[] {
+function applyFilters(expenses: HistoryEntry[], filters: Filters, search: string, categories: Category[]): HistoryEntry[] {
   let result = expenses;
 
   if (filters.categories.length > 0)
@@ -100,8 +110,8 @@ function countActiveFilters(filters: Filters): number {
   return n;
 }
 
-function groupByDate(expenses: Expense[]): DayGroup[] {
-  const map = new Map<string, Expense[]>();
+function groupByDate(expenses: HistoryEntry[]): DayGroup[] {
+  const map = new Map<string, HistoryEntry[]>();
   for (const exp of expenses) {
     const list = map.get(exp.date) ?? [];
     list.push(exp);
@@ -116,7 +126,7 @@ function groupByDate(expenses: Expense[]): DayGroup[] {
       );
       return {
         date,
-        total: exps.reduce((s, e) => s + e.amount, 0),
+        total: spendingOf(exps),
         expenses: exps,
       };
     });
@@ -318,7 +328,8 @@ export default function HistoryPage() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
 
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<HistoryEntry[]>([]);
+  const [kind, setKind] = useState<KindFilter>("all");
   const [loading, setLoading] = useState(true);
   // The full live list, archived categories included — an expense on an archived
   // category still has to resolve its icon (AC-6). The `is_active` filter belongs
@@ -327,15 +338,16 @@ export default function HistoryPage() {
   // separately from Home's active-only one) so a live `cat_NNN` id resolves on
   // the very first render, before this load's own categories fetch resolves.
   const [allCategories, setAllCategories] = useState<Category[]>(() => getCachedCategoriesFull() ?? DEFAULT_CATEGORIES);
-  const [selected, setSelected] = useState<Expense | null>(null);
+  const [selected, setSelected] = useState<HistoryEntry | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
 
   useEffect(() => {
-    getAllExpenses()
-      .then(setExpenses)
+    // Income failing to load must not hide the expenses, so it falls back to none.
+    Promise.all([getAllExpenses(), getSharedIncomes().catch(() => [] as Income[])])
+      .then(([exps, incs]) => setExpenses([...exps, ...incs.map(incomeEntry)]))
       .catch(() => setExpenses([]))
       .finally(() => setLoading(false));
   }, []);
@@ -373,7 +385,11 @@ export default function HistoryPage() {
     [allCategories]
   );
 
-  const filtered = useMemo(() => applyFilters(expenses, filters, search, categories), [expenses, filters, search, categories]);
+  const filtered = useMemo(
+    () => applyFilters(expenses, filters, search, categories)
+      .filter((e) => kind === "all" || (kind === "income") === (e.kind === "income")),
+    [expenses, filters, search, categories, kind]
+  );
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
 
   const monthGroups = useMemo(() => {
@@ -466,6 +482,23 @@ export default function HistoryPage() {
             </div>
           )}
 
+          {/* All / Expenses / Income */}
+          <div data-testid="kind-filter" className="flex gap-2 px-4 pb-3">
+            {(["all", "expense", "income"] as KindFilter[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={kind === k}
+                onClick={() => setKind(k)}
+                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  kind === k ? "bg-primary text-primary-content" : "bg-base-200 text-base-content/70"
+                }`}
+              >
+                {t(`history.kind_${k}`)}
+              </button>
+            ))}
+          </div>
+
           {/* Active filter chips */}
           {chips.length > 0 && (
             <div className="flex items-center gap-2 px-4 pb-3 overflow-x-auto scrollbar-none">
@@ -507,7 +540,7 @@ export default function HistoryPage() {
         {/* List */}
         <div className="py-2">
           {monthGroups.map(([monthKey, dayGroups]) => {
-            const monthTotal = dayGroups.reduce((s, g) => s + g.total, 0);
+            const monthTotal = dayGroups.reduce((s, g) => s + g.total, 0); // spending only
             const entryCount = dayGroups.reduce((s, g) => s + g.expenses.length, 0);
             return (
               <div key={monthKey} className="mb-4">
@@ -535,6 +568,8 @@ export default function HistoryPage() {
                         const cat = resolveCategory(expense.category_id, allCategories);
                         const paidByUser = USERS.find(u => u.id === expense.paid_by || u.name === expense.paid_by);
                         const catName = lang === "zh" ? (cat?.name_zh ?? cat?.name_en ?? expense.category_id) : (cat?.name_en ?? expense.category_id);
+                        const isIncome = expense.kind === "income";
+                        const biz = isIncome ? "" : businessOf(expense, allCategories);
                         return (
                           <button
                             key={expense.id}
@@ -550,11 +585,12 @@ export default function HistoryPage() {
                                 <div className="text-[13px] text-base-content/50 mt-0.5 truncate">{expense.notes}</div>
                               )}
                               <div className="text-[12px] text-base-content/40 mt-0.5">
+                                {biz && <span data-testid="row-business">{BUSINESS_ICONS[biz]} {t(`earnings.business_${biz}`)} · </span>}
                                 {paidByUser?.name ?? expense.paid_by}
                               </div>
                             </div>
-                            <div className="text-[15px] font-medium tabular-nums shrink-0">
-                              NT${expense.amount.toLocaleString()}
+                            <div className={`text-[15px] font-medium tabular-nums shrink-0 ${isIncome ? "text-success" : ""}`}>
+                              {isIncome ? "+" : ""}NT${expense.amount.toLocaleString()}
                             </div>
                           </button>
                         );

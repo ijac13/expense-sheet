@@ -11,6 +11,7 @@ export interface Expense {
   notes?: string;
   created_at: string; // ISO datetime
   subscription_id?: string; // set if created by a recurring subscription
+  business?: string; // "" = Life; "rent" / "uber" counts toward that business
 }
 
 export const MOCK_EXPENSES: Expense[] = [

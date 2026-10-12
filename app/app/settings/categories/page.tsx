@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Category, GovCategory, GOV_CATEGORY_LABELS, GOV_CATEGORY_OPTIONS, NOTE_MAX_LENGTH, categoryIcon, isFixedCategory } from "../../lib/categories";
+import { Business, BUSINESSES, BUSINESS_ICONS, Category, CategoryKind, GovCategory, GOV_CATEGORY_LABELS, GOV_CATEGORY_OPTIONS, NOTE_MAX_LENGTH, categoryIcon, isFixedCategory } from "../../lib/categories";
 import {
   getCategories,
   addCategory,
@@ -23,10 +23,12 @@ interface FormState {
   gov_category: GovCategory | "";
   note: string;
   fixed: boolean;
+  kind: CategoryKind;
+  business: Business;
   error: string;
 }
 
-const emptyForm: FormState = { icon: "", name_en: "", name_zh: "", gov_category: "", note: "", fixed: false, error: "" };
+const emptyForm: FormState = { icon: "", name_en: "", name_zh: "", gov_category: "", note: "", fixed: false, kind: "expense", business: "", error: "" };
 
 type SaveStatus = { type: "success" | "error"; message: string } | null;
 
@@ -66,7 +68,7 @@ export default function CategoryManagementPage() {
   }
 
   function openEdit(cat: Category) {
-    setForm({ icon: cat.icon, name_en: cat.name_en, name_zh: cat.name_zh, gov_category: cat.gov_category ?? "", note: cat.note ?? "", fixed: isFixedCategory(cat), error: "" });
+    setForm({ icon: cat.icon, name_en: cat.name_en, name_zh: cat.name_zh, gov_category: cat.gov_category ?? "", note: cat.note ?? "", fixed: isFixedCategory(cat), kind: cat.kind ?? "expense", business: cat.business ?? "", error: "" });
     setFormMode({ type: "edit", id: cat.id });
   }
 
@@ -84,7 +86,8 @@ export default function CategoryManagementPage() {
       setForm((f) => ({ ...f, error: t("cat_mgmt.error_zh_required") }));
       return;
     }
-    if (!form.gov_category) {
+    // The government spending category describes spending; income has none.
+    if (form.kind === "expense" && !form.gov_category) {
       setForm((f) => ({ ...f, error: t("cat_mgmt.gov_category_required") }));
       return;
     }
@@ -105,6 +108,9 @@ export default function CategoryManagementPage() {
         name_zh: form.name_zh.trim(),
         gov_category: form.gov_category as GovCategory,
         note: form.note.trim(),
+        // Written only when set, so a plain expense category creates no new columns.
+        ...(form.kind === "income" && { kind: form.kind }),
+        ...(form.business && { business: form.business }),
         // Written only when it differs from the default by name, so an untouched
         // switch stays unset and keeps following the name rule.
         ...(form.fixed !== isFixedCategory({ name_en: form.name_en.trim() }) && { fixed: form.fixed }),
@@ -131,7 +137,7 @@ export default function CategoryManagementPage() {
         setCategories((prev) => prev.filter((c) => c.id !== placeholder.id));
         const msg = err instanceof Error ? err.message : "Failed to save category";
         setFormMode({ type: "add" });
-        setForm({ ...data, fixed: form.fixed, error: msg });
+        setForm({ ...data, fixed: form.fixed, kind: form.kind, business: form.business, error: msg });
       }
     } else if (formMode?.type === "edit") {
       const editId = formMode.id;
@@ -154,6 +160,9 @@ export default function CategoryManagementPage() {
         name_zh: form.name_zh.trim(),
         gov_category: form.gov_category as GovCategory,
         note: form.note.trim(),
+        // Only a changed kind or default is written, like the Fixed switch below.
+        ...(form.kind !== (preEditCat?.kind ?? "expense") && { kind: form.kind }),
+        ...(form.business !== (preEditCat?.business ?? "") && { business: form.business }),
         // Only a flipped switch is written; the first one creates the sheet column.
         ...(form.fixed !== isFixedCategory(preEditCat) && { fixed: form.fixed }),
       };
@@ -315,9 +324,42 @@ export default function CategoryManagementPage() {
               </div>
               <div>
                 <label className="label pb-1">
+                  <span className="label-text">{t("cat_mgmt.kind_label")}</span>
+                </label>
+                <select
+                  data-testid="category-kind"
+                  className="select select-bordered w-full"
+                  value={form.kind}
+                  onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as CategoryKind, error: "" }))}
+                >
+                  <option value="expense">{t("home.mode_expense")}</option>
+                  <option value="income">{t("home.mode_income")}</option>
+                </select>
+              </div>
+              <div>
+                <label className="label pb-1">
+                  <span className="label-text">{t("cat_mgmt.business_label")}</span>
+                </label>
+                <select
+                  data-testid="category-business"
+                  className="select select-bordered w-full"
+                  value={form.business}
+                  onChange={(e) => setForm((f) => ({ ...f, business: e.target.value as Business, error: "" }))}
+                >
+                  <option value="">❤️ {t("home.for_life")}</option>
+                  {BUSINESSES.map((b) => (
+                    <option key={b} value={b}>{BUSINESS_ICONS[b]} {t(`earnings.business_${b}`)}</option>
+                  ))}
+                </select>
+                <span className="text-xs text-base-content/50">{t("cat_mgmt.business_hint")}</span>
+              </div>
+              {form.kind === "expense" && (
+              <div>
+                <label className="label pb-1">
                   <span className="label-text">{t("cat_mgmt.gov_category_label")} <span className="text-error">*</span></span>
                 </label>
                 <select
+                  data-testid="category-gov"
                   className="select select-bordered w-full"
                   value={form.gov_category}
                   onChange={(e) => setForm((f) => ({ ...f, gov_category: e.target.value as GovCategory | "", error: "" }))}
@@ -328,6 +370,7 @@ export default function CategoryManagementPage() {
                   ))}
                 </select>
               </div>
+              )}
               <div>
                 <label className="label pb-1">
                   <span className="label-text">{t("cat_mgmt.note_label")}</span>
@@ -340,6 +383,7 @@ export default function CategoryManagementPage() {
                   onChange={(e) => setForm((f) => ({ ...f, note: e.target.value.slice(0, NOTE_MAX_LENGTH), error: "" }))}
                 />
               </div>
+              {form.kind === "expense" && (
               <label className="label cursor-pointer justify-start gap-3">
                 <input
                   type="checkbox"
@@ -353,6 +397,7 @@ export default function CategoryManagementPage() {
                   <span className="block text-xs text-base-content/50">{t("cat_mgmt.fixed_hint")}</span>
                 </span>
               </label>
+              )}
               {form.error && (
                 <p className="text-error text-sm">{form.error}</p>
               )}
@@ -395,10 +440,15 @@ export default function CategoryManagementPage() {
                   <span className="font-medium">{cat.name_en}</span>
                   <span className="text-base-content/50 text-sm ml-2">{cat.name_zh}</span>
                   <div className="mt-0.5">
-                    {cat.gov_category
+                    {cat.kind === "income"
+                      ? <span className="badge badge-success badge-outline badge-xs text-xs">{t("home.mode_income")}</span>
+                      : cat.gov_category
                       ? <span className="text-xs text-base-content/60">{GOV_CATEGORY_LABELS[cat.gov_category as GovCategory]}</span>
                       : <span className="badge badge-warning badge-xs text-xs">{t("cat_mgmt.gov_category_unset")}</span>
                     }
+                    {cat.business && (
+                      <span className="badge badge-outline badge-xs text-xs ml-2">{BUSINESS_ICONS[cat.business]} {t(`earnings.business_${cat.business}`)}</span>
+                    )}
                     {isFixedCategory(cat) && (
                       <span className="badge badge-primary badge-outline badge-xs text-xs ml-2">{t("cat_mgmt.fixed_badge")}</span>
                     )}
