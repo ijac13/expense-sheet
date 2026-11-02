@@ -60,6 +60,17 @@ gates:
                 id: briefing:080:verify:attempt-1:revision-1
                 digest: sha256:15073eb129c0c5461318f99d567d83286d71e7230dfb9a5781c8389d9d518e34
                 room-ref: '@review/verify/briefing-1'
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:080:verify:1
+                briefing: briefing:080:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-11-02T04:54:28.568523Z"
+                decision: approve
+                reason: Captain approved in Subspace review with no annotations and confirmed the new screen on staging.
+              application:
+                target-stage: done
+                state: pending
 ---
 
 In Reports > Annual, clicking a category lists every single expense from the year (e.g. five Daily Necessity items in October, five more in September), which makes it hard to see how spending in that category changes month to month.
