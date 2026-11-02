@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-079-annual-business-toggle
 issue:
-pr:
+pr: "#53"
 mod-block: merge:pr-merge
 gates:
     version: 1
