@@ -1,13 +1,13 @@
 ---
 id: 079
 title: Reports > Annual chart ignores "include business cost" toggle
-status: spec
+status: build
 source: captain (bug report, 2026-11-02)
 started: 2026-11-02T02:57:48Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-079-annual-business-toggle
 issue:
 pr:
 mod-block:
@@ -41,6 +41,17 @@ gates:
                 id: briefing:079:spec:attempt-1:revision-1
                 digest: sha256:6867ce36c5ad6b683b5844a627053f1c501f912d060b7ee72acf4be9b8e3704b
                 room-ref: '@review/spec/briefing-1'
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:079:spec:1
+                briefing: briefing:079:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-11-02T03:30:47.408158Z"
+                decision: approve
+                reason: Captain approved spec in Subspace review with no annotations; By payer stays out of scope.
+              application:
+                target-stage: build
+                state: consumed
 ---
 
 In Reports > Annual, the monthly chart responds to "Live only" but stays unchanged when the captain switches to "Include business cost", so the chart misreports monthly totals that should include business costs.
