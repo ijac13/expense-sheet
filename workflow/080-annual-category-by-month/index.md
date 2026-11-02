@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-080-annual-category-by-month
 issue:
-pr:
+pr: pr-merge:54
 mod-block: merge:pr-merge
 gates:
     version: 1
