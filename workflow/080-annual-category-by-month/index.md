@@ -1,9 +1,9 @@
 ---
 id: 080
 title: Reports > Annual category drilldown shows monthly totals, trend chart, then expenses
-status: ideation
+status: spec
 source: captain (request, 2026-11-02)
-started:
+started: 2026-11-02T03:53:32Z
 completed:
 verdict:
 score:
@@ -22,6 +22,17 @@ gates:
                 id: briefing:080:ideation:attempt-1:revision-1
                 digest: sha256:bf5fc23e14fa53b796b03a5a5893c01b9f7a86df6efdb383f984993f607f9ef8
                 room-ref: '@review/ideation/briefing-1'
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:080:ideation:1
+                briefing: briefing:080:ideation:attempt-1:revision-1
+                by: person:captain
+                at: "2026-11-02T03:53:32.251045Z"
+                decision: approve
+                reason: Captain approved in Subspace review with no annotations; proceed to spec.
+              application:
+                target-stage: spec
+                state: consumed
 ---
 
 In Reports > Annual, clicking a category lists every single expense from the year (e.g. five Daily Necessity items in October, five more in September), which makes it hard to see how spending in that category changes month to month.
