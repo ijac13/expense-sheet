@@ -1,16 +1,16 @@
 ---
 id: 079
 title: Reports > Annual chart ignores "include business cost" toggle
-status: verify
+status: done
 source: captain (bug report, 2026-11-02)
 started: 2026-11-02T02:57:48Z
-completed:
-verdict:
+completed: 2026-11-02T04:22:07Z
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-079-annual-business-toggle
 issue:
 pr: pr-merge:53
-mod-block: merge:pr-merge
+mod-block:
 gates:
     version: 1
     records:
@@ -70,7 +70,8 @@ gates:
                 reason: Captain approved in chat ('approve 079') after the staging check; supersedes the pane's question-only 'revise'.
               application:
                 target-stage: done
-                state: pending
+                state: consumed
+archived: 2026-11-02T04:22:07Z
 ---
 
 In Reports > Annual, the monthly chart responds to "Live only" but stays unchanged when the captain switches to "Include business cost", so the chart misreports monthly totals that should include business costs.
