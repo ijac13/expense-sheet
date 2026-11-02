@@ -1,7 +1,7 @@
 ---
 id: 079
 title: Reports > Annual chart ignores "include business cost" toggle
-status: build
+status: verify
 source: captain (bug report, 2026-11-02)
 started: 2026-11-02T02:57:48Z
 completed:
