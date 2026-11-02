@@ -41,6 +41,17 @@ gates:
                 id: briefing:080:spec:attempt-1:revision-1
                 digest: sha256:7747636e1028c8505381ed848603ddcef653e144a0097beef43b7fddda03c89e
                 room-ref: '@review/spec/briefing-1'
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:080:spec:1
+                briefing: briefing:080:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-11-02T04:05:56.081211Z"
+                decision: approve
+                reason: Captain approved spec in Subspace review with no annotations; keep last year's bars (recommended default). Build waits for 079 to merge.
+              application:
+                target-stage: build
+                state: pending
 ---
 
 In Reports > Annual, clicking a category lists every single expense from the year (e.g. five Daily Necessity items in October, five more in September), which makes it hard to see how spending in that category changes month to month.
