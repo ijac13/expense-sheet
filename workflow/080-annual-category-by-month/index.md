@@ -11,6 +11,17 @@ worktree:
 issue:
 pr:
 mod-block:
+gates:
+    version: 1
+    records:
+        - id: gate:080:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:080-ideation-1
+              briefing:
+                id: briefing:080:ideation:attempt-1:revision-1
+                digest: sha256:bf5fc23e14fa53b796b03a5a5893c01b9f7a86df6efdb383f984993f607f9ef8
+                room-ref: '@review/ideation/briefing-1'
 ---
 
 In Reports > Annual, clicking a category lists every single expense from the year (e.g. five Daily Necessity items in October, five more in September), which makes it hard to see how spending in that category changes month to month.

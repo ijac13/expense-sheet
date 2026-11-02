@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:080:ideation:attempt-1:revision-1",
+  "question": "Approve 080 (Annual category drilldown: monthly totals + category trend chart, then expenses per month) to move into spec?",
+  "artifacts": [
+    {
+      "id": "artifact:080:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/f4a7338af8756033cdfe722a48f56f983eba7d98/workflow/080-annual-category-by-month/index.md",
+      "rev": "sha256:31e1863c3c02a3e6c5ba044bf9f1e0c61e0643aa3313a5e0eccae80f63a1cee7",
+      "mediaType": "text/markdown",
+      "summary": "Today clicking a category on Annual lists every expense of the year. Seed: show one total per month for that category, a monthly trend chart for that category only, and click a month to see its individual expenses. Excludes the Monthly tab drilldown and category membership. Spec decides layout, toggle interaction, and how month rows open."
+    }
+  ]
+}
