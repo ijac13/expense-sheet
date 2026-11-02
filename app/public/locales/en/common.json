@@ -56,6 +56,7 @@
     "annual_total": "Annual Total",
     "transactions": "transactions",
     "month_avg": "/month avg",
+    "by_month": "By month",
     "monthly_trend": "Monthly Trend",
     "no_data_period": "No data for this period",
     "try_different_month": "Try a different month",
