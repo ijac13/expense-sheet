@@ -11,6 +11,17 @@ worktree:
 issue:
 pr:
 mod-block:
+gates:
+    version: 1
+    records:
+        - id: gate:079:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:079-ideation-1
+              briefing:
+                id: briefing:079:ideation:attempt-1:revision-1
+                digest: sha256:0f7062f2392e2fe92a03334ccfb2f5f2760dea9a46f9bcb0b8d03521c7c50572
+                room-ref: '@review/ideation/briefing-1'
 ---
 
 In Reports > Annual, the monthly chart responds to "Live only" but stays unchanged when the captain switches to "Include business cost", so the chart misreports monthly totals that should include business costs.
