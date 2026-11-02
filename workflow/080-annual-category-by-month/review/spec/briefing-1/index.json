@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:080:spec:attempt-1:revision-1",
+  "question": "Approve the 080 spec (Annual category month-by-month screen with category chart, tap a month for its expenses) to start build after 079 merges?",
+  "artifacts": [
+    {
+      "id": "artifact:080:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/b63788537b846a68cbceb69434b1d02b78a0c7ed/workflow/080-annual-category-by-month/index.md",
+      "rev": "sha256:a158308c41ec5bddb250fb61111db93ffb5f85b675d877fb6a7af07088e4b656",
+      "mediaType": "text/markdown",
+      "summary": "New screen on Annual category tap: header, category-only trend chart (reuses 079's TrendCard, this year + last year), month rows newest first with total and count, tap a month to open its expenses in the existing list. Counts exactly the tapped row's category + group + payer, so the toggle needs no extra rule and months add up to the row. AC-1..8 offline, AC-9..10 on staging. ~+370 LOC across 9 files. Build must wait for 079 to merge. Question: keep last year's bars in the category chart (recommended yes)."
+    }
+  ]
+}

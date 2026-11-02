@@ -33,6 +33,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:080:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:080-spec-1
+              briefing:
+                id: briefing:080:spec:attempt-1:revision-1
+                digest: sha256:7747636e1028c8505381ed848603ddcef653e144a0097beef43b7fddda03c89e
+                room-ref: '@review/spec/briefing-1'
 ---
 
 In Reports > Annual, clicking a category lists every single expense from the year (e.g. five Daily Necessity items in October, five more in September), which makes it hard to see how spending in that category changes month to month.
