@@ -60,6 +60,17 @@ gates:
                 id: briefing:079:verify:attempt-1:revision-1
                 digest: sha256:06f131a58f6003d61fb59d04781d7512e76328816cbb14bc39df17268f0233eb
                 room-ref: '@review/verify/briefing-1'
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:079:verify:1
+                briefing: briefing:079:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-11-02T04:06:50.010984Z"
+                decision: approve
+                reason: Captain approved in chat ('approve 079') after the staging check; supersedes the pane's question-only 'revise'.
+              application:
+                target-stage: done
+                state: pending
 ---
 
 In Reports > Annual, the monthly chart responds to "Live only" but stays unchanged when the captain switches to "Include business cost", so the chart misreports monthly totals that should include business costs.
