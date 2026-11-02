@@ -52,6 +52,14 @@ gates:
               application:
                 target-stage: build
                 state: consumed
+        - id: gate:079:verify
+          stage: verify
+          attempts:
+            - id: gate-attempt:079-verify-1
+              briefing:
+                id: briefing:079:verify:attempt-1:revision-1
+                digest: sha256:06f131a58f6003d61fb59d04781d7512e76328816cbb14bc39df17268f0233eb
+                room-ref: '@review/verify/briefing-1'
 ---
 
 In Reports > Annual, the monthly chart responds to "Live only" but stays unchanged when the captain switches to "Include business cost", so the chart misreports monthly totals that should include business costs.

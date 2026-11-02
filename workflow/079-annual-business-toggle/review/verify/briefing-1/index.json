@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:079:verify:attempt-1:revision-1",
+  "question": "Approve 079 verify (Annual chart follows the business-cost toggle) as PASSED to open the PR and ship to production?",
+  "artifacts": [
+    {
+      "id": "artifact:079:verify:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/9494a48f5fe90ad2a696c283006d3b37716f9f3d/workflow/079-annual-business-toggle/index.md",
+      "rev": "sha256:ab76680bdeb924862a7a874797eba88a620100f5ce8e43d524adb9ef53f2ffab",
+      "mediaType": "text/markdown",
+      "summary": "AC-1..AC-5 pass with independent falsifiers (294/294 tests). Staging serves this exact build (hash match). AC-6: live staging data through the deployed code shows Oct 2026 NT$1,243 Life only vs NT$49,658 with business; needs the captain's signed-in tap on staging to close. Extra fix: tapping a bar after a NT$0 month opened the wrong month (live in prod today), fixed in 3 lines."
+    }
+  ]
+}
