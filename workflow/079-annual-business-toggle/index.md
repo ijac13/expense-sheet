@@ -33,6 +33,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:079:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:079-spec-1
+              briefing:
+                id: briefing:079:spec:attempt-1:revision-1
+                digest: sha256:6867ce36c5ad6b683b5844a627053f1c501f912d060b7ee72acf4be9b8e3704b
+                room-ref: '@review/spec/briefing-1'
 ---
 
 In Reports > Annual, the monthly chart responds to "Live only" but stays unchanged when the captain switches to "Include business cost", so the chart misreports monthly totals that should include business costs.
