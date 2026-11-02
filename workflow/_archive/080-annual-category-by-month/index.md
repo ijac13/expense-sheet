@@ -1,16 +1,16 @@
 ---
 id: 080
 title: Reports > Annual category drilldown shows monthly totals, trend chart, then expenses
-status: verify
+status: done
 source: captain (request, 2026-11-02)
 started: 2026-11-02T03:53:32Z
-completed:
-verdict:
+completed: 2026-11-02T15:59:14Z
+verdict: PASSED
 score:
 worktree: .worktrees/spacedock-ensign-080-annual-category-by-month
 issue:
 pr: pr-merge:54
-mod-block: merge:pr-merge
+mod-block:
 gates:
     version: 1
     records:
@@ -70,7 +70,8 @@ gates:
                 reason: Captain approved in Subspace review with no annotations and confirmed the new screen on staging.
               application:
                 target-stage: done
-                state: pending
+                state: consumed
+archived: 2026-11-02T15:59:14Z
 ---
 
 In Reports > Annual, clicking a category lists every single expense from the year (e.g. five Daily Necessity items in October, five more in September), which makes it hard to see how spending in that category changes month to month.
