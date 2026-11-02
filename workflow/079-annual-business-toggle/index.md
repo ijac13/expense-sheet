@@ -185,3 +185,23 @@ Semantics this may change: none stored. `MonthlyTrend` gains two fields; the sum
 ### Summary
 
 The chart's monthly data is computed Life-only and the chart never receives the toggle, so it cannot change; the screenshots (headline 2.64M vs 3.40M, Oct bar NT$206,081 in both) match. Reproduced on the real Reports page in jsdom via the enlarged chart's tap readout, which also proves the test harness for the fix. One open question for the captain: whether "By payer" (also Life-only by design) should follow the toggle; spec keeps it out of scope.
+
+## Stage Report: build
+
+Plan: keep Life and business apart per month in `getAnnualSummary`, add `business`/`prev_business` to `MonthlyTrend`, and have `TrendCard` map the shown amounts once under `includeBusiness`, then hand them to both charts. Commit `0f4fb05`.
+
+- DONE: Implementation on the build branch: monthly_trend carries business/prev_business per month and TrendCard (inline + enlarged chart + tap readout) shows total+business when "Include business costs" is on
+  `reportService.ts` `monthSplit` (payer-filtered, business = all minus Life); `page.tsx` `TrendCard` gets `includeBusiness` and passes the adjusted data to the inline and enlarged charts.
+- DONE: AC-1 to AC-5 each checked off with evidence from new tests in `cd app && npm test`, full suite green, no regression to existing Life-only assertions
+  `npm test`: 294/294 pass; `tsc --noEmit -p .` clean. Falsifiers were run as throwaway edits to the compiled output, then rebuilt:
+  - AC-1/AC-2 (page test "enlarged chart's bars follow the … toggle"): Oct reads NT$32,750 then NT$67,600, Aug NT$0 then NT$38,900, and back to the same Life readouts after "Life only". Fails if TrendCard gets `includeBusiness: false`.
+  - AC-2 regression: "the annual trend and total are Life only too" and `reports-annual-compare` `monthly_trend` asserts pass unchanged. Fail if `total` includes business.
+  - AC-3 (data test + page test): `prev_business` Oct 28,000 / Aug 0; the readout shows last year at 29,200 with business. Fails if the page drops `prev_business`.
+  - AC-4 (data test "…bars add up to the headline"): sum(total) = `a.total`; sum(total+business) = `total + rent + uber`. Fails if business ignores the Uber-tagged fuel row.
+  - AC-5 (data test "…only the chosen payer's rows"): Oct business is 34,850 for user1 and 5,000 for user2. Fails if business is computed before `filterByPayer`.
+- DONE: Diff size within the spec's +60 LOC ±40% tolerance across the 4 named files, or the deviation explained
+  Same 4 files, +118/−16 (net +102, about 170% of the estimate; the ceiling is +84). Production code is +15 net, under the estimate. The overage is the test file (+87 against about +40): a separate payer-filter test, a last-year fixture, and a readout loop that taps every drawn bar.
+
+### Summary
+
+The chart now follows the toggle for this year's and last year's bars, and agrees with the headline in both modes. Unplanned addition, needed for AC-1 and already broken in production: Recharts 3.8 skips zero-height bars and passes `onClick` an index that counts only the drawn bars. So tapping a bar after a NT$0 month opened the wrong month in the readout (the Aug bar read as Jan). `TrendBars` now uses `originalDataIndex` (3 lines in `page.tsx`); without it the page test fails. Local setup note: the worktree's `app/node_modules` is a symlink to the main checkout's, which is untracked and not committed.
