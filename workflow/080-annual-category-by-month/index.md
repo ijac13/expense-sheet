@@ -1,7 +1,7 @@
 ---
 id: 080
 title: Reports > Annual category drilldown shows monthly totals, trend chart, then expenses
-status: build
+status: verify
 source: captain (request, 2026-11-02)
 started: 2026-11-02T03:53:32Z
 completed:
