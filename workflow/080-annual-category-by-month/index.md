@@ -230,3 +230,54 @@ Plan (written before coding): move 079's chart block out of `page.tsx` into `Tre
 ### Summary
 
 Annual category rows now open a month-by-month view: header with the year total and count, a category-only trend chart (079's TrendCard moved unchanged to `TrendChart.tsx`), month rows newest first, and a tap into one month's expenses via the unchanged `DrillDown`. Month totals come from the same `getExpensesByCategory` filter as the tapped row, so they always add up to it and the business toggle needs no extra handling. One new i18n key (`reports.by_month`); counts reuse `reports.transactions`. The `app/node_modules` symlink used to run tests is untracked and not committed.
+
+## Verify: how it works, and how to try it
+
+### What changed on screen
+
+- On Reports > Annual, tapping a category row (for example Eating Out under Living costs) now opens a "month by month" screen instead of a long list of every expense in the year.
+- At the top: the category name, the year, the year total (same number as the row you tapped) and how many expenses that is.
+- Below: a bar chart for just that category, this year's bar beside last year's grey bar, with the same enlarge button and tap-a-bar readout as the main Annual chart.
+- Below the chart: a "By month" list, newest month first. A month with no spending shows NT$0 and cannot be tapped.
+- Tapping a month opens that month's expenses (the same list screen used today). Tapping an expense opens the usual edit sheet.
+- Back goes one step at a time: month, then the month list, then Annual.
+
+### What happens behind the scenes
+
+- Nothing on the server changed. The app already asks the server for "all expenses in this category for this year, for this group and payer". The new screen asks the same question once for this year and once for last year, then adds up each month's expenses on the phone.
+- Because it is the exact same question the Annual row used, the 12 month totals always add up to the row you tapped, and the Life only / Include business costs toggle needs no special handling.
+- When you come Back from a month, the screen asks again, so an edit you just made shows straight away.
+
+### Try it on staging (https://expense-sheet-staging.web.app)
+
+Staging has no Daily Necessities spending in October, so these steps use Eating Out, which has October spending.
+
+1. Open the staging link on your phone and sign in.
+2. Tap Reports, then Annual (year 2026). Under Living costs, Eating Out reads NT$666.
+3. Tap Eating Out. Expected: total NT$666, 6 transactions; a bar chart; "By month" list: Nov NT$222 (2), Oct NT$222 (2), Sep NT$222 (2), Aug to Jan NT$0 (greyed out).
+4. Tap the enlarge button on the chart and tap the October bar. Expected readout: "Oct · 2025 NT$0 · 2026 NT$222". Close it.
+5. Tap Oct. Expected: two expenses, total NT$222. One is NT$122 dated 2026-10-01.
+6. Optional edit check: tap the NT$122 expense, Edit, change the amount to 222, Save. The October total becomes NT$322. Tap Back: Oct now reads NT$322, the October bar reads NT$322, the total reads NT$766. Tap Back again: Eating Out on Annual reads NT$766. Then change that expense back to 122.
+7. Also worth a look: Daily Necessities (NT$1,923) shows Sep NT$843 and Jan NT$1,080, every other month NT$0.
+
+## Stage Report: verify
+
+- DONE: Build branch deployed to staging (hosting only) and confirmed live by content match, with the staging URL for the captain
+  Fresh build of `6c7927d` (out/.next removed first) with `.env.staging` loaded only in the shell (gitignored copy, not committed); 0 files mention the production project id; `firebase deploy --only hosting --project staging`; `git checkout app/public/manifest.json`. sha256 `out/index.html` = curl `/` = `bc2a3b90…6c0b0ae6`; `reports.html` = `347e7818…` both sides and references chunk `0gu37dnraqnxx.js`, which is byte-identical served vs local (`ff5940b2…`) and contains `reports.by_month` (new in this branch); served `/locales/en/common.json` has `"by_month": "By month"`. Unauthenticated `GET /api` returns 401. URL: https://expense-sheet-staging.web.app
+- DONE: Verification report mapping AC-1..AC-10 to pass/fail with concrete evidence, including the AC-9 live staging drive (edit an expense inside a month, Back shows the updated month total and bar)
+  `cd app && npm test`: 302/302 pass. Independent falsifiers on the compiled code, reverted after (tree clean, suite re-run 8/8):
+  - AC-1, AC-2 PASS: test asserts Nov 0, Oct 1,000·4, Sep 400·2, Aug 700·1, Jul..Jan 0, sum 2,100. Dropping `group` from `getCategoryMonths` fails 6 of 8 tests. Live staging rows through the real page: every Living/Rent/Uber row's months add up to the row (e.g. Daily Necessities 1,923 = Jan 1,080 + Sep 843; Rent 470,000).
+  - AC-3 PASS: test reads Oct "2025 NT$600 · 2026 NT$1,000", Aug "2025 NT$0 · 2026 NT$700". Live: Eating Out Oct bar "Oct · 2025 NT$0 · 2026 NT$222".
+  - AC-4 PASS: Oct opens 4 rows NT$1,000; Back to month list; Back to Annual. Live: Eating Out Oct opens 2 expenses NT$222.
+  - AC-5, AC-6, AC-7 PASS: tests for toggle (Living unchanged, Rent row only NT$5,000 Oct), payer (Aug NT$0 disabled, sum 1,400), past year (12 rows, only Oct tappable).
+  - AC-8 PASS: Monthly and Earnings tests pass unedited; `DrillDown.tsx` not in the diff.
+  - AC-9 PASS (live data; signed-in tap left to the captain): staging rows through the compiled page, edit made in the real edit sheet on Eating Out > Oct, NT$122 -> 222: PATCH sent with amount 222; Oct screen NT$322; Back: Oct row NT$322, Oct bar "2026 NT$322", total NT$766; Back: Annual row NT$766. Then the same amount was written to the staging sheet (Expenses!C96), re-read fresh: Oct row and bar NT$322, total 766. Restored to the original "122" (cell re-read matches; Oct total back to 222, 1,506 rows). The script ran twice (once more under the refetch falsifier); both runs restored. Removing the refetch-on-Back fails the edit test, and the live drive then shows a stale NT$222 after Back.
+  - AC-10 PENDING: the captain's own check on a phone, steps above. A signed-in browser drive is not possible here (sign-in needs the captain's Google account; headless browsers crash in this sandbox, as in 079).
+- DONE: Plain-language explanation of the frontend behavior and backend flow, plus exact try-it steps on staging for the captain (AC-10)
+  Section "Verify: how it works, and how to try it" above; uses Eating Out because staging has no October Daily Necessities.
+- DONE: Mandatory PII / secrets check
+  No `.env` files, keys, emails, phone numbers or URLs in the branch diff; fixtures use `ijac`/`wei`/`user1`; `git status` clean.
+
+### Summary
+
+Recommend PASSED: AC-1..AC-9 have test and live-staging evidence with independent falsifiers, and staging serves exactly this build (hash match). The one staging edit was restored to its original value. AC-10 is the captain's phone check on staging; note that the try-it steps use Eating Out > October, since staging's Daily Necessities has no October spending. Production was not touched.
