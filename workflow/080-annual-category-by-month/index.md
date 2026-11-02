@@ -206,3 +206,27 @@ Overlap with 079: 079 changes `TrendBars`/`TrendCard` and the Annual `TrendCard`
 ### Summary
 
 Wrote the spec for a month-by-month Annual category view: header, a category-only trend chart reusing 079's TrendCard, month rows newest first, and a tap into one month's expenses via the existing list screen. The spike confirmed the per-month totals add up to the tapped row and that TrendCard handles a sparse category series; the one open question for the captain is whether the category chart keeps last year's bars (recommended yes).
+
+## Stage Report: build
+
+Plan (written before coding): move 079's chart block out of `page.tsx` into `TrendChart.tsx` verbatim; add `getCategoryMonths` built on `getExpensesByCategory` (this year + last year, same payer and group) so months add up to the row; new `CategoryYear.tsx` renders header, `TrendCard` with `includeBusiness={false}`, month rows, and `DrillDown` for one month; route the Annual drill-down branch in `page.tsx` to it; pin today in the new test file.
+
+- DONE: Implementation on the build branch (from main with 079 merged): Annual category tap opens CategoryYear with header, category-only TrendCard (this year + last year, moved to TrendChart.tsx with 079's fixes intact), month rows newest first, month tap opens DrillDown for one month, Back month -> list -> Annual
+  Commit 33d95a3. `git merge-base --is-ancestor 2f1d646 HEAD` passed before the move; `diff` of 2f1d646's page.tsx:391-522 against TrendChart.tsx:12-143 differs only in `export default` on TrendCard (includeBusiness + originalDataIndex intact). `next build` and `tsc --noEmit` pass.
+- DONE: AC-1 to AC-8 each checked off with evidence from new tests in `cd app && npm test`, full suite green, 079's existing trend/toggle tests still passing unchanged
+  `npm test`: 302/302 pass (294 baseline + 8 new in `app/test/reports-annual-category.render.test.js`, today pinned to 2026-11-02). Per claim:
+  - AC-1/AC-2: rows read exactly Nov NT$0, Oct NT$1,000·4, Sep NT$400·2, Aug NT$700·1, Jul..Jan NT$0; no expense notes on screen; sum = NT$2,100. Fails if Annual still opens `DrillDown month={null}` (mutation run: all 8 fail) or if the group filter is dropped from `getCategoryMonths` (mutation run: 6 of 8 fail).
+  - AC-3: enlarged category chart, every bar tapped: Oct "2025 NT$600 · 2026 NT$1,000", Aug "2025 NT$0 · 2026 NT$700". Fails if the chart gets Annual's `monthly_trend` or loses the group filter.
+  - AC-4: Oct opens 4 rows, total NT$1,000, no #大筆; Back shows 11 month rows; Back again shows `cost-groups`. Fails if Back from October jumps to Annual or the group is not passed to DrillDown.
+  - AC-5: Living months identical with toggle on/off; Rent row opens only Oct NT$5,000·1 and its single item. Fails if business costs leak into Life months or the Rent group is dropped.
+  - AC-6: payer ijac: Aug NT$0, button disabled, sum 1,400. Fails if payer "all" is fetched.
+  - AC-7: 2025 lists Dec..Jan (12), only Oct NT$600 tappable. Fails if the list is cut at today's month for every year.
+  - Edges: a Dec expense dated ahead is listed (sum 2,180); a change in October shows on the month list after Back (refetch on return).
+  - AC-8: `reports-monthly-compare` and `income-earnings` tests pass with no edits; 079's trend/toggle tests in `reports-annual-compare` and `income-earnings` pass unchanged; `reports-annual-groups` AC-6 gained 2 lines to tap January first. `DrillDown.tsx` untouched.
+  - AC-9, AC-10 are interactive (staging), left for verify and the captain.
+- DONE: Diff size within the spec's +370 LOC ±40% across the named files, or the deviation explained
+  `git diff --numstat` vs main: +553 / -148 = +405 net across 10 files (spec named 9; the 10th is `package.json`'s test list, which the spec also mentioned). Within tolerance (222-518). Test file is 206 vs ~180 estimated.
+
+### Summary
+
+Annual category rows now open a month-by-month view: header with the year total and count, a category-only trend chart (079's TrendCard moved unchanged to `TrendChart.tsx`), month rows newest first, and a tap into one month's expenses via the unchanged `DrillDown`. Month totals come from the same `getExpensesByCategory` filter as the tapped row, so they always add up to it and the business toggle needs no extra handling. One new i18n key (`reports.by_month`); counts reuse `reports.transactions`. The `app/node_modules` symlink used to run tests is untracked and not committed.
