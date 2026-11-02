@@ -292,19 +292,26 @@ export async function getAnnualSummary(
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
   ];
 
-  const monthTotal = (y: number, mo: number) => {
+  // Life and business (Rent + Uber) per month, kept apart so the page can add
+  // business in when "Include business costs" is chosen, as the headline does.
+  const monthSplit = (y: number, mo: number) => {
     const ym = makeDate(y, mo, 1).slice(0, 7);
-    return sum(lifeOnly(filterByPayer(
-      allExpenses.filter((e) => e.date.startsWith(ym)),
-      payer
-    ), categories));
+    const list = filterByPayer(allExpenses.filter((e) => e.date.startsWith(ym)), payer);
+    const life = sum(lifeOnly(list, categories));
+    return { life, business: sum(list) - life };
   };
-  const monthly_trend: MonthlyTrend[] = MONTH_SHORT.map((label, i) => ({
-    month: i + 1,
-    label,
-    total: monthTotal(year, i + 1),
-    prev_total: monthTotal(year - 1, i + 1),
-  }));
+  const monthly_trend: MonthlyTrend[] = MONTH_SHORT.map((label, i) => {
+    const cur = monthSplit(year, i + 1);
+    const prev = monthSplit(year - 1, i + 1);
+    return {
+      month: i + 1,
+      label,
+      total: cur.life,
+      prev_total: prev.life,
+      business: cur.business,
+      prev_business: prev.business,
+    };
+  });
 
   // While the viewed year is running, last year is cut at today's month-day so
   // both sides cover the same days. A string compare keeps Feb 29 safe.

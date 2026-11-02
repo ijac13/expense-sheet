@@ -409,12 +409,15 @@ function TrendLegend({ year }: { year: number }) {
 }
 
 function TrendBars({ year, onPick }: { year: number; onPick?: (index: number) => void }) {
+  // Recharts skips zero-height bars and numbers only the drawn ones, so the
+  // month comes from originalDataIndex, not the click's index.
+  const onClick = onPick ? (bar: { originalDataIndex: number }) => onPick(bar.originalDataIndex) : undefined;
   return (
     <>
       <Bar dataKey="prev_total" name={String(year - 1)} fill={LAST_YEAR_COLOR} radius={[3, 3, 0, 0]}
-        onClick={onPick ? (_: unknown, i: number) => onPick(i) : undefined} />
+        onClick={onClick} />
       <Bar dataKey="total" name={String(year)} fill={THIS_YEAR_COLOR} radius={[3, 3, 0, 0]}
-        onClick={onPick ? (_: unknown, i: number) => onPick(i) : undefined} />
+        onClick={onClick} />
     </>
   );
 }
@@ -480,9 +483,12 @@ function TrendFullscreen({ data, year, onClose }: { data: MonthlyTrend[]; year: 
   );
 }
 
-function TrendCard({ data, year }: { data: MonthlyTrend[]; year: number }) {
+function TrendCard({ data: trend, year, includeBusiness }: { data: MonthlyTrend[]; year: number; includeBusiness: boolean }) {
   const { t } = useTranslation();
   const [enlarged, setEnlarged] = useState(false);
+  const data = includeBusiness
+    ? trend.map((m) => ({ ...m, total: m.total + m.business, prev_total: m.prev_total + m.prev_business }))
+    : trend;
   return (
     <div className="bg-base-200 rounded-2xl p-4">
       <div className="flex items-center justify-between mb-3">
@@ -1095,7 +1101,7 @@ export default function ReportsPage() {
                 <EarningsLink summary={earnings} year={annualYear} month={null} />
 
                 {/* Monthly trend chart — this year vs last year */}
-                {mounted && <TrendCard data={annual.monthly_trend} year={annualYear} />}
+                {mounted && <TrendCard data={annual.monthly_trend} year={annualYear} includeBusiness={includeBusiness} />}
 
                 {/* Cost groups — Fixed / Big extras / Living costs (071) */}
                 {(annual.expense_count > 0 || shownTotal(0, annual.groups, true) > 0) && (
