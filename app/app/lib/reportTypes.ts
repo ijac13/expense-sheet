@@ -48,6 +48,12 @@ export interface MonthlyTrend {
   prev_business: number;
 }
 
+// One month of a single category on Annual (080): its own totals only, so the
+// business fields stay 0 and the count is how many expenses make up `total`.
+export interface CategoryMonth extends MonthlyTrend {
+  count: number;
+}
+
 // The captain's planning-sheet split of a year: Fixed (categories switched on as
 // fixed), Big extras (other expenses noted #大筆), Living costs (the rest) —
 // together, Life. Rent and Uber each hold their business's costs, which stay out

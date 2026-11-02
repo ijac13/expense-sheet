@@ -117,6 +117,8 @@ test("AC-6: a living row drills into exactly its own expenses", async () => {
 
   const travelLiving = allByTestId(page, "living-row").find((r) => r.textContent.includes("Travel"));
   await click(travelLiving);
+  // Annual opens the category month by month (080); January holds the rows.
+  await click(allByTestId(page, "category-month-row").find((r) => r.textContent.startsWith("Jan")));
   assert.equal(drillTotal(), "NT$1,200", "the drill-down total matches the living row");
   assert.ok(page.textContent.includes("高鐵"));
   assert.ok(!page.textContent.includes("日本機票"), "the tagged trip is not in the living drill-down");

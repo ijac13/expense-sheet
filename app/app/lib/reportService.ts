@@ -10,6 +10,7 @@ import {
   CategoryBreakdown,
   PayerBreakdown,
   MonthlyTrend,
+  CategoryMonth,
   PayerFilter,
   CostGroup,
   AnnualCostGroups,
@@ -374,6 +375,38 @@ export async function getExpensesByCategory(
   return expenses
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((e) => toReportExpense(e, categories));
+}
+
+/**
+ * One category's year month by month (080): the 12 months of `year`, each with
+ * the total and count of the same expenses getExpensesByCategory lists for it
+ * (same payer and group), beside the same month a year earlier. Built from that
+ * fetch, so the months always add up to the row the captain tapped.
+ */
+export async function getCategoryMonths(
+  year: number,
+  categoryId: string,
+  payer: PayerFilter = "all",
+  group?: CostGroup
+): Promise<CategoryMonth[]> {
+  const [cur, prev] = await Promise.all([
+    getExpensesByCategory(year, null, categoryId, payer, group),
+    getExpensesByCategory(year - 1, null, categoryId, payer, group),
+  ]);
+  const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const inMonth = (list: ReportExpense[], m: number) => list.filter((e) => Number(e.date.slice(5, 7)) === m);
+  return MONTH_SHORT.map((label, i) => {
+    const mine = inMonth(cur, i + 1);
+    return {
+      month: i + 1,
+      label,
+      total: sum(mine),
+      prev_total: sum(inMonth(prev, i + 1)),
+      business: 0,
+      prev_business: 0,
+      count: mine.length,
+    };
+  });
 }
 
 /**
