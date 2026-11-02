@@ -42,8 +42,10 @@ export interface MonthlySummary {
 export interface MonthlyTrend {
   month: number;
   label: string; // e.g. "Jan"
-  total: number;
+  total: number; // Life only
   prev_total: number; // the same month, one year earlier
+  business: number; // Rent + Uber costs, added in when business costs are included
+  prev_business: number;
 }
 
 // The captain's planning-sheet split of a year: Fixed (categories switched on as

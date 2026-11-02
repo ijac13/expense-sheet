@@ -468,3 +468,90 @@ test("Reports shows the donut and its slice list in one card, and the group deta
   assert.ok(!chart.querySelector('[data-testid="group-total-living"]'));
   assert.equal(chart.nextElementSibling, details, "details follow the chart card");
 });
+
+// ---------------------------------------------------------------------------
+// Annual monthly trend follows "Include business costs" (079)
+// ---------------------------------------------------------------------------
+
+// Last year: Life + Rent in October, Life only in August, so every month
+// asserted below has a bar to tap in both modes.
+const PREV_YEAR = [
+  row("p1", "cat_001", 1200, "2025-10-04"),
+  row("p2", "cat_026", 28000, "2025-10-01"),
+  row("p3", "cat_001", 500, "2025-08-04"),
+];
+
+test("annual trend: each month carries its business costs, this year and last, and the bars add up to the headline", async () => {
+  installGlobals({ categories: CATEGORIES, expenses: [...EXPENSES, ...PREV_YEAR], incomes: INCOMES });
+  const { getAnnualSummary } = lib("reportService");
+  const a = await getAnnualSummary(2026, "all", new Date(2026, 11, 31));
+  const oct = a.monthly_trend[9];
+  const aug = a.monthly_trend[7];
+
+  assert.deepEqual([oct.total, oct.business], [32750, 30000 + 2450 + 2400], "Uber-tagged fuel counts as business");
+  assert.deepEqual([aug.total, aug.business], [0, 30000 + 8900], "a Rent-only month");
+  assert.deepEqual([oct.prev_total, oct.prev_business], [1200, 28000]);
+  assert.deepEqual([aug.prev_total, aug.prev_business], [500, 0]);
+
+  const add = (f) => a.monthly_trend.reduce((s, m) => s + f(m), 0);
+  assert.equal(add((m) => m.total), a.total, "Life only: bars sum to the headline");
+  assert.equal(
+    add((m) => m.total + m.business),
+    a.total + a.groups.rent.total + a.groups.uber.total,
+    "Include business costs: bars sum to the headline"
+  );
+});
+
+test("annual trend: business per month counts only the chosen payer's rows", async () => {
+  const wei = [row("w1", "cat_026", 5000, "2026-10-02", { paid_by: "wei" }), row("w2", "cat_001", 700, "2026-10-02", { paid_by: "wei" })];
+  installGlobals({ categories: CATEGORIES, expenses: [...EXPENSES, ...wei], incomes: INCOMES });
+  const { getAnnualSummary } = lib("reportService");
+  const ijac = await getAnnualSummary(2026, "user1", new Date(2026, 11, 31));
+  const weiOnly = await getAnnualSummary(2026, "user2", new Date(2026, 11, 31));
+  assert.deepEqual([ijac.monthly_trend[9].total, ijac.monthly_trend[9].business], [32750, 34850]);
+  assert.deepEqual([weiOnly.monthly_trend[9].total, weiOnly.monthly_trend[9].business], [700, 5000]);
+});
+
+test("Reports > Annual: the enlarged chart's bars follow the Life only / Include business costs toggle", async () => {
+  // The page opens on today's year, so the fixture moves to it.
+  const Y = new Date().getFullYear();
+  const shift = (e) => ({ ...e, date: `${Number(e.date.slice(0, 4)) + Y - 2026}${e.date.slice(4)}` });
+  installGlobals({ categories: CATEGORIES, expenses: [...EXPENSES, ...PREV_YEAR].map(shift), incomes: [] });
+  global.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 0);
+  global.cancelAnimationFrame = (id) => clearTimeout(id);
+  const page = await mount(loadPage("reports/page.js"));
+  await click(key(page, "reports.annual"));
+  await React.act(async () => {});
+  const scope = (label) => key(page.querySelector('[data-testid="scope-toggle"]'), label);
+
+  // Tap every drawn bar in the enlarged chart; return the readout per month.
+  const readouts = async () => {
+    await click(page.querySelector('[data-testid="trend-enlarge"]'));
+    await React.act(() => new Promise((r) => setTimeout(r, 50)));
+    const full = page.querySelector('[data-testid="trend-fullscreen"]');
+    const out = {};
+    const bars = () => full.querySelectorAll(".recharts-bar-rectangle path");
+    // A tap re-draws the bars, so each is looked up again.
+    for (let i = 0; i < bars().length; i++) {
+      await click(bars()[i]);
+      const text = full.querySelector('[data-testid="trend-picked"]').textContent;
+      out[text.slice(0, 3)] = text;
+    }
+    await click(full.querySelector('button[aria-label="reports.close"]'));
+    return out;
+  };
+  const line = (m, prev, cur) => `${m} · ${Y - 1} NT$${prev.toLocaleString()} · ${Y} NT$${cur.toLocaleString()}`;
+
+  const life = await readouts();
+  assert.equal(life.Oct, line("Oct", 1200, 32750));
+  assert.equal(life.Aug, line("Aug", 500, 0));
+
+  await click(scope("reports.include_business"));
+  assert.equal(scope("reports.include_business").getAttribute("aria-pressed"), "true");
+  const all = await readouts();
+  assert.equal(all.Oct, line("Oct", 1200 + 28000, 32750 + 32450 + 2400), "NT$67,600 this year");
+  assert.equal(all.Aug, line("Aug", 500, 38900), "the water heater month");
+
+  await click(scope("reports.life_only"));
+  assert.deepEqual(await readouts(), life, "back to Life only");
+});
