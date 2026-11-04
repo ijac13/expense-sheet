@@ -1,6 +1,6 @@
 ---
 title: Keep the backend awake so Home, Report and History open without a 4-second wait
-status: build
+status: verify
 source: captain (report "prod is slower now", 2026-11-04)
 id: 081
 gates:
