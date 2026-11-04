@@ -1,6 +1,6 @@
 ---
 title: Keep the backend awake so Home, Report and History open without a 4-second wait
-status: spec
+status: build
 source: captain (report "prod is slower now", 2026-11-04)
 id: 081
 gates:
@@ -46,7 +46,19 @@ gates:
                 id: briefing:081:spec:attempt-2:revision-1
                 digest: sha256:8b51dfdeb37a7637ef6d922b329d9735136038330b127938e03a2a02b320a9f6
                 room-ref: '@review/spec/briefing-2'
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:081:spec:2
+                briefing: briefing:081:spec:attempt-2:revision-1
+                by: person:captain
+                at: "2026-11-04T07:44:52.556357Z"
+                decision: approve
+                reason: 'Captain chose option 1 in chat (''option 1'': approve and build), superseding the pane''s revise whose note read ''1 and 2 are good. Don''t do #3, #4''. Build A (Home Save from cached live categories) + B (slim @googleapis/sheets). Options 3 (keep-warm ping) and 4 (paid minInstances) are excluded.'
+              application:
+                target-stage: build
+                state: consumed
 started: 2026-11-04T06:15:22Z
+worktree: .worktrees/spacedock-ensign-081-backend-always-awake
 ---
 
 ## Question for the captain
