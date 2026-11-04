@@ -57,6 +57,14 @@ gates:
               application:
                 target-stage: build
                 state: consumed
+        - id: gate:081:verify
+          stage: verify
+          attempts:
+            - id: gate-attempt:081-verify-1
+              briefing:
+                id: briefing:081:verify:attempt-1:revision-1
+                digest: sha256:68ff8c9e38c813193ea45d6e049b4cb73b70140ae50145d406e374b93837b5ab
+                room-ref: '@review/verify/briefing-1'
 started: 2026-11-04T06:15:22Z
 worktree: .worktrees/spacedock-ensign-081-backend-always-awake
 ---
