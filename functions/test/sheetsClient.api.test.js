@@ -1,6 +1,6 @@
 // Run with: npm run build && node --test test/
 // Entity 063, AC-7. Drives the REAL exported `api` handler twice against a
-// googleapis stub that counts calls to google.auth.getClient(), so the
+// @googleapis/sheets stub that counts calls to auth.getClient(), so the
 // assertion lands on whether the backend actually re-minted an OAuth token on
 // a second request — not on reading the source. See test/sheetsStub.js for
 // the shared stub pieces reused here.
@@ -10,20 +10,18 @@ const { makeSheets, call, makeAuthStub, installAuthStub, AUTHORIZED_EMAILS } = r
 
 const HEADER = ["id", "name_en", "name_zh", "icon", "sort_order", "is_active", "gov_category"];
 
-/** Same shape as sheetsStub's loadApi, but with a googleapis stub that counts
- * google.auth.getClient() calls instead of one that resolves silently. */
+/** Same shape as sheetsStub's loadApi, but with a @googleapis/sheets stub that
+ * counts auth.getClient() calls instead of one that resolves silently. */
 function loadApiCountingAuth(sheets) {
   let getClientCalls = 0;
-  const id = require.resolve("googleapis");
+  const id = require.resolve("@googleapis/sheets");
   require.cache[id] = {
     id,
     filename: id,
     loaded: true,
     exports: {
-      google: {
-        auth: { getClient: async () => { getClientCalls++; return {}; } },
-        sheets: () => sheets,
-      },
+      auth: { getClient: async () => { getClientCalls++; return {}; } },
+      sheets: () => sheets,
     },
   };
   installAuthStub(makeAuthStub());
@@ -45,7 +43,7 @@ test("AC-7: a warm instance reuses one authenticated Sheets client across reques
 
   const second = await call(api, "GET", "/api/categories");
   assert.equal(second.status, 200);
-  assert.equal(getClientCalls(), 1, "a second request on the same warm instance did not call google.auth.getClient() again");
+  assert.equal(getClientCalls(), 1, "a second request on the same warm instance did not call auth.getClient() again");
 });
 
 test("AC-7: different endpoints on the same warm instance still share the one client", async () => {

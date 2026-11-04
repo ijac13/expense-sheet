@@ -221,12 +221,12 @@ function installAuthStub(authStub) {
 
 /** Install the stub, then load the compiled handler on top of it. */
 function loadApi(sheets, authStub = makeAuthStub()) {
-  const id = require.resolve("googleapis");
+  const id = require.resolve("@googleapis/sheets");
   require.cache[id] = {
     id,
     filename: id,
     loaded: true,
-    exports: { google: { auth: { getClient: async () => ({}) }, sheets: () => sheets } },
+    exports: { auth: { getClient: async () => ({}) }, sheets: () => sheets },
   };
   installAuthStub(authStub);
   process.env.SPREADSHEET_ID = "sheet-under-test";
