@@ -25,6 +25,14 @@ gates:
               application:
                 target-stage: spec
                 state: consumed
+        - id: gate:081:spec
+          stage: spec
+          attempts:
+            - id: gate-attempt:081-spec-1
+              briefing:
+                id: briefing:081:spec:attempt-1:revision-1
+                digest: sha256:a76af3ea05b6eaf5f0dbdc132eced194a64d7dbadd69171aac8afb522a2f9106
+                room-ref: '@review/spec/briefing-1'
 started: 2026-11-04T06:15:22Z
 ---
 

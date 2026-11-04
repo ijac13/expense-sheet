@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:081:spec:attempt-1:revision-1",
+  "question": "Approve the spec: set minInstances 1 on the api function only (~USD 8/month per project), and answer Q1 cost and Q2 staging-too?",
+  "artifacts": [
+    {
+      "id": "artifact:081:spec:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/da3ce7c2e2342b24c07d837a97d55d2216f724c4/workflow/081-backend-always-awake/index.md",
+      "rev": "sha256:3e3dd99560663a457af7c0117b0192e2c5d51989164ea218b5248ddc1e385114",
+      "mediaType": "text/markdown",
+      "summary": "Add minInstances: 1 to the api function options (functions/src/index.ts:299), per function so the daily scheduler stays asleep. Cost ~USD 8/month per project (256 MiB, 1 vCPU); kill switch is USD 32. Read-only checks: staging and prod configs identical, minInstances null today. AC-1..2 offline test, AC-3..4 staging, AC-5 prod after captain's deploy, AC-6 captain feels it. ~+25 LOC, 2 files. Questions: Q1 is USD 8/month OK; Q2 keep staging awake too (recommended) or prod only."
+    }
+  ]
+}
