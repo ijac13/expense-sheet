@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:081:ideation:attempt-1:revision-1",
+  "question": "Approve this direction: keep one copy of the production backend always running so the first visit after a break no longer waits ~4 seconds?",
+  "artifacts": [
+    {
+      "id": "artifact:081:ideation:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/235b91cecd8281526572fc756d455c561ba3ef52/workflow/081-backend-always-awake/index.md",
+      "rev": "sha256:01a4cf5dc4da2d48de23825fa7fa4e43a1ccb97c98dda2a2c45395d7701938a4",
+      "mediaType": "text/markdown",
+      "summary": "Cause found: the backend sleeps when idle; first request 4.2s, then 0.45s. Home's Save, Report and History all wait on it. Not caused by 079/080 (website only). Direction: set minimum one running instance on the api function, then deploy the backend. Excludes moving to Taiwan and faster startup. Spec owes the exact setting, monthly cost, staging check, and the captain's prod backend deploy command."
+    }
+  ]
+}

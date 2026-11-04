@@ -3,6 +3,17 @@ title: Keep the backend awake so Home, Report and History open without a 4-secon
 status: ideation
 source: captain (report "prod is slower now", 2026-11-04)
 id: 081
+gates:
+    version: 1
+    records:
+        - id: gate:081:ideation
+          stage: ideation
+          attempts:
+            - id: gate-attempt:081-ideation-1
+              briefing:
+                id: briefing:081:ideation:attempt-1:revision-1
+                digest: sha256:57f3097ad9f94583da80b1d80988e35b5b48c80ba152148eb5948cd8c4bb876d
+                room-ref: '@review/ideation/briefing-1'
 ---
 
 After the app sits unused, the backend goes to sleep, and the next visit waits about 4 seconds while it wakes up, so Home's Save button, Report and History all feel slow.
