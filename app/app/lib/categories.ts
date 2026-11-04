@@ -280,6 +280,15 @@ export function getCachedCategories(): Category[] | null {
   }
 }
 
+/**
+ * Whether a list holds only live `cat_NNN` ids, so any one of them is a value a
+ * write may submit. Home lets Save work from a cached list only when this holds:
+ * the backend rejects a missing id, but a slug would be silently accepted.
+ */
+export function isLiveCategoryList(categories: Pick<Category, "id">[]): boolean {
+  return categories.length > 0 && categories.every((c) => /^cat_\d+$/.test(c.id));
+}
+
 /** Overwrites the cached category list. Swallows a throwing localStorage rather
  * than letting a full page crash on a successful fetch. */
 export function saveCachedCategories(categories: Category[]): void {

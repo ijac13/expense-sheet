@@ -1,7 +1,7 @@
 // Run with: npm test
-// Entity 063, AC-1/AC-2/AC-3/AC-4/AC-5/AC-6. Mounts the real Home page and
-// asserts on what's actually on screen: which category list paints first,
-// whether Save is correctly gated while that happens, whether the cache is
+// Entity 063, AC-2/AC-3/AC-4/AC-5/AC-6, and entity 081 AC-1..AC-4 (which
+// replace 063 AC-1). Mounts the real Home page and asserts on what's actually
+// on screen: which category list paints first, when Save is enabled, whether the cache is
 // kept fresh, and whether a same-value refresh remounts the grid or leaves it
 // alone. See test/helpers/dom.js for what the fetch/localStorage stubs emulate.
 const test = require("node:test");
@@ -61,20 +61,89 @@ test("AC-3: a device with no cache still paints DEFAULT_CATEGORIES first, exactl
 });
 
 // ---------------------------------------------------------------------------
-// AC-1 — Save stays correctly gated regardless of first-paint source.
+// Entity 081 (reverses 063 AC-1) — Save works from a cached list of live ids.
+// The backend checks every write's category_id against the live sheet, so a
+// cached cat_NNN id can't write a bad category; a slug still can, so a slug
+// cache (or no cache) keeps Save off until the live list arrives (entity 058).
 // ---------------------------------------------------------------------------
 
-test("AC-1: Save stays disabled until the live fetch resolves, even when the grid painted from a cache", async () => {
+const TWO_CACHED = [
+  CACHED[0],
+  { id: "cat_502", name_en: "Second Cached", name_zh: "第二快取", icon: "🧺", sort_order: 2, is_active: true, gov_category: "miscellaneous" },
+];
+const selectedName = (c) => selectedTile(c).map((b) => b.textContent).join("|");
+const click = (el) => React.act(async () => { el.dispatchEvent(new global.window.Event("click", { bubbles: true })); });
+const key = (c, k) => buttons(c).find((b) => b.textContent === k);
+
+test("081 AC-1: with a cached list of live ids, Save is enabled and a live id selected before the fetch resolves", async () => {
   const { container, releaseCategories } = await mountHome({ cached: CACHED, deferCategories: true });
 
-  assert.equal(saveButton(container).disabled, true, "disabled while categoriesReady is still false");
-  assert.match(statusLine(container).textContent, /categories_loading/);
-  assert.equal(selectedTile(container).length, 0, "nothing is committed to as selected yet");
+  assert.equal(saveButton(container).disabled, false, "Save works before the live fetch resolves");
+  assert.equal(statusLine(container), null, "no loading line once the cache is usable");
+  assert.equal(selectedTile(container).length, 1, "one tile is selected");
+  assert.match(selectedName(container), /Cached Category/, "the selected tile is the cached cat_501");
 
   await flush(releaseCategories);
+  assert.equal(saveButton(container).disabled, false, "still enabled after the live list arrives");
+});
 
-  assert.equal(saveButton(container).disabled, false, "enables once the live fetch actually resolves");
-  assert.equal(selectedTile(container).length, 1, "a live id is selected, not a cached/placeholder one");
+test("081 AC-2: with no cache, Save stays disabled with the loading line until the fetch resolves", async () => {
+  const { container, releaseCategories } = await mountHome({ deferCategories: true });
+
+  assert.equal(saveButton(container).disabled, true);
+  assert.match(statusLine(container).textContent, /categories_loading/);
+
+  await flush(releaseCategories);
+  assert.equal(saveButton(container).disabled, false, "enables once the live fetch resolves");
+});
+
+test("081 AC-2: a cache holding any non-cat_NNN id is treated as no cache — Save waits for live", async () => {
+  const slugged = [CACHED[0], { ...DEFAULT_CATEGORIES[0] }];
+  const { container, releaseCategories } = await mountHome({ cached: slugged, deferCategories: true });
+
+  assert.equal(saveButton(container).disabled, true, "a slug in the cache keeps Save off");
+  assert.match(statusLine(container).textContent, /categories_loading/);
+
+  await flush(releaseCategories);
+  assert.equal(saveButton(container).disabled, false);
+});
+
+test("081 AC-3: saving from the cache before the fetch resolves posts a cached cat_NNN id, never a slug", async () => {
+  const { container, expWrites } = await mountHome({ cached: TWO_CACHED, deferCategories: true });
+
+  await click(key(container, "4"));
+  await click(saveButton(container));
+
+  assert.equal(expWrites.length, 1, "the expense POST left the page while the categories fetch was still pending");
+  const sent = expWrites[0].body.category_id;
+  assert.match(sent, /^cat_\d+$/);
+  assert.ok(TWO_CACHED.some((c) => c.id === sent), `${sent} is one of the cached ids`);
+  assert.ok(!DEFAULT_CATEGORIES.some((c) => c.id === sent), "not a DEFAULT_CATEGORIES slug");
+});
+
+test("081 AC-4: a still-present selection survives the live refresh", async () => {
+  const live = [...ACTIVE_FIXTURE, { ...TWO_CACHED[1] }];
+  const { container, releaseCategories } = await mountHome({ cached: TWO_CACHED, categories: live, deferCategories: true });
+
+  await click(tileFor(container, "Second Cached"));
+  assert.match(selectedName(container), /Second Cached/);
+
+  await flush(releaseCategories);
+  assert.match(selectedName(container), /Second Cached/, "cat_502 is still in the live list, so it stays selected");
+});
+
+test("081 AC-4: a selection that vanished from the live list is replaced by a live id", async () => {
+  const { container, releaseCategories, expWrites } = await mountHome({ cached: TWO_CACHED, deferCategories: true });
+
+  await click(tileFor(container, "Second Cached"));
+  await flush(releaseCategories);
+
+  assert.equal(selectedTile(container).length, 1);
+  assert.doesNotMatch(selectedName(container), /Second Cached/, "the vanished cat_502 is no longer selected");
+  await click(key(container, "4"));
+  await click(saveButton(container));
+  const sent = expWrites[0].body.category_id;
+  assert.ok(ACTIVE_FIXTURE.some((c) => c.id === sent), `${sent} is a live id from the refreshed list`);
 });
 
 // ---------------------------------------------------------------------------
