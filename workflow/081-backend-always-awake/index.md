@@ -301,3 +301,62 @@ Revised for the captain's "no cost" request. Recommended: Home turns Save on fro
 ### Summary
 
 Home now turns Save on immediately from the device's cached category list when every cached id is a live `cat_NNN` id; no cache or a slug cache keeps today's wait. The backend loads `@googleapis/sheets` instead of the full `googleapis` bundle (local load ~540 ms to ~135 ms; the Cloud Run saving is verify's AC-7). `googleapis` stays as a devDependency for the one-off scripts, whose tests still stub it.
+
+## Verify: for the captain
+
+### Staging URL for your own test
+
+https://expense-sheet-staging.web.app (the staging app; its icon says "Expenses β").
+
+### What changed on screen (frontend walkthrough)
+
+- Open Home on a phone or browser that has used the staging app before. The category tiles and the Save button are ready right away, with no grey "loading categories" wait.
+- The app remembers the category list from your last visit. It lets you save from that remembered list straight away, then quietly refreshes the list in the background.
+- If the category you picked still exists after the refresh, it stays picked. If it was deleted meanwhile, the app switches to a category that exists.
+- A brand-new device (never opened the app) still waits for the live list, exactly as before.
+
+### What changed behind the scenes (backend explanation)
+
+- The backend is the small program at Google that reads and writes your spreadsheet. After about 15 minutes with no use, Google puts it to sleep; the next visit wakes it up, which caused the ~4-5 second wait.
+- Waking up includes loading a "Google tools" add-on. We used to load the whole Google toolbox (every Google product); now we load only the Google Sheets part. Less to load means a faster wake-up.
+- Safety net: every save is still checked by the backend against the live spreadsheet. If the remembered list holds a category that no longer exists, the backend refuses the save and Home shows an error. Nothing wrong gets written.
+- Cost: USD 0. No always-on server, no timer pings.
+
+### Production steps (AC-9, after merge, from the main checkout)
+
+Backend first, then website (the backend deploy is your command to run):
+
+1. `! cd /Users/ijac/Claude-ijac/expense-sheet && npm --prefix functions run build && firebase deploy --only functions:api --project production`
+2. Website: `git checkout app/public/manifest.json`, then `cd app && rm -rf out && npm run build`, check `out/manifest.json` says "Expense Tracker", then `firebase deploy --only hosting --project production`.
+3. After 30+ minutes unused: `curl -s -o /dev/null -w "%{http_code} %{time_total}\n" https://expense-sheet-b2db8.web.app/api/categories` should print 401 and well under 3 s (was 4.2 s), and Home's Save should work right away on your phone.
+
+### Your test on staging (AC-8)
+
+1. Leave staging unused for at least 30 minutes.
+2. On a phone or browser where you've opened the staging app before, open https://expense-sheet-staging.web.app and sign in if asked.
+3. On Home, check: within about a second, a category tile is highlighted and Save is not greyed out.
+4. Type an amount, pick a category, tap Save. The expense should appear under today's list with that category.
+5. Delete that test expense.
+
+## Stage Report: verify
+
+- DONE: Run cd app && npm test and npm --prefix functions test in the 081 worktree; record pass counts (AC-1..AC-6)
+  app 307/307, functions 379/379 at bc2b7e7. AC-1..AC-4: `category-cache.render.test.js` (build showed each fails on the unchanged page or a named mutation). AC-5: `no-googleapis.test.js`. AC-6: whole backend suite on the slim library.
+- DONE: Deploy the 081 branch to STAGING only: backend first (firebase deploy --only functions:api --project staging), then the website built with .env.staging loaded in-shell (never copy it over .env.local); run git checkout app/public/manifest.json after the staging build. Never deploy to production.
+  Both deploys were denied to me by the auto-mode classifier ("[Production Deploy]"). The captain ran them from the worktree: backend 2026-11-04T07:55:20Z (hash bb87d84b, confirmed by FO), then hosting. I built the website with `.env.staging` sourced in-shell and restored manifest.json. Nothing went to production.
+- DONE: Confirm staging serves this build (content hash match of a changed chunk) and that the deployed backend no longer loads googleapis
+  sha256 local vs live match: index.html d726d1fd, manifest.json eb423cb1, chunks 0-a-rcjkkkt8s.js 12cb0f31, 0wi1yu1-ynz54.js 860d521b. Live chunk 00tv5d6--wrml.js contains `isLiveCategoryList ... /^cat_\d+$/`. Backend: the deployed `lib/index.js` requires only `@googleapis/sheets`; loading it gives 0 `node_modules/googleapis/` modules, and `googleapis` is in devDependencies only. I could not read the running container's modules directly (gcloud is blocked); the AC-7 timings are the live signal.
+- DONE: AC-7: after at least 30 minutes with no staging traffic, curl https://expense-sheet-staging.web.app/api/categories (expect 401) and record time_total; repeat for 3 idle trials, report the median vs the 4.68 s baseline and the under-3.0 s threshold
+  Live 401s after 2054 s / 1956 s / 2353 s idle: 2.10 s, 1.98 s, 2.75 s (warm 0.45 / 0.37 / 0.72 s). Median 2.10 s vs 4.68 s baseline (and 4.74 s I measured on the old backend at 07:51 UTC): PASS, under 3.0 s. An earlier run was voided because the Mac slept.
+- FAILED: AC-8: live drive on staging: open Home after the idle wait on a browser that has opened the app before; record whether Save is usable within about a second and that an expense saves into the right category (then delete the test expense)
+  Not run by the agent: no browser tool is available in this session, and staging sign-in is a Google popup on the captain's account, which I can't and shouldn't automate. Handed to the captain as the 5-step test above. The live chunk carrying the cache-enabled Save logic is the strongest agent-side evidence.
+- DONE: Include at least one live staging HTTP response and one observed UI behaviour as evidence
+  HTTP: six live 401 timings above. UI: not observed by the agent (see AC-8); the served page code was checked by hash and content instead.
+- DONE: Write the plain-language frontend walkthrough and backend explanation for the captain, the staging URL for the captain's own test, and AC-9's production steps (captain runs the backend deploy: firebase deploy --only functions:api --project production, then the website)
+  `## Verify: for the captain` above.
+- DONE: Recommend PASSED or REJECTED with every AC mapped to evidence
+  PASSED, conditional on the captain's AC-8 staging test. AC-1..AC-6: tests. AC-5 also: deployed lib. AC-7: live median 2.10 s. AC-8: captain's test. AC-9: after the production deploys. PII/secrets: the diff has no `.env` files, keys, emails or private URLs.
+
+### Summary
+
+The staging backend now wakes in a median 2.10 s after 30+ minutes idle (was 4.68-4.74 s), under the 3.0 s bar. Tests pass and staging serves this exact build. AC-8's on-screen check needs the captain's signed-in browser, so it is handed over as concrete steps. Both staging deploys had to be run by the captain because the classifier blocked them.
