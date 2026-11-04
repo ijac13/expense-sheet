@@ -273,3 +273,31 @@ Spec sets `minInstances: 1` on the `api` function only, at about USD 8/month per
 ### Summary
 
 Revised for the captain's "no cost" request. Recommended: Home turns Save on from the device's cached live category list (the backend already rejects bad ids), plus a slimmer Sheets library that cuts backend wake-up time. Both are free. Option A reverses 063's "Save waits for live" test, which the captain's answer approves. The keep-warm ping is called out as not truly free or reliable, and paid `minInstances` stays as the comparison.
+
+## Stage Report: build
+
+- DONE: Write a brief implementation plan in the entity before coding
+  `## Implementation plan (build)`, commit 489ce00 (before any code commit).
+- DONE: Implement A: Home enables Save from a cached all-cat_NNN category list, reconciles categoryId with pickCategoryId, live fetch refreshes in background and keeps a still-present selection (app/app/page.tsx, app/app/lib/categories.ts)
+  Commit 3rd on branch (`081: Home enables Save...`): `isLiveCategoryList` in categories.ts; Home's one-time initial state reads the cache, reconciles with `pickCategoryId`, sets `categoriesReady` only when the picked id is non-empty. Live fetch path unchanged. Home mounts only after AuthGuard resolves client-side, so no hydration mismatch.
+- DONE: Implement B: replace googleapis with @googleapis/sheets in functions/src/index.ts and functions/src/scheduler.ts, re-point test stubs, move googleapis to devDependencies
+  Commit 6d2d97c. Kept `auth.getClient({ scopes })` instead of the spec's `new auth.GoogleAuth(...)`: `auth` is the same `AuthPlus` object as `google.auth`, so the call is byte-for-byte today's. Local whole-backend load: ~135 ms (spec measured ~540 ms before).
+- DONE: Add/rewrite tests for AC-1..AC-6 and confirm each new test fails when the feature is broken
+  AC-1 (Save enabled, cached tile selected, no loading line pre-fetch): fails on unchanged page and when the cache path skips `pickCategoryId`.
+  AC-2 (no cache / slug cache keep Save off with `categories_loading`): fail when the slug check is dropped (M1) or Save is ready without a cache (M4).
+  AC-3 (POST pre-fetch carries a cached `cat_NNN`, no slug): fails on unchanged page and when reconciliation is skipped (M2).
+  AC-4a (cached cat_502 still live stays selected): fails when the live refresh resets selection (M3). AC-4b (vanished cat_502 replaced, POST sends a live id): fails when the refresh keeps the old id.
+  AC-5 (`functions/test/no-googleapis.test.js`: child process loads `lib/index.js`, no `node_modules/googleapis/` file in `require.cache`; package.json placement): both tests failed before the swap, pass after.
+  AC-6 (existing backend suite on the slim library): stub re-pointed back to `googleapis` makes 23/24 categories API tests fail, so the stubs are load-bearing.
+- DONE: Run cd app && npm test and npm --prefix functions test; both pass
+  app 307/307; functions 379/379 (after final commit).
+- DONE: Do not deploy to staging or production; verify owns AC-7..AC-9
+  Nothing deployed; no firebase command run.
+- DONE: Do not implement options 3 (keep-warm ping) or 4 (paid minInstances)
+  No scheduler or `minInstances` change in the diff.
+- DONE: Report each AC with evidence and actual LOC vs the +90 +/-50% estimate in the stage report
+  AC-1..AC-6 above; AC-7..AC-9 left to verify. Net +119 LOC (+160/-41) across 10 files excluding package-lock.json and the entity: 132% of estimate, inside the 45-135 band. Extra files vs spec: a one-line comment in `functions/test/scheduler.test.js`.
+
+### Summary
+
+Home now turns Save on immediately from the device's cached category list when every cached id is a live `cat_NNN` id; no cache or a slug cache keeps today's wait. The backend loads `@googleapis/sheets` instead of the full `googleapis` bundle (local load ~540 ms to ~135 ms; the Cloud Run saving is verify's AC-7). `googleapis` stays as a devDependency for the one-off scripts, whose tests still stub it.
