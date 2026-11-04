@@ -44,15 +44,18 @@ gates:
 started: 2026-11-04T06:15:22Z
 ---
 
-## Questions for the captain
+## Question for the captain
 
-- **Q1 — Cost ceiling.** One always-running backend copy costs about **USD $8 a month (about TWD 260)** per project. Your billing kill switch cuts off the production project at USD $32 a month. Is USD $8 a month on production OK? (Recommended: yes.)
-  - Answer:
-- **Q2 — Staging too?** Keeping staging awake as well lets us prove the speed-up on staging before production, for another ~USD $8 a month on the staging project. Choose: (a) both awake, ~USD $16 total — recommended, matches "preview on staging before production"; or (b) production only, ~USD $8, and the speed-up is first measured on production after your deploy.
-  - Answer:
+**Which way should we fix the slow first open?** Options are listed with the recommended one first.
 
+1. **Recommended, free: let Home save right away and make the backend start faster.**
+   - Home's Save works as soon as the app opens, using the category list your phone saved last time.
+   - The backend also loads a much smaller Google Sheets add-on, so it wakes up faster. Report and History will still be a little slow if you open them first after a break, but less than today (estimate: about 2-3 seconds instead of about 4; measured on staging before you decide to ship).
+2. **Free, smaller: only let Home save right away.** Website change only. Report and History stay as slow as today when opened first after a break.
+3. **Almost free, unreliable: a timer pings the backend every few minutes to keep it awake.** Probably stays inside Google's free allowance, but that isn't guaranteed: it could cost a few cents a month, and Google can still put the backend to sleep between pings.
+4. **Paid, for comparison: keep one backend copy always running.** About USD $8 a month (about TWD 260) per project, against your USD $32 production kill switch. Every page is fast after a break.
 
-After the app sits unused, the backend goes to sleep, and the next visit waits about 4 seconds while it wakes up, so Home's Save button, Report and History all feel slow.
+- Answer:
 
 ## User Stories
 
@@ -86,95 +89,117 @@ Direction (option 1, captain-chosen): set a minimum of one running instance on t
 
 ### Goal
 
-Keep one copy of the `api` backend always running so the first Home, Report or History visit after a break answers in about 0.5 seconds instead of about 4 seconds.
+Remove the ~4-second wait on the first app open after a break at no cost: Home's Save works immediately from this device's last-known category list, and the backend wakes faster by loading a small Sheets library instead of the whole Google API bundle.
 
-### Chosen approach
+### Options compared (read-only research, 2026-11-04)
 
-- Add `minInstances: 1` to the options of `export const api = onRequest({ secrets: [anthropicKey] }, ...)` in `functions/src/index.ts:299`. Plain-language: "minimum instances" tells Google to keep at least one copy of the backend switched on, even when nobody is using it, so nobody waits for it to boot.
-- Per function, not global. Firebase Functions v2 accepts `minInstances` in each function's options (`onRequest({...})`, typed `number | Expression<number>` in `firebase-functions@7.4.0` `lib/v2/options.d.ts:85`); `setGlobalOptions` would also keep the daily `subscriptionScheduler` awake, which wastes money. Source: Firebase "Manage functions" doc, "Keep a minimum number of instances warm" (https://firebase.google.com/docs/functions/manage-functions).
-- If the captain picks Q2 (b): use `minInstances: projectID.equals("expense-sheet-b2db8").thenElse(1, 0)` (`projectID` is built into `firebase-functions/params`). This picks the value per project from committed code, with no hidden `.env` file (the `.env` files are gitignored).
-- Memory, CPU and region stay as they are.
+| Option | Cost | Home Save after a break | Report / History opened first after a break | Deploy |
+| --- | --- | --- | --- | --- |
+| A. Home saves from cached list | USD 0 | Instant (returning device) | Unchanged (~4 s) | Website |
+| B. Slim Sheets library | USD 0 | Faster (est. 2-3 s) | Faster (est. 2-3 s) | Backend |
+| **A + B (recommended)** | USD 0 | Instant | Faster (est. 2-3 s) | Both |
+| C. Keep-warm ping every 5 min | ~USD 0, not guaranteed | Usually instant | Usually ~0.5 s | Backend |
+| D. `minInstances: 1` (paid) | ~USD 8/month per project | Instant | ~0.5 s | Backend |
 
-### Expected monthly cost
+- **A, website-side cache.** Home already paints from `getCachedCategories()` (entity 063) but keeps Save off until `GET /api/categories` returns (`app/app/page.tsx:47`, `:318`). The gate exists to block writing a placeholder slug (058). A cached list is a list of live `cat_NNN` ids from an earlier successful fetch, and the backend checks every write against the live sheet (`functions/test/categoryValidation.api.test.js` 058 AC-9..AC-13: an unknown id is rejected with 400 and nothing is written; an archived id is accepted). So Save can turn on from a cache whose ids are all live-shaped without risking a bad write. This reverses 063's AC-1 ("Save stays disabled until the live fetch resolves, even when painted from a cache", `app/test/category-cache.render.test.js:67`), which needs the captain's sign-off; 058's actual guarantee (no slug ever posted) stays. Report and History show expense data, not just categories; caching all expenses across sessions on the device is a bigger change (stale totals, data on a shared device), so A leaves them alone. Once Home has opened, the backend is awake and Report and History are fast in that session already.
+- **B, faster cold start.** Measured locally with Node 24: `require("googleapis")` takes 450-915 ms (194 MB package), `require("@googleapis/sheets")` 53-56 ms (v14.0.0, installed in the scratchpad only), `@anthropic-ai/sdk` 34 ms, `firebase-functions/v2/https` 145 ms. The whole `functions/lib/index.js` load is ~540 ms locally, with `googleapis` the bulk. Cloud Run's 1 vCPU and cold disk are slower than a laptop, so the real saving is estimated at 1-2 s of the ~4 s; verify measures it on staging. Lazy-loading the Anthropic SDK saves ~34 ms, not worth it. The backend only uses `google.auth.getClient` and `google.sheets` (`functions/src/index.ts:57-69`, `functions/src/scheduler.ts:27`), both available from `@googleapis/sheets`.
+- **C, keep-warm ping.** A scheduled function calling the `api` URL every 5 minutes. Cloud Scheduler gives 3 free jobs per billing account; `subscriptionScheduler` already uses one on production and one on staging, so a production ping would be the 3rd (free only if both projects share one billing account, which I could not check read-only; a 4th job is USD 0.10/month). That's 8,640 runs a month: within the 2 million free requests, and each run's compute (the ping function's own cold start plus `api`'s answer, roughly 1-3 vCPU-seconds) totals about 9,000-26,000 vCPU-s, within the 180,000 free vCPU-s if the rest of the app stays small. The extra function image adds Artifact Registry storage that may go over the 0.5 GB free amount (cents). Google doesn't promise to keep an idle instance alive for any set time, so even a 5-minute ping can miss. **Not truly zero cost and not guaranteed.**
+- **D, paid comparison.** `minInstances: 1` on `api` only: about USD 8.2/month per project at 256 MiB / 1 vCPU (Firebase "Manage functions" doc quotes ~USD 8 for this exact config). The full cost working is in the first spec version (commit da3ce7c).
 
-- Current `api` config: 256 MiB memory, 1 vCPU, us-central1 (Tier 1 pricing).
-- Idle always-running copy, 730 hours a month: CPU 1 x 2,628,000 s x USD 0.0000025 = USD 6.57; memory 0.25 GiB x 2,628,000 s x USD 0.0000025 = USD 1.64. Total about **USD 8.2 a month** per project, before the free tier.
-- Sources: Firebase "Manage functions" doc states about USD $8/month for a 256 MiB function at 1 CPU with concurrency on (our exact config); Cloud Run pricing page (https://cloud.google.com/run/pricing) gives the idle rates above. The Cloud Run pricing page did not render its numbers in my fetch, so the rates are cross-checked against the Firebase doc figure, not read live. The Firebase CLI prints its own cost estimate at deploy time; verify records that number.
-- Billing kill switch (`billing-guardrails/README.md`): detaches production billing at USD $32 a month. This change uses about a quarter of that.
+### Chosen approach (A + B)
+
+- **A:** in `app/app/page.tsx`, when `getCachedCategories()` returns a list whose ids are all `cat_NNN`, start with Save enabled: reconcile `categoryId` against the cached expense categories with `pickCategoryId`, the same call the live path uses. The live fetch still runs in the background, overwrites the list and cache, and re-reconciles: a selected id that is still in the live list stays selected. With no cache, or a cache that holds any non-`cat_NNN` id, keep today's behaviour (Save off with "loading" until live).
+- **B:** in `functions/`, replace `googleapis` with `@googleapis/sheets` in `src/index.ts` and `src/scheduler.ts` (`import { sheets, auth } from "@googleapis/sheets"`; `new auth.GoogleAuth({ scopes }).getClient()`). Update the test stubs that patch `require.cache` for `"googleapis"` (`test/sheetsStub.js:224`, `test/sheetsClient.api.test.js:17`). One-off scripts under `functions/scripts/` still use `googleapis`; move it to `devDependencies` so scripts keep working and the deployed backend doesn't load it.
 
 ### User Stories
 
-- As the captain, I want Home's Save button to turn on quickly when I open the app, so that I can log an expense right away.
-- As the captain, I want Report and History to show quickly, even after the app sat unused for hours, so that checking spending feels instant.
-- As the captain, I want to know the monthly cost before it ships, so that it stays inside my billing limit.
+- As the captain, I want Home's Save button to work as soon as I open the app, so that I can log an expense right away.
+- As the captain, I want Report and History to open faster after the app sat unused, at no extra cost.
+- As the captain, I want any mistake to show as a visible error, never a silently wrong category, even when Home saved from a remembered list.
 
 ### Edge Cases
 
-- **Backend redeployed.** Each deploy replaces the running copy; the first request right after a deploy can still be slow. Expected, not a failure.
-- **Google recycles the copy.** Google occasionally restarts instances for maintenance; it starts a replacement on its own, but a request landing in that moment can be slow. Rare.
-- **Two people at once.** One copy serves up to 80 requests at the same time (concurrency 80), so the captain and partner logging together both hit the warm copy.
-- **Burst beyond one copy.** If traffic ever needs a second copy, that second one starts cold. Not expected at this app's usage. The production timing sample below (1.2s, 3.7s, 0.47s) shows a second cold copy can occur today.
-- **Kill switch trips.** If total production spend reaches USD $32, billing detaches and the whole backend stops. This change adds ~USD $8 to the monthly total.
-- **Deploy confirmation prompt.** The Firebase CLI asks to confirm the cost of minimum instances on deploy. A non-interactive deploy (an agent running it) needs `--force` or fails; verify must expect this prompt.
+- **First open on a new device (no cache):** Save stays off with "loading" until the live list arrives, exactly as today.
+- **A category deleted since the cache was saved, and the captain saves with it:** the backend rejects it with 400, nothing is written, and Home shows its existing error. The live list replaces the cache within seconds anyway.
+- **A category archived since the cache:** the backend accepts it (058 AC-11); the expense is filed under the category the captain tapped. The live refresh then drops it from the picker.
+- **Old cache holding a slug:** treated as no cache; Save waits for live (058's guarantee stays).
+- **Saving while the backend is still cold:** the save request waits for the remaining wake-up. The categories fetch starts the wake-up when the page opens, so by the time an amount is typed most of the wait has passed; with B it's shorter.
+- **Offline:** Save is enabled from the cache, the POST fails, and Home shows the existing save error; nothing is written. Same outcome as tapping Save offline today after a live load.
+- **Two people at once:** unchanged; each phone uses its own cache, and the backend validates each write.
+- **Report or History opened first after a break:** still waits for the backend to wake up, shorter with B. Not instant without option C or D.
 
 ### Out of Scope
 
+- Keep-warm pings (C) and `minInstances` (D), unless the captain picks them.
+- Caching expenses, reports or history data on the device across sessions.
 - Moving the backend to Taiwan (asia-east1).
-- Making the backend start faster (loading heavy code only when needed).
-- Changing memory, CPU or concurrency (a smaller CPU setting could cut cost to ~USD $3 but forces one request at a time; separate decision).
-- Any change to what the website shows.
-- Keeping `subscriptionScheduler` awake.
+- Changing memory, CPU or concurrency.
+- Changing one-off scripts in `functions/scripts/` beyond keeping them runnable.
 
 ## Acceptance criteria
 
-**AC-1 — The `api` function declares one minimum instance in code.**
-Verified by: offline — a new test in `functions/test/` builds and requires `functions/lib/index.js` and asserts `api.__endpoint.minInstances` is `1` (or, for Q2 (b), is the projectID expression resolving to 1 for `expense-sheet-b2db8` and 0 otherwise). Today the value is `null` (checked 2026-11-04). Falsified by: removing `minInstances` from the `onRequest` options.
+**AC-1 — With a cached list of live ids, Save is enabled before the live fetch resolves, and a live id is selected.**
+Verified by: offline — a Home-mount test (rewrite of `category-cache.render.test.js` AC-1) with a `cat_NNN` cache and a deferred categories fetch asserts the Save button is not disabled and one tile is selected before the fetch resolves. Falsified by: keeping Save tied to the live fetch only.
 
-**AC-2 — `subscriptionScheduler` stays at zero minimum instances.**
-Verified by: offline — same test asserts `subscriptionScheduler.__endpoint.minInstances` is not 1. Falsified by: moving the setting into `setGlobalOptions`.
+**AC-2 — With no cache, or a cache containing any non-`cat_NNN` id, Save stays disabled with the loading message until the live fetch resolves.**
+Verified by: offline — Home-mount tests for both cases assert `disabled` and the `categories_loading` status line before the fetch resolves. Falsified by: enabling Save from `DEFAULT_CATEGORIES` or from a slug cache.
 
-**AC-3 — The deployed staging `api` shows minimum instances 1** (Q2 (a) only; for (b) it shows none).
-Verified by: offline — `firebase functions:list --project staging --json` shows `"minInstances": 1` on `api`. Falsified by: deploying without the code change.
+**AC-3 — Saving from the cache before the live fetch resolves posts a `cat_NNN` id that was in the cache, and never a slug.**
+Verified by: offline — Home-mount test types an amount and taps Save with the fetch still pending; asserts the POST body's `category_id` matches `/^cat_\d+$/` and is in the cached list. 058's existing tests in `legacy-category-writes.render.test.js` still pass. Falsified by: a reconciliation that leaves `getDefaultCategory()`'s slug selected.
 
-**AC-4 — The first request after idle is fast on staging** (Q2 (a) only).
-Verified by: offline — after at least 30 minutes with no traffic, `curl -s -o /dev/null -w "%{http_code} %{time_total}\n" https://expense-sheet-staging.web.app/api/categories` returns 401 (no login needed; the 401 still runs the backend) in under 1.0 s. Baseline today: 4.68 s first, 0.45 s after. Falsified by: staging scaling to zero (the first request returns to ~4 s).
+**AC-4 — When the live list arrives, a still-present selected category stays selected; a vanished one is replaced by a live id.**
+Verified by: offline — Home-mount test: the captain picks cached id X, then live resolves (a) with X, (b) without X; asserts the selection stays X in (a) and is a live id in (b). Falsified by: resetting the selection on every live refresh.
 
-**AC-5 — The deployed production `api` shows minimum instances 1, and the first request after idle is fast.**
-Verified by: offline, after the captain's deploy — `firebase functions:list --project production --json` shows `"minInstances": 1` on `api`; after at least 30 minutes idle, the same curl against `https://expense-sheet-b2db8.web.app/api/categories` answers under 1.0 s. Baseline today: 4.2 s (first officer), 1.2 s then 3.7 s (this spec). Falsified by: production still showing no `minInstances`.
+**AC-5 — The deployed backend no longer loads `googleapis`.**
+Verified by: offline — a `functions/test/` test requires the built `lib/index.js` and asserts no `require.cache` key contains `/node_modules/googleapis/`, and `functions/package.json` lists `googleapis` only under `devDependencies`. Today `lib/index.js` loads it. Falsified by: any `src/` file importing `"googleapis"`.
 
-**AC-6 — Home's Save button turns on quickly after a break.**
-Verified by: interactive — the captain opens production Home after at least 30 minutes away and Save is usable within about a second. Falsified by: the familiar ~4 s wait.
+**AC-6 — The existing backend test suite still passes with the slim library.**
+Verified by: offline — `npm --prefix functions test` passes, with the stubs re-pointed to `@googleapis/sheets`. Falsified by: an API difference between the two packages that the routes depend on.
+
+**AC-7 — The first request to staging after idle is faster than the baseline.**
+Verified by: offline (live measurement) — after at least 30 minutes with no traffic, `curl -s -o /dev/null -w "%{http_code} %{time_total}\n" https://expense-sheet-staging.web.app/api/categories` returns 401 (no login needed; the 401 still wakes the backend) in under 3.0 s, taking the median of 3 separate idle trials. Baseline today: 4.68 s first, 0.45 s warm. Falsified by: the slim library not cutting startup time (the result stays around 4 s).
+
+**AC-8 — On staging, Home's Save works immediately after a break on a device that has opened the app before.**
+Verified by: interactive — a live drive (verify agent) and then the captain open staging Home after 30+ minutes away; Save is usable within about a second, and an expense saves into the right category. Falsified by: the familiar ~4 s greyed-out Save.
+
+**AC-9 — On production after the captain's deploys, the same holds.**
+Verified by: interactive (captain) plus the AC-7 curl against `https://expense-sheet-b2db8.web.app/api/categories` (baseline: 4.2 s; this spec measured 1.2 s and 3.7 s). Falsified by: either still showing the old wait.
 
 ## Risk evidence
 
-Riskiest mechanism: that `minInstances` is set per function in this SDK, and that staging and production deploy the same code the same way. Exercised read-only on 2026-11-04, nothing deployed:
+Riskiest mechanisms: (1) that saving from a cache can't write a bad category, and (2) that dropping `googleapis` actually shortens startup. Exercised read-only, nothing deployed:
 
-- `firebase functions:list --project production`: `api` is gcfv2, us-central1, 256 MiB, cpu 1, concurrency 80, maxInstances 20, no minInstances.
-- `firebase functions:list --project staging`: identical config. Both projects deploy the same `functions/` source; only the gitignored `.env` / `.env.staging` values differ (STAGING_SETUP.md: `firebase deploy --only functions --project staging|production`).
-- Built `functions/lib` and read `api.__endpoint`: `minInstances: null` today, so AC-1's test can read the value offline.
-- `firebase-functions@7.4.0` types: `minInstances?: number | Expression<number>` per function; `projectID` param and `.equals().thenElse()` exist for the Q2 (b) variant.
-- Timing (401, unauthenticated): staging 4.68 s cold then 0.45 s; production 1.2 s, 3.7 s, 0.47 s.
-- `gcloud` is unusable in this sandbox (config read denied), so Cloud Run console-level settings were read through the Firebase CLI only.
+- (1) The backend checks every write's `category_id` against the live sheet per request (`functions/test/categoryValidation.api.test.js`, 058 AC-9..AC-13): absent ids get 400 with no row written; archived ids are accepted. The cache is written only from a successful live fetch (`app/app/page.tsx:84`). The only thing standing in the way is 063's deliberate AC-1 test, which this spec rewrites with the captain's approval.
+- (2) Local load times (Node 24, 3 runs): `googleapis` 450-915 ms vs `@googleapis/sheets` 53-56 ms. Whole `lib/index.js` ~540 ms. The Cloud Run saving is an estimate until verify measures AC-7.
+- Current config on both projects (`firebase functions:list`): `api` 256 MiB, 1 vCPU, concurrency 80, us-central1, no minInstances. Both deploy the same `functions/` source; only gitignored `.env` values differ.
+- Read-only timing (401): staging 4.68 s cold then 0.45 s; production 1.2 s, 3.7 s, 0.47 s.
+- C's free-tier fit depends on whether production and staging share a billing account; `gcloud` is blocked in this sandbox, so this is unconfirmed.
 
 ## Expected surface and tolerance
 
-Estimate: +25 net LOC across 2 files, tolerance ±50%.
+Estimate: +90 net LOC across 8 files (excluding `functions/package-lock.json`, which is regenerated), tolerance ±50%.
 
-- `functions/src/index.ts` around line 299: add `minInstances` to the `api` options plus a short comment with the cost (+2 to +6 lines; +1 import line for Q2 (b)).
-- `functions/test/minInstances.test.js` (new): AC-1 and AC-2 (~20 lines).
+- `app/app/page.tsx`: cached-ready initial state and reconciliation (+15 to +25).
+- `app/app/lib/categories.ts`: a helper saying whether a cached list is all live ids (+8).
+- `app/test/category-cache.render.test.js`: AC-1 rewritten; AC-2..AC-4 added (+50).
+- `functions/src/index.ts`, `functions/src/scheduler.ts`: import swap (~±6).
+- `functions/test/sheetsStub.js`, `functions/test/sheetsClient.api.test.js`: stub target swap (~±6).
+- `functions/test/no-googleapis.test.js` (new): AC-5 (~15).
+- `functions/package.json`: add `@googleapis/sheets`, move `googleapis` to devDependencies.
 
-Semantics this may change: billing (always-on instance, ~USD 8/month per project). No API shape, stored data, auth or schedule change.
+Semantics this may change: when Save is enabled on Home (earlier, from the cache), which reverses 063 AC-1. No API shape, stored data, auth or schedule change. Billing: none.
 
 ## Test plan
 
-- Build: `npm --prefix functions test` (runs the new test plus the existing suite).
-- Verify: `firebase deploy --only functions:api --project staging` (expect the cost confirmation prompt; record the CLI's cost estimate), then AC-3 `functions:list`, wait 30+ minutes, AC-4 curl.
-- Production backend deploy is the captain's command, run from the main checkout after merge:
+- Build: `npm --prefix app test` and `npm --prefix functions test` (new tests plus existing suites, including 058's write-guard tests).
+- Verify: deploy both to staging (`firebase deploy --only functions,hosting --project staging`, with the website rebuilt fresh using `.env.staging`), then run 3 idle trials for AC-7 (30+ minutes apart) and the AC-8 live drive.
+- Production, after merge, from the main checkout (the captain runs the backend deploy; backend before website):
 
-      firebase deploy --only functions:api --project production
+      firebase deploy --only functions --project production
+      firebase deploy --only hosting --project production
 
-  Then AC-5 (`firebase functions:list --project production --json` and the 30-minute-idle curl) and AC-6 by the captain. Website deploy is not needed (no website change).
-- Cost: a few minutes of agent time plus a 30-minute idle wait per environment. Live staging drive needed for AC-4 only.
+  Then AC-9.
+- Cost: agent time plus about 90 minutes of idle waiting for the AC-7 trials. USD 0 in cloud charges.
 
 ### Feedback Cycles
 
@@ -200,3 +225,24 @@ Semantics this may change: billing (always-on instance, ~USD 8/month per project
 ### Summary
 
 Spec sets `minInstances: 1` on the `api` function only, at about USD 8/month per project. Read-only checks confirmed staging and production run identical configs and that the setting can be checked offline from the built code. Two captain decisions sit at the top: the cost ceiling, and whether staging stays awake too (recommended, so the speed-up is proven on staging first). The Firebase CLI's cost confirmation prompt on deploy is called out for verify.
+
+## Stage Report: spec (cycle 1)
+
+- DONE: Write the spec (Spec Template) in the entity body: goal, user stories, edge cases, out of scope, and a top-level ## Acceptance criteria section with each AC marked offline or interactive
+  Rewritten around A + B (zero cost): AC-1..AC-7 offline, AC-8..AC-9 interactive; `### Feedback Cycles` left in place.
+- DONE: State the exact setting (minimum instances on the api function in functions/src/index.ts) and confirm against Firebase Functions v2 docs how it is set, per function or globally
+  Kept as option D only: `minInstances: 1` per function in the `api` onRequest options (Firebase "Manage functions" doc). The recommended fix changes Home's Save gate and swaps `googleapis` for `@googleapis/sheets`.
+- DONE: State the expected monthly cost of one always-running instance at the api function's current memory/CPU, with the source of the price
+  D: ~USD 8.2/month per project (Firebase doc). A and B: USD 0. C: near zero but not guaranteed (3 free Scheduler jobs per billing account, 2 already used; image storage may cost cents).
+- DONE: Exercise the riskiest mechanism read-only: confirm the current api function config (memory, region, concurrency) and how staging vs production deploys differ; do not deploy anything
+  Backend rejects unknown category ids per request (058 AC-9..13), so saving from a cache is safe; local load timing: `googleapis` 450-915 ms vs `@googleapis/sheets` 53-56 ms (scratchpad install only). Nothing deployed.
+- DONE: Name expected files and lines changed, with tolerance
+  +90 LOC across 8 files (app page, categories lib, app test, functions src x2, stubs x2, new test, package.json), ±50%.
+- DONE: Propose proof for each AC, including a staging check (first request after idle time) and the production backend deploy as a command the captain runs
+  AC-7: median of 3 idle curls on staging under 3.0 s (baseline 4.68 s); the captain runs `firebase deploy --only functions --project production`, then hosting.
+- DONE: Add a short plain-language question at the top for the captain if any decision is theirs (for example cost ceiling)
+  One question: pick 1 (A + B, recommended), 2 (A only), 3 (ping, near-free), or 4 (paid minInstances, ~USD 8/month).
+
+### Summary
+
+Revised for the captain's "no cost" request. Recommended: Home turns Save on from the device's cached live category list (the backend already rejects bad ids), plus a slimmer Sheets library that cuts backend wake-up time. Both are free. Option A reverses 063's "Save waits for live" test, which the captain's answer approves. The keep-warm ping is called out as not truly free or reliable, and paid `minInstances` stays as the comparison.
