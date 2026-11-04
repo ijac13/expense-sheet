@@ -41,6 +41,11 @@ gates:
                 at: "2026-11-04T06:46:19.064799Z"
                 decision: revise
                 reason: 'Captain asked in the pane (on Q1 cost): ''can you propose other way that is no cost?'' Rejects the paid always-on direction for now; wants a zero-cost approach proposed.'
+            - id: gate-attempt:081-spec-2
+              briefing:
+                id: briefing:081:spec:attempt-2:revision-1
+                digest: sha256:8b51dfdeb37a7637ef6d922b329d9735136038330b127938e03a2a02b320a9f6
+                room-ref: '@review/spec/briefing-2'
 started: 2026-11-04T06:15:22Z
 ---
 
