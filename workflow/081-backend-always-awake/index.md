@@ -222,6 +222,16 @@ Semantics this may change: when Save is enabled on Home (earlier, from the cache
 
 - Cycle 1: spec revise (captain, 2026-11-04) on Q1 cost: "can you propose other way that is no cost?" Revise the spec to propose zero-cost approaches; keep the paid always-on option only as a comparison.
 
+## Implementation plan (build)
+
+- **A, `app/app/lib/categories.ts`:** add `isLiveCategoryList(list)`: true only for a non-empty list whose every id matches `/^cat_\d+$/`.
+- **A, `app/app/page.tsx`:** read the cache once at mount. When it is a live list and reconciling `getDefaultCategory()` against its expense categories with `pickCategoryId` yields an id, start with that `categoryId`, its `business`, and `categoriesReady = true`. Otherwise keep today's start (slug seed, Save off, loading line). The live fetch is unchanged: it overwrites list and cache and re-reconciles with `pickCategoryId(current, ...)`, which keeps a still-present selection. Home mounts only after AuthGuard resolves on the client, so the cache read cannot cause a hydration mismatch.
+- **A, tests (`app/test/category-cache.render.test.js`):** rewrite 063 AC-1 into 081 AC-1; add AC-2 (no cache, slug cache), AC-3 (POST from cache before live), AC-4 (live keeps X / replaces vanished X). Check each fails against the unchanged page.
+- **B, `functions/src/index.ts`, `functions/src/scheduler.ts`:** `import { sheets, auth, sheets_v4 } from "@googleapis/sheets"`; client via `new auth.GoogleAuth({ scopes }).getClient()`; types `sheets_v4.Sheets`.
+- **B, stubs:** `test/sheetsStub.js` and `test/sheetsClient.api.test.js` stub `@googleapis/sheets` (`{ auth: { GoogleAuth }, sheets }`). Script tests keep stubbing `googleapis` (scripts unchanged).
+- **B, `functions/package.json`:** add `@googleapis/sheets` to dependencies, move `googleapis` to devDependencies.
+- **B, AC-5 test (`functions/test/no-googleapis.test.js`):** load `lib/index.js` in a child process and assert no `/node_modules/googleapis/` module was loaded; assert package.json placement. Check it fails before the swap.
+
 ## Stage Report: spec
 
 - DONE: Write the spec (Spec Template) in the entity body: goal, user stories, edge cases, out of scope, and a top-level ## Acceptance criteria section with each AC marked offline or interactive
