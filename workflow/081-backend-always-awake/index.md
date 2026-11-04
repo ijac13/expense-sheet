@@ -33,6 +33,14 @@ gates:
                 id: briefing:081:spec:attempt-1:revision-1
                 digest: sha256:a76af3ea05b6eaf5f0dbdc132eced194a64d7dbadd69171aac8afb522a2f9106
                 room-ref: '@review/spec/briefing-1'
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:081:spec:1
+                briefing: briefing:081:spec:attempt-1:revision-1
+                by: person:captain
+                at: "2026-11-04T06:46:19.064799Z"
+                decision: revise
+                reason: 'Captain asked in the pane (on Q1 cost): ''can you propose other way that is no cost?'' Rejects the paid always-on direction for now; wants a zero-cost approach proposed.'
 started: 2026-11-04T06:15:22Z
 ---
 
@@ -167,6 +175,10 @@ Semantics this may change: billing (always-on instance, ~USD 8/month per project
 
   Then AC-5 (`firebase functions:list --project production --json` and the 30-minute-idle curl) and AC-6 by the captain. Website deploy is not needed (no website change).
 - Cost: a few minutes of agent time plus a 30-minute idle wait per environment. Live staging drive needed for AC-4 only.
+
+### Feedback Cycles
+
+- Cycle 1: spec revise (captain, 2026-11-04) on Q1 cost: "can you propose other way that is no cost?" Revise the spec to propose zero-cost approaches; keep the paid always-on option only as a comparison.
 
 ## Stage Report: spec
 
