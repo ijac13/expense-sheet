@@ -1,6 +1,6 @@
 ---
 title: Keep the backend awake so Home, Report and History open without a 4-second wait
-status: ideation
+status: spec
 source: captain (report "prod is slower now", 2026-11-04)
 id: 081
 gates:
@@ -14,6 +14,18 @@ gates:
                 id: briefing:081:ideation:attempt-1:revision-1
                 digest: sha256:57f3097ad9f94583da80b1d80988e35b5b48c80ba152148eb5948cd8c4bb876d
                 room-ref: '@review/ideation/briefing-1'
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:081:ideation:1
+                briefing: briefing:081:ideation:attempt-1:revision-1
+                by: person:captain
+                at: "2026-11-04T06:15:14.554613Z"
+                decision: approve
+                reason: 'Captain approved in the review pane with no notes: accepts keeping one backend instance always running.'
+              application:
+                target-stage: spec
+                state: consumed
+started: 2026-11-04T06:15:22Z
 ---
 
 After the app sits unused, the backend goes to sleep, and the next visit waits about 4 seconds while it wakes up, so Home's Save button, Report and History all feel slow.
