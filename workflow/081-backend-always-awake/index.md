@@ -279,7 +279,7 @@ Revised for the captain's "no cost" request. Recommended: Home turns Save on fro
 - DONE: Write a brief implementation plan in the entity before coding
   `## Implementation plan (build)`, commit 489ce00 (before any code commit).
 - DONE: Implement A: Home enables Save from a cached all-cat_NNN category list, reconciles categoryId with pickCategoryId, live fetch refreshes in background and keeps a still-present selection (app/app/page.tsx, app/app/lib/categories.ts)
-  Commit 3rd on branch (`081: Home enables Save...`): `isLiveCategoryList` in categories.ts; Home's one-time initial state reads the cache, reconciles with `pickCategoryId`, sets `categoriesReady` only when the picked id is non-empty. Live fetch path unchanged. Home mounts only after AuthGuard resolves client-side, so no hydration mismatch.
+  Commit f84e691: `isLiveCategoryList` in categories.ts; Home's one-time initial state reads the cache, reconciles with `pickCategoryId`, sets `categoriesReady` only when the picked id is non-empty. Live fetch path unchanged. Home mounts only after AuthGuard resolves client-side, so no hydration mismatch.
 - DONE: Implement B: replace googleapis with @googleapis/sheets in functions/src/index.ts and functions/src/scheduler.ts, re-point test stubs, move googleapis to devDependencies
   Commit 6d2d97c. Kept `auth.getClient({ scopes })` instead of the spec's `new auth.GoogleAuth(...)`: `auth` is the same `AuthPlus` object as `google.auth`, so the call is byte-for-byte today's. Local whole-backend load: ~135 ms (spec measured ~540 ms before).
 - DONE: Add/rewrite tests for AC-1..AC-6 and confirm each new test fails when the feature is broken
