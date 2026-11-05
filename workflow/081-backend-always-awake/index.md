@@ -59,6 +59,7 @@ gates:
                 state: consumed
 started: 2026-11-04T06:15:22Z
 worktree: .worktrees/spacedock-ensign-081-backend-always-awake
+mod-block: merge:pr-merge
 ---
 
 ## Question for the captain
