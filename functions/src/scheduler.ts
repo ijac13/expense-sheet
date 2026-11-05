@@ -8,7 +8,7 @@
 // `rowToSubscription`, and every write goes through `buildWriteRow`, which
 // throws rather than dropping a field with no column.
 
-import { google } from "googleapis";
+import type { sheets_v4 } from "@googleapis/sheets";
 import {
   Row,
   ColumnMap,
@@ -24,7 +24,7 @@ import {
   Subscription,
 } from "./sheetSchema";
 
-type Sheets = ReturnType<typeof google.sheets>;
+type Sheets = sheets_v4.Sheets;
 
 // The spreadsheet is Asia/Taipei (UTC+8, no DST). A Function runs in UTC, so an
 // unqualified "today" would file 8 hours of every day under the wrong date.

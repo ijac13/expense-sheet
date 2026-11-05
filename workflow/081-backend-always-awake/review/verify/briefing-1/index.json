@@ -1,0 +1,15 @@
+{
+  "type": "Briefing",
+  "version": "1",
+  "id": "briefing:081:verify:attempt-1:revision-1",
+  "question": "Approve 081 verify as PASSED after your own staging test of Home's Save (AC-8)?",
+  "artifacts": [
+    {
+      "id": "artifact:081:verify:attempt-1:revision-1:item-1",
+      "uri": "git-root://main/ab06940977808d3e4a191f234cbd5a130086e6ce/workflow/081-backend-always-awake/index.md",
+      "rev": "sha256:91b832cd59b757d9e4e583bb6cf79357e55a88954dd40dfbecdf4d5affcbce0d",
+      "mediaType": "text/markdown",
+      "summary": "Recommend PASSED, conditional on captain's AC-8 staging test. Tests: app 307/307, functions 379/379 (AC-1..6). Staging serves this exact build (hash match). AC-7 live: first request after 30+ min idle 2.10/1.98/2.75 s, median 2.10 s vs 4.68 s baseline, under 3.0 s. AC-8: agent has no browser/sign-in; captain tests Home Save on staging. AC-9 after merge: captain runs prod backend deploy, then website. Cost USD 0."
+    }
+  ]
+}

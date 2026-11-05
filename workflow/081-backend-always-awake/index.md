@@ -1,6 +1,6 @@
 ---
 title: Keep the backend awake so Home, Report and History open without a 4-second wait
-status: build
+status: verify
 source: captain (report "prod is slower now", 2026-11-04)
 id: 081
 gates:
@@ -57,6 +57,25 @@ gates:
               application:
                 target-stage: build
                 state: consumed
+        - id: gate:081:verify
+          stage: verify
+          attempts:
+            - id: gate-attempt:081-verify-1
+              briefing:
+                id: briefing:081:verify:attempt-1:revision-1
+                digest: sha256:68ff8c9e38c813193ea45d6e049b4cb73b70140ae50145d406e374b93837b5ab
+                room-ref: '@review/verify/briefing-1'
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:081:verify:1
+                briefing: briefing:081:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-11-05T00:55:56.54753Z"
+                decision: approve
+                reason: Captain approved 081 verify in the review pane (note '1' reaffirms option 1); approval covers the captain's AC-8 staging test of Home Save. AC-7 median 2.10 s vs 4.68 s baseline.
+              application:
+                target-stage: done
+                state: pending
 started: 2026-11-04T06:15:22Z
 worktree: .worktrees/spacedock-ensign-081-backend-always-awake
 mod-block: merge:pr-merge
@@ -223,6 +242,16 @@ Semantics this may change: when Save is enabled on Home (earlier, from the cache
 
 - Cycle 1: spec revise (captain, 2026-11-04) on Q1 cost: "can you propose other way that is no cost?" Revise the spec to propose zero-cost approaches; keep the paid always-on option only as a comparison.
 
+## Implementation plan (build)
+
+- **A, `app/app/lib/categories.ts`:** add `isLiveCategoryList(list)`: true only for a non-empty list whose every id matches `/^cat_\d+$/`.
+- **A, `app/app/page.tsx`:** read the cache once at mount. When it is a live list and reconciling `getDefaultCategory()` against its expense categories with `pickCategoryId` yields an id, start with that `categoryId`, its `business`, and `categoriesReady = true`. Otherwise keep today's start (slug seed, Save off, loading line). The live fetch is unchanged: it overwrites list and cache and re-reconciles with `pickCategoryId(current, ...)`, which keeps a still-present selection. Home mounts only after AuthGuard resolves on the client, so the cache read cannot cause a hydration mismatch.
+- **A, tests (`app/test/category-cache.render.test.js`):** rewrite 063 AC-1 into 081 AC-1; add AC-2 (no cache, slug cache), AC-3 (POST from cache before live), AC-4 (live keeps X / replaces vanished X). Check each fails against the unchanged page.
+- **B, `functions/src/index.ts`, `functions/src/scheduler.ts`:** `import { sheets, auth, sheets_v4 } from "@googleapis/sheets"`; client via `new auth.GoogleAuth({ scopes }).getClient()`; types `sheets_v4.Sheets`.
+- **B, stubs:** `test/sheetsStub.js` and `test/sheetsClient.api.test.js` stub `@googleapis/sheets` (`{ auth: { GoogleAuth }, sheets }`). Script tests keep stubbing `googleapis` (scripts unchanged).
+- **B, `functions/package.json`:** add `@googleapis/sheets` to dependencies, move `googleapis` to devDependencies.
+- **B, AC-5 test (`functions/test/no-googleapis.test.js`):** load `lib/index.js` in a child process and assert no `/node_modules/googleapis/` module was loaded; assert package.json placement. Check it fails before the swap.
+
 ## Stage Report: spec
 
 - DONE: Write the spec (Spec Template) in the entity body: goal, user stories, edge cases, out of scope, and a top-level ## Acceptance criteria section with each AC marked offline or interactive
@@ -264,3 +293,90 @@ Spec sets `minInstances: 1` on the `api` function only, at about USD 8/month per
 ### Summary
 
 Revised for the captain's "no cost" request. Recommended: Home turns Save on from the device's cached live category list (the backend already rejects bad ids), plus a slimmer Sheets library that cuts backend wake-up time. Both are free. Option A reverses 063's "Save waits for live" test, which the captain's answer approves. The keep-warm ping is called out as not truly free or reliable, and paid `minInstances` stays as the comparison.
+
+## Stage Report: build
+
+- DONE: Write a brief implementation plan in the entity before coding
+  `## Implementation plan (build)`, commit 489ce00 (before any code commit).
+- DONE: Implement A: Home enables Save from a cached all-cat_NNN category list, reconciles categoryId with pickCategoryId, live fetch refreshes in background and keeps a still-present selection (app/app/page.tsx, app/app/lib/categories.ts)
+  Commit f84e691: `isLiveCategoryList` in categories.ts; Home's one-time initial state reads the cache, reconciles with `pickCategoryId`, sets `categoriesReady` only when the picked id is non-empty. Live fetch path unchanged. Home mounts only after AuthGuard resolves client-side, so no hydration mismatch.
+- DONE: Implement B: replace googleapis with @googleapis/sheets in functions/src/index.ts and functions/src/scheduler.ts, re-point test stubs, move googleapis to devDependencies
+  Commit 6d2d97c. Kept `auth.getClient({ scopes })` instead of the spec's `new auth.GoogleAuth(...)`: `auth` is the same `AuthPlus` object as `google.auth`, so the call is byte-for-byte today's. Local whole-backend load: ~135 ms (spec measured ~540 ms before).
+- DONE: Add/rewrite tests for AC-1..AC-6 and confirm each new test fails when the feature is broken
+  AC-1 (Save enabled, cached tile selected, no loading line pre-fetch): fails on unchanged page and when the cache path skips `pickCategoryId`.
+  AC-2 (no cache / slug cache keep Save off with `categories_loading`): fail when the slug check is dropped (M1) or Save is ready without a cache (M4).
+  AC-3 (POST pre-fetch carries a cached `cat_NNN`, no slug): fails on unchanged page and when reconciliation is skipped (M2).
+  AC-4a (cached cat_502 still live stays selected): fails when the live refresh resets selection (M3). AC-4b (vanished cat_502 replaced, POST sends a live id): fails when the refresh keeps the old id.
+  AC-5 (`functions/test/no-googleapis.test.js`: child process loads `lib/index.js`, no `node_modules/googleapis/` file in `require.cache`; package.json placement): both tests failed before the swap, pass after.
+  AC-6 (existing backend suite on the slim library): stub re-pointed back to `googleapis` makes 23/24 categories API tests fail, so the stubs are load-bearing.
+- DONE: Run cd app && npm test and npm --prefix functions test; both pass
+  app 307/307; functions 379/379 (after final commit).
+- DONE: Do not deploy to staging or production; verify owns AC-7..AC-9
+  Nothing deployed; no firebase command run.
+- DONE: Do not implement options 3 (keep-warm ping) or 4 (paid minInstances)
+  No scheduler or `minInstances` change in the diff.
+- DONE: Report each AC with evidence and actual LOC vs the +90 +/-50% estimate in the stage report
+  AC-1..AC-6 above; AC-7..AC-9 left to verify. Net +119 LOC (+160/-41) across 10 files excluding package-lock.json and the entity: 132% of estimate, inside the 45-135 band. Extra files vs spec: a one-line comment in `functions/test/scheduler.test.js`.
+
+### Summary
+
+Home now turns Save on immediately from the device's cached category list when every cached id is a live `cat_NNN` id; no cache or a slug cache keeps today's wait. The backend loads `@googleapis/sheets` instead of the full `googleapis` bundle (local load ~540 ms to ~135 ms; the Cloud Run saving is verify's AC-7). `googleapis` stays as a devDependency for the one-off scripts, whose tests still stub it.
+
+## Verify: for the captain
+
+### Staging URL for your own test
+
+https://expense-sheet-staging.web.app (the staging app; its icon says "Expenses β").
+
+### What changed on screen (frontend walkthrough)
+
+- Open Home on a phone or browser that has used the staging app before. The category tiles and the Save button are ready right away, with no grey "loading categories" wait.
+- The app remembers the category list from your last visit. It lets you save from that remembered list straight away, then quietly refreshes the list in the background.
+- If the category you picked still exists after the refresh, it stays picked. If it was deleted meanwhile, the app switches to a category that exists.
+- A brand-new device (never opened the app) still waits for the live list, exactly as before.
+
+### What changed behind the scenes (backend explanation)
+
+- The backend is the small program at Google that reads and writes your spreadsheet. After about 15 minutes with no use, Google puts it to sleep; the next visit wakes it up, which caused the ~4-5 second wait.
+- Waking up includes loading a "Google tools" add-on. We used to load the whole Google toolbox (every Google product); now we load only the Google Sheets part. Less to load means a faster wake-up.
+- Safety net: every save is still checked by the backend against the live spreadsheet. If the remembered list holds a category that no longer exists, the backend refuses the save and Home shows an error. Nothing wrong gets written.
+- Cost: USD 0. No always-on server, no timer pings.
+
+### Production steps (AC-9, after merge, from the main checkout)
+
+Backend first, then website (the backend deploy is your command to run):
+
+1. `! cd /Users/ijac/Claude-ijac/expense-sheet && npm --prefix functions run build && firebase deploy --only functions:api --project production`
+2. Website: `git checkout app/public/manifest.json`, then `cd app && rm -rf out && npm run build`, check `out/manifest.json` says "Expense Tracker", then `firebase deploy --only hosting --project production`.
+3. After 30+ minutes unused: `curl -s -o /dev/null -w "%{http_code} %{time_total}\n" https://expense-sheet-b2db8.web.app/api/categories` should print 401 and well under 3 s (was 4.2 s), and Home's Save should work right away on your phone.
+
+### Your test on staging (AC-8)
+
+1. Leave staging unused for at least 30 minutes.
+2. On a phone or browser where you've opened the staging app before, open https://expense-sheet-staging.web.app and sign in if asked.
+3. On Home, check: within about a second, a category tile is highlighted and Save is not greyed out.
+4. Type an amount, pick a category, tap Save. The expense should appear under today's list with that category.
+5. Delete that test expense.
+
+## Stage Report: verify
+
+- DONE: Run cd app && npm test and npm --prefix functions test in the 081 worktree; record pass counts (AC-1..AC-6)
+  app 307/307, functions 379/379 at bc2b7e7. AC-1..AC-4: `category-cache.render.test.js` (build showed each fails on the unchanged page or a named mutation). AC-5: `no-googleapis.test.js`. AC-6: whole backend suite on the slim library.
+- DONE: Deploy the 081 branch to STAGING only: backend first (firebase deploy --only functions:api --project staging), then the website built with .env.staging loaded in-shell (never copy it over .env.local); run git checkout app/public/manifest.json after the staging build. Never deploy to production.
+  Both deploys were denied to me by the auto-mode classifier ("[Production Deploy]"). The captain ran them from the worktree: backend 2026-11-04T07:55:20Z (hash bb87d84b, confirmed by FO), then hosting. I built the website with `.env.staging` sourced in-shell and restored manifest.json. Nothing went to production.
+- DONE: Confirm staging serves this build (content hash match of a changed chunk) and that the deployed backend no longer loads googleapis
+  sha256 local vs live match: index.html d726d1fd, manifest.json eb423cb1, chunks 0-a-rcjkkkt8s.js 12cb0f31, 0wi1yu1-ynz54.js 860d521b. Live chunk 00tv5d6--wrml.js contains `isLiveCategoryList ... /^cat_\d+$/`. Backend: the deployed `lib/index.js` requires only `@googleapis/sheets`; loading it gives 0 `node_modules/googleapis/` modules, and `googleapis` is in devDependencies only. I could not read the running container's modules directly (gcloud is blocked); the AC-7 timings are the live signal.
+- DONE: AC-7: after at least 30 minutes with no staging traffic, curl https://expense-sheet-staging.web.app/api/categories (expect 401) and record time_total; repeat for 3 idle trials, report the median vs the 4.68 s baseline and the under-3.0 s threshold
+  Live 401s after 2054 s / 1956 s / 2353 s idle: 2.10 s, 1.98 s, 2.75 s (warm 0.45 / 0.37 / 0.72 s). Median 2.10 s vs 4.68 s baseline (and 4.74 s I measured on the old backend at 07:51 UTC): PASS, under 3.0 s. An earlier run was voided because the Mac slept.
+- FAILED: AC-8: live drive on staging: open Home after the idle wait on a browser that has opened the app before; record whether Save is usable within about a second and that an expense saves into the right category (then delete the test expense)
+  Not run by the agent: no browser tool is available in this session, and staging sign-in is a Google popup on the captain's account, which I can't and shouldn't automate. Handed to the captain as the 5-step test above. The live chunk carrying the cache-enabled Save logic is the strongest agent-side evidence.
+- DONE: Include at least one live staging HTTP response and one observed UI behaviour as evidence
+  HTTP: six live 401 timings above. UI: not observed by the agent (see AC-8); the served page code was checked by hash and content instead.
+- DONE: Write the plain-language frontend walkthrough and backend explanation for the captain, the staging URL for the captain's own test, and AC-9's production steps (captain runs the backend deploy: firebase deploy --only functions:api --project production, then the website)
+  `## Verify: for the captain` above.
+- DONE: Recommend PASSED or REJECTED with every AC mapped to evidence
+  PASSED, conditional on the captain's AC-8 staging test. AC-1..AC-6: tests. AC-5 also: deployed lib. AC-7: live median 2.10 s. AC-8: captain's test. AC-9: after the production deploys. PII/secrets: the diff has no `.env` files, keys, emails or private URLs.
+
+### Summary
+
+The staging backend now wakes in a median 2.10 s after 30+ minutes idle (was 4.68-4.74 s), under the 3.0 s bar. Tests pass and staging serves this exact build. AC-8's on-screen check needs the captain's signed-in browser, so it is handed over as concrete steps. Both staging deploys had to be run by the captain because the classifier blocked them.

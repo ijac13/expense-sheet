@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, PenLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryPicker from "./components/CategoryPicker";
 import DatePickerModal from "./components/DatePickerModal";
-import { Business, Category, CategoryKind, DEFAULT_CATEGORIES, businessToStore, categoriesOfKind, categoryIcon, getCachedCategories, getDefaultCategory, pickCategoryId, resolveCategory, saveCachedCategories, saveLastCategory } from "./lib/categories";
+import { Business, Category, CategoryKind, DEFAULT_CATEGORIES, businessToStore, categoriesOfKind, categoryIcon, getCachedCategories, getDefaultCategory, isLiveCategoryList, pickCategoryId, resolveCategory, saveCachedCategories, saveLastCategory } from "./lib/categories";
 import { getCategories } from "./lib/categoryService";
 import { addExpense, getTodayExpenses, Expense } from "./lib/expenses";
 import { addIncome } from "./lib/incomes";
@@ -30,21 +30,32 @@ export default function HomePage() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { resolvedUserId } = useAuth();
-  const [categoryId, setCategoryId] = useState<string>(() => getDefaultCategory());
   // DEFAULT_CATEGORIES is what the picker DRAWS before the live list arrives, so
   // the screen is never blank. `categoriesReady` is what decides whether anything
   // may be SUBMITTED — a slug is a legitimate placeholder and an illegitimate
   // write, and conflating the two is the bug this entity exists to remove.
   // A device that has fetched successfully before draws its last-known live list
   // instead, so first paint doesn't visibly swap out from under the captain.
-  const [allCategories, setCategories] = useState<Category[]>(() => getCachedCategories() ?? DEFAULT_CATEGORIES);
+  // When that cached list holds only live ids, Save works from it straight away
+  // (entity 081): the backend rejects any id no longer in the sheet, so the
+  // captain isn't kept waiting for a backend that is still waking up.
+  const [initial] = useState(() => {
+    const cached = getCachedCategories();
+    const stored = getDefaultCategory();
+    if (!cached || !isLiveCategoryList(cached)) return { list: cached ?? DEFAULT_CATEGORIES, id: stored, business: "" as Business, ready: false };
+    const expenseCats = categoriesOfKind(cached, "expense");
+    const id = pickCategoryId(stored, expenseCats);
+    return { list: cached, id: id || stored, business: expenseCats.find((c) => c.id === id)?.business ?? "", ready: id !== "" };
+  });
+  const [categoryId, setCategoryId] = useState<string>(initial.id);
+  const [allCategories, setCategories] = useState<Category[]>(initial.list);
   // Expense or income: the same calculator logs both, each with its own categories.
   const [mode, setMode] = useState<CategoryKind>("expense");
   const categories = categoriesOfKind(allCategories, mode);
   // Who an expense is for. Starts at Life; a category with a default (Rent paid,
   // Tenant) fills it in, and the captain can change it before saving.
-  const [business, setBusiness] = useState<Business>("");
-  const [categoriesReady, setCategoriesReady] = useState(false);
+  const [business, setBusiness] = useState<Business>(initial.business);
+  const [categoriesReady, setCategoriesReady] = useState(initial.ready);
   const [categoriesFailed, setCategoriesFailed] = useState(false);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");

@@ -52,7 +52,7 @@ const cellOf = (row, header, name) => row[header.indexOf(name)];
 
 test("AC-1: the deploy manifest registers a daily 01:00 Asia/Taipei schedule", async () => {
   const f = fixture();
-  loadApi(f.sheets); // installs the googleapis stub before index.js loads
+  loadApi(f.sheets); // installs the @googleapis/sheets stub before index.js loads
   const { subscriptionScheduler } = require("../lib/index.js");
 
   // __endpoint is what `firebase deploy` reads to create the Cloud Scheduler job,

@@ -1,7 +1,7 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
-import { google } from "googleapis";
+import { auth as googleAuth, sheets as googleSheets, sheets_v4 } from "@googleapis/sheets";
 import Anthropic from "@anthropic-ai/sdk";
 import { parseInsightsPeriod, buildInsightsPrompt } from "./insights";
 import {
@@ -51,16 +51,16 @@ function setCors(res: { set: (key: string, value: string) => void }) {
 }
 
 // Memoized at module scope so a warm instance reuses one authenticated Sheets
-// client instead of re-minting an OAuth token via google.auth.getClient() on
+// client instead of re-minting an OAuth token via auth.getClient() on
 // every request. Cleared on rejection so one transient auth failure doesn't
 // wedge every request on this instance until it cold-starts away.
-let sheetsClientPromise: Promise<ReturnType<typeof google.sheets>> | null = null;
+let sheetsClientPromise: Promise<sheets_v4.Sheets> | null = null;
 
-function getSheetsClient(): Promise<ReturnType<typeof google.sheets>> {
+function getSheetsClient(): Promise<sheets_v4.Sheets> {
   if (!sheetsClientPromise) {
-    sheetsClientPromise = google.auth
+    sheetsClientPromise = googleAuth
       .getClient({ scopes: ["https://www.googleapis.com/auth/spreadsheets"] })
-      .then((auth) => google.sheets({ version: "v4", auth }))
+      .then((auth) => googleSheets({ version: "v4", auth }))
       .catch((err) => {
         sheetsClientPromise = null;
         throw err;
@@ -72,7 +72,7 @@ function getSheetsClient(): Promise<ReturnType<typeof google.sheets>> {
 // Fetch a whole tab plus the column map built from its own header row. The map
 // costs no extra API call: every read already returns row 1 and threw it away.
 async function readTab(
-  sheets: ReturnType<typeof google.sheets>,
+  sheets: sheets_v4.Sheets,
   spreadsheetId: string,
   spec: TabSpec
 ): Promise<{ rows: Row[]; map: ColumnMap }> {
@@ -87,7 +87,7 @@ async function readTab(
 // Just the header row, for paths that do not need the data (row insertion, and
 // DELETE, which then reads only the resolved id column).
 async function readColumnMap(
-  sheets: ReturnType<typeof google.sheets>,
+  sheets: sheets_v4.Sheets,
   spreadsheetId: string,
   spec: TabSpec
 ): Promise<ColumnMap> {
@@ -124,7 +124,7 @@ function endsBeforeStart(start: string, end: string): boolean {
  * Returns the error message, or null when the id is good.
  */
 async function categoryIdError(
-  sheets: ReturnType<typeof google.sheets>,
+  sheets: sheets_v4.Sheets,
   spreadsheetId: string,
   value: unknown
 ): Promise<string | null> {
@@ -210,7 +210,7 @@ function businessError(value: unknown): string | null {
 // The Income tab, or null when it has not been created yet — a GET before the
 // first income write is an empty list, not an error.
 async function readIncomeTab(
-  sheets: ReturnType<typeof google.sheets>,
+  sheets: sheets_v4.Sheets,
   spreadsheetId: string
 ): Promise<{ rows: Row[]; map: ColumnMap } | null> {
   const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" });
@@ -230,7 +230,7 @@ function fixedCell(value: Cell): boolean | null {
 // `dataRow` is already laid out against the tab's own header via buildWriteRow,
 // so unnamed columns arrive blank rather than shifting a value into them.
 async function insertRowAtTop(
-  sheets: ReturnType<typeof google.sheets>,
+  sheets: sheets_v4.Sheets,
   spreadsheetId: string,
   tabName: string,
   dataRow: string[]
@@ -272,7 +272,7 @@ const LEGACY_USER_MAP: Record<string, string> = {
 // Resolve a user ID to their display name using the Users tab.
 // Falls back to LEGACY_USER_MAP, then to the raw value.
 async function resolveUserDisplayNames(
-  sheets: ReturnType<typeof google.sheets>,
+  sheets: sheets_v4.Sheets,
   spreadsheetId: string,
   ids: string[]
 ): Promise<Map<string, string>> {
