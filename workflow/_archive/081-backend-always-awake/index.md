@@ -1,6 +1,6 @@
 ---
 title: Keep the backend awake so Home, Report and History open without a 4-second wait
-status: verify
+status: done
 source: captain (report "prod is slower now", 2026-11-04)
 id: 081
 gates:
@@ -75,11 +75,14 @@ gates:
                 reason: Captain approved 081 verify in the review pane (note '1' reaffirms option 1); approval covers the captain's AC-8 staging test of Home Save. AC-7 median 2.10 s vs 4.68 s baseline.
               application:
                 target-stage: done
-                state: pending
+                state: consumed
 started: 2026-11-04T06:15:22Z
 worktree: .worktrees/spacedock-ensign-081-backend-always-awake
-mod-block: merge:pr-merge
+mod-block:
 pr: pr-merge:55
+verdict: PASSED
+completed: 2026-11-05T03:30:23Z
+archived: 2026-11-05T03:30:23Z
 ---
 
 ## Question for the captain
