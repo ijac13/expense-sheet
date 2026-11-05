@@ -65,6 +65,17 @@ gates:
                 id: briefing:081:verify:attempt-1:revision-1
                 digest: sha256:68ff8c9e38c813193ea45d6e049b4cb73b70140ae50145d406e374b93837b5ab
                 room-ref: '@review/verify/briefing-1'
+              resolution:
+                type: Resolution
+                id: resolution:spacedock:081:verify:1
+                briefing: briefing:081:verify:attempt-1:revision-1
+                by: person:captain
+                at: "2026-11-05T00:55:56.54753Z"
+                decision: approve
+                reason: Captain approved 081 verify in the review pane (note '1' reaffirms option 1); approval covers the captain's AC-8 staging test of Home Save. AC-7 median 2.10 s vs 4.68 s baseline.
+              application:
+                target-stage: done
+                state: pending
 started: 2026-11-04T06:15:22Z
 worktree: .worktrees/spacedock-ensign-081-backend-always-awake
 ---
